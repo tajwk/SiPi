@@ -1,0 +1,516 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SkyView</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    body { margin:0; padding:0; overflow:hidden; background:black; color:white; }
+    #skyviewCanvas { display:block; width:100vw; height:100vh; }
+    #popup {
+      position: absolute;
+      background: rgba(0,0,0,0.8);
+      color: white;
+      padding: 8px;
+      border-radius: 4px;
+      font-family: sans-serif;
+      display: none;
+      font-size: 0.9em;
+    }
+    #popup button {
+      margin-top: 6px;
+      padding: 4px 8px;
+      background: #28a;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+  </style>
+  <script src="{{ url_for('static', filename='js/jquery-3.6.0.min.js') }}"></script>
+</head>
+<body>
+  <canvas id="skyviewCanvas"></canvas>
+  <div id="popup"></div>
+
+  <script>
+    const LAT = {{ site_latitude }};
+    const LON = {{ site_longitude }};
+
+    // current mount pointing
+    let mountPos = { alt: null, az: null };
+
+    function toJulian(date) {
+      return date.valueOf()/86400000 + 2440587.5;
+    }
+    function computeLST(date, lon) {
+      const JD = toJulian(date);
+      const D  = JD - 2451545.0;
+      let GMST = (18.697374558 + 24.06570982441908 * D) % 24;
+      if (GMST < 0) GMST += 24;
+      let LST = GMST + lon/15;
+      LST %= 24;
+      if (LST < 0) LST += 24;
+      return LST;
+    }
+
+    function parseHMS(hms) {
+      const [h,m,s] = hms.split(':').map(parseFloat);
+      return h + m/60 + s/3600;
+    }
+    function parseDeg(d) {
+      const sign = d[0] === '-' ? -1 : 1;
+      const [deg,min,sec] = d.slice(1).split(':').map(parseFloat);
+      return sign * (deg + min/60 + sec/3600);
+    }
+
+    function eqToAltAz(ra, dec, lst, lat) {
+      const ha = (((lst - ra)*15 + 180) % 360) - 180;
+      const haR = ha * Math.PI/180;
+      const decR = dec * Math.PI/180;
+      const latR = lat * Math.PI/180;
+      const altR = Math.asin(
+        Math.sin(decR)*Math.sin(latR) +
+        Math.cos(decR)*Math.cos(latR)*Math.cos(haR)
+      );
+      let azR = Math.atan2(
+        Math.sin(haR),
+        Math.cos(haR)*Math.sin(latR) - Math.tan(decR)*Math.cos(latR)
+      );
+      let az = azR * 180/Math.PI;
+      if (az < 0) az += 360;
+      return { alt: altR * 180/Math.PI, az };
+    }
+
+    let objects = [], canvas, ctx, radius, cx, cy;
+
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      cx = canvas.width/2; cy = canvas.height/2;
+      radius = Math.min(cx, cy)*0.95;
+      draw();
+    }
+
+    function drawGrid() {
+      ctx.strokeStyle = 'gray';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4,4]);
+      [30, 60].forEach(alt => {
+        const r = (90 - alt)/90 * radius;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, 2*Math.PI);
+        ctx.stroke();
+      });
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - radius);
+      ctx.lineTo(cx, cy + radius);
+      ctx.moveTo(cx - radius, cy);
+      ctx.lineTo(cx + radius, cy);
+      ctx.stroke();
+      ctx.fillStyle = 'white';
+      ctx.font = `${Math.max(12, radius*0.04)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('N', cx, cy - radius - 12);
+      ctx.fillText('S', cx, cy + radius + 12);
+      ctx.fillText('W', cx - radius - 12, cy);
+      ctx.fillText('E', cx + radius + 12, cy);
+    }
+
+    function draw() {
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      // horizon
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, 2*Math.PI);
+      ctx.stroke();
+      // grid + cardinal
+      drawGrid();
+
+      const now = new Date();
+      const lst = computeLST(now, LON);
+
+      // draw Messier objects
+      objects.forEach(o => {
+        const aa = eqToAltAz(o.ra, o.dec, lst, LAT);
+        if (aa.alt <= 0) return;
+        const r = (90 - aa.alt)/90 * radius;
+        const ang = aa.az * Math.PI/180;
+        const x = cx + r * Math.sin(ang);
+        const y = cy - r * Math.cos(ang);
+        o.screen = { x, y, alt: aa.alt, az: aa.az };
+
+        // size ∝ magnitude
+        const minSize = 2, maxSize = 8;
+        const sz = minSize + (10 - o.mag)/10 * (maxSize - minSize);
+
+        ctx.fillStyle = 'cyan';
+        ctx.beginPath();
+        ctx.arc(x, y, sz, 0, 2*Math.PI);
+        ctx.fill();
+      });
+
+      // draw mount reticle
+      if (mountPos.alt !== null && mountPos.alt > 0) {
+        const r2 = (90 - mountPos.alt)/90 * radius;
+        const ang2 = mountPos.az * Math.PI/180;
+        const x2 = cx + r2 * Math.sin(ang2);
+        const y2 = cy - r2 * Math.cos(ang2);
+        ctx.strokeStyle = 'red';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(x2, y2, 6, 0, 2*Math.PI);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x2 - 8, y2);
+        ctx.lineTo(x2 + 8, y2);
+        ctx.moveTo(x2, y2 - 8);
+        ctx.lineTo(x2, y2 + 8);
+        ctx.stroke();
+      }
+    }
+
+    // fetch mount pointing every 0.5s
+    function fetchMount() {
+      $.getJSON('/status').done(data => {
+        const alt = parseFloat(data.alt);
+        const az  = parseFloat(data.az);
+        if (!isNaN(alt) && !isNaN(az)) {
+          mountPos.alt = alt;
+          mountPos.az  = az;
+        }
+      });
+    }
+
+    function showPopup(o, pageX, pageY) {
+      $('#popup').html(`
+        <div><strong>${o.name}</strong></div>
+        <div>Alt: ${o.screen.alt.toFixed(1)}°</div>
+        <div>Az:  ${o.screen.az.toFixed(1)}°</div>
+        <button id="gotoBtn">GoTo</button>
+      `).css({ left: pageX + 12, top: pageY + 12 }).show();
+
+      $('#gotoBtn').off('click').on('click', () => {
+        $.ajax({
+          url: '/goto-altaz',
+          method: 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify({
+            az:  o.screen.az.toFixed(2),
+            alt: o.screen.alt.toFixed(2)
+          })
+        });
+        $('#popup').hide();
+      });
+    }
+
+    $(function(){
+      canvas = document.getElementById('skyviewCanvas');
+      ctx = canvas.getContext('2d');
+      $(window).on('resize', resize);
+
+      // load Messier list
+      $.get('/messier-data', data => {
+        objects = data.map(o => ({
+          name: o.name,
+          ra:   parseHMS(o.ra),
+          dec:  parseDeg(o.dec),
+          mag:  parseFloat(o.mag)
+        }));
+        resize();
+        // update full sky + reticle every 0.5s
+        setInterval(() => {
+          fetchMount();
+          draw();
+        }, 500);
+      });
+
+      // right-click to pop up GoTo
+      $('#skyviewCanvas').on('contextmenu', e => {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+        let nearest = { dist: Infinity, obj: null };
+        objects.forEach(o => {
+          if (!o.screen) return;
+          const d = Math.hypot(o.screen.x - mx, o.screen.y - my);
+          if (d < 10 && d < nearest.dist) {
+            nearest = { dist: d, obj: o };
+          }
+        });
+        if (nearest.obj) {
+          showPopup(nearest.obj, e.pageX, e.pageY);
+        }
+      });
+
+      $(document).click(e => {
+        if (!$(e.target).closest('#popup').length) {
+          $('#popup').hide();
+        }
+      });
+    });
+  </script>
+</body>
+</html>
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SkyView</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    body { margin:0; padding:0; overflow:hidden; background:black; color:white; }
+    #skyviewCanvas { display:block; width:100vw; height:100vh; }
+    #popup {
+      position: absolute;
+      background: rgba(0,0,0,0.8);
+      color: white;
+      padding: 8px;
+      border-radius: 4px;
+      font-family: sans-serif;
+      display: none;
+      font-size: 0.9em;
+    }
+    #popup button {
+      margin-top: 6px;
+      padding: 4px 8px;
+      background: #28a;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+  </style>
+  <script src="{{ url_for('static', filename='js/jquery-3.6.0.min.js') }}"></script>
+</head>
+<body>
+  <canvas id="skyviewCanvas"></canvas>
+  <div id="popup"></div>
+
+  <script>
+    const LAT = {{ site_latitude }};
+    const LON = {{ site_longitude }};
+
+    // current mount pointing
+    let mountPos = { alt: null, az: null };
+
+    function toJulian(date) {
+      return date.valueOf()/86400000 + 2440587.5;
+    }
+    function computeLST(date, lon) {
+      const JD = toJulian(date);
+      const D  = JD - 2451545.0;
+      let GMST = (18.697374558 + 24.06570982441908 * D) % 24;
+      if (GMST < 0) GMST += 24;
+      let LST = GMST + lon/15;
+      LST %= 24;
+      if (LST < 0) LST += 24;
+      return LST;
+    }
+
+    function parseHMS(hms) {
+      const [h,m,s] = hms.split(':').map(parseFloat);
+      return h + m/60 + s/3600;
+    }
+    function parseDeg(d) {
+      const sign = d[0] === '-' ? -1 : 1;
+      const [deg,min,sec] = d.slice(1).split(':').map(parseFloat);
+      return sign * (deg + min/60 + sec/3600);
+    }
+
+    function eqToAltAz(ra, dec, lst, lat) {
+      const ha = (((lst - ra)*15 + 180) % 360) - 180;
+      const haR = ha * Math.PI/180;
+      const decR = dec * Math.PI/180;
+      const latR = lat * Math.PI/180;
+      const altR = Math.asin(
+        Math.sin(decR)*Math.sin(latR) +
+        Math.cos(decR)*Math.cos(latR)*Math.cos(haR)
+      );
+      let azR = Math.atan2(
+        Math.sin(haR),
+        Math.cos(haR)*Math.sin(latR) - Math.tan(decR)*Math.cos(latR)
+      );
+      let az = azR * 180/Math.PI;
+      if (az < 0) az += 360;
+      return { alt: altR * 180/Math.PI, az };
+    }
+
+    let objects = [], canvas, ctx, radius, cx, cy;
+
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      cx = canvas.width/2; cy = canvas.height/2;
+      radius = Math.min(cx, cy)*0.95;
+      draw();
+    }
+
+    function drawGrid() {
+      ctx.strokeStyle = 'gray';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4,4]);
+      [30, 60].forEach(alt => {
+        const r = (90 - alt)/90 * radius;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, 2*Math.PI);
+        ctx.stroke();
+      });
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - radius);
+      ctx.lineTo(cx, cy + radius);
+      ctx.moveTo(cx - radius, cy);
+      ctx.lineTo(cx + radius, cy);
+      ctx.stroke();
+      ctx.fillStyle = 'white';
+      ctx.font = `${Math.max(12, radius*0.04)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('N', cx, cy - radius - 12);
+      ctx.fillText('S', cx, cy + radius + 12);
+      ctx.fillText('W', cx - radius - 12, cy);
+      ctx.fillText('E', cx + radius + 12, cy);
+    }
+
+    function draw() {
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      // horizon
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, 2*Math.PI);
+      ctx.stroke();
+      // grid + cardinal
+      drawGrid();
+
+      const now = new Date();
+      const lst = computeLST(now, LON);
+
+      // draw Messier objects
+      objects.forEach(o => {
+        const aa = eqToAltAz(o.ra, o.dec, lst, LAT);
+        if (aa.alt <= 0) return;
+        const r = (90 - aa.alt)/90 * radius;
+        const ang = aa.az * Math.PI/180;
+        const x = cx + r * Math.sin(ang);
+        const y = cy - r * Math.cos(ang);
+        o.screen = { x, y, alt: aa.alt, az: aa.az };
+
+        // size ∝ magnitude
+        const minSize = 2, maxSize = 8;
+        const sz = minSize + (10 - o.mag)/10 * (maxSize - minSize);
+
+        ctx.fillStyle = 'cyan';
+        ctx.beginPath();
+        ctx.arc(x, y, sz, 0, 2*Math.PI);
+        ctx.fill();
+      });
+
+      // draw mount reticle
+      if (mountPos.alt !== null && mountPos.alt > 0) {
+        const r2 = (90 - mountPos.alt)/90 * radius;
+        const ang2 = mountPos.az * Math.PI/180;
+        const x2 = cx + r2 * Math.sin(ang2);
+        const y2 = cy - r2 * Math.cos(ang2);
+        ctx.strokeStyle = 'red';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(x2, y2, 6, 0, 2*Math.PI);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x2 - 8, y2);
+        ctx.lineTo(x2 + 8, y2);
+        ctx.moveTo(x2, y2 - 8);
+        ctx.lineTo(x2, y2 + 8);
+        ctx.stroke();
+      }
+    }
+
+    // fetch mount pointing every 0.5s
+    function fetchMount() {
+      $.getJSON('/status').done(data => {
+        const alt = parseFloat(data.alt);
+        const az  = parseFloat(data.az);
+        if (!isNaN(alt) && !isNaN(az)) {
+          mountPos.alt = alt;
+          mountPos.az  = az;
+        }
+      });
+    }
+
+    function showPopup(o, pageX, pageY) {
+      $('#popup').html(`
+        <div><strong>${o.name}</strong></div>
+        <div>Alt: ${o.screen.alt.toFixed(1)}°</div>
+        <div>Az:  ${o.screen.az.toFixed(1)}°</div>
+        <button id="gotoBtn">GoTo</button>
+      `).css({ left: pageX + 12, top: pageY + 12 }).show();
+
+      $('#gotoBtn').off('click').on('click', () => {
+        $.ajax({
+          url: '/goto-altaz',
+          method: 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify({
+            az:  o.screen.az.toFixed(2),
+            alt: o.screen.alt.toFixed(2)
+          })
+        });
+        $('#popup').hide();
+      });
+    }
+
+    $(function(){
+      canvas = document.getElementById('skyviewCanvas');
+      ctx = canvas.getContext('2d');
+      $(window).on('resize', resize);
+
+      // load Messier list
+      $.get('/messier-data', data => {
+        objects = data.map(o => ({
+          name: o.name,
+          ra:   parseHMS(o.ra),
+          dec:  parseDeg(o.dec),
+          mag:  parseFloat(o.mag)
+        }));
+        resize();
+        // update full sky + reticle every 0.5s
+        setInterval(() => {
+          fetchMount();
+          draw();
+        }, 500);
+      });
+
+      // right-click to pop up GoTo
+      $('#skyviewCanvas').on('contextmenu', e => {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+        let nearest = { dist: Infinity, obj: null };
+        objects.forEach(o => {
+          if (!o.screen) return;
+          const d = Math.hypot(o.screen.x - mx, o.screen.y - my);
+          if (d < 10 && d < nearest.dist) {
+            nearest = { dist: d, obj: o };
+          }
+        });
+        if (nearest.obj) {
+          showPopup(nearest.obj, e.pageX, e.pageY);
+        }
+      });
+
+      $(document).click(e => {
+        if (!$(e.target).closest('#popup').length) {
+          $('#popup').hide();
+        }
+      });
+    });
+  </script>
+</body>
+</html>

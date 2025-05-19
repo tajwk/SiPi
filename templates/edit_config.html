@@ -1,0 +1,339 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Edit Configuration</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script src="{{ url_for('static', filename='js/jquery-3.6.0.min.js') }}"></script>
+  <style>
+    body.night-mode .container {
+      background-color: var(--bg);
+    }
+    body.night-mode input[type="radio"],
+    body.night-mode input[type="checkbox"] {
+      -webkit-appearance: none;
+      appearance: none;
+      background-color: black;
+      border: 2px solid red;
+      width: 16px;
+      height: 16px;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    body.night-mode input[type="radio"] { border-radius: 50%; }
+    body.night-mode input[type="checkbox"] { border-radius: 3px; }
+    body.night-mode input[type="radio"]:checked,
+    body.night-mode input[type="checkbox"]:checked {
+      background-color: red;
+      border-color: red;
+    }
+    body.night-mode input[type="text"],
+    body.night-mode textarea {
+      background-color: #333333;
+      color: red;
+      border: 2px solid red;
+    }
+    body.night-mode fieldset {
+      background-color: black;
+      border: 2px solid red;
+      padding: 8px;
+    }
+    body.night-mode fieldset legend {
+      color: red;
+      padding: 0 5px;
+    }
+    body.night-mode h2,
+    body.night-mode label,
+    body.night-mode .flash {
+      color: red;
+    }
+    body.night-mode input::selection,
+    body.night-mode textarea::selection {
+      background: red;
+      color: black;
+    }
+
+    /* Base button (small) */
+    .btn {
+      border: 1px solid var(--accent);
+      padding: 0.5em 1em;
+      border-radius: var(--radius);
+      background-color: var(--surface);
+      color: var(--fg);
+      font: inherit;
+      cursor: pointer;
+      transition: var(--transition);
+      font-size: 1rem;
+    }
+    .btn:hover,
+    .btn:focus {
+      background-color: var(--surface-alt);
+    }
+
+    /* Large button */
+    .btn-large {
+      padding: 0.75em 1.5em;
+      font-size: 1.1rem;
+    }
+
+    .container {
+      padding: var(--padding);
+    }
+
+    /* Grid layout for lower section */
+    .grid-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+      margin-top: 30px;
+    }
+    .grid-item h2 {
+      margin-top: 0;
+      font-size: 1.2rem;
+      text-align: center;
+    }
+    .grid-item {
+      padding: 10px;
+    }
+    .grid-item input[type="text"] {
+      width: 100%;
+      box-sizing: border-box;
+      margin-bottom: 10px;
+    }
+    .grid-item .btn + .btn {
+      margin-left: 10px;
+    }
+  </style>
+</head>
+<body>
+<script>
+  (function(){
+    if (localStorage.getItem('nightMode') === 'enabled') {
+      document.body.classList.add('night-mode');
+    }
+  })();
+  window.addEventListener('storage', function(e){
+    if (e.key === 'nightMode') {
+      document.body.classList.toggle('night-mode', e.newValue === 'enabled');
+    }
+  });
+</script>
+
+<div class="container">
+  <div style="text-align:left; margin-bottom: 20px;">
+    <a href="/" class="btn">Back</a>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div id="flash-container">
+        {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <form method="post" action="{{ url_for('edit_config') }}">
+    <div style="text-align:center; margin-bottom:20px;">
+      <h2>Mount Type</h2>
+      <div style="display:inline-block; text-align:left;">
+        <label><input type="radio" name="mountType" value="0" {% if mount_type=='0' %}checked{% endif %}> Alt/Az</label><br>
+        <label><input type="radio" name="mountType" value="1" {% if mount_type=='1' %}checked{% endif %}> Equatorial</label><br>
+        <label><input type="radio" name="mountType" value="3" {% if mount_type=='3' %}checked{% endif %}> Alt/Alt</label>
+      </div>
+    </div>
+
+    <h2 style="text-align:center;">Scope Encoder Settings</h2>
+    <div style="display:flex; justify-content:center; gap:40px; margin-bottom:20px;">
+      <div style="flex:1; max-width:300px; text-align:left;">
+        <fieldset>
+          <legend>Az / RA</legend>
+          <label><input type="radio" name="azMode" value="ignore" {% if az_mode=='ignore' %}checked{% endif %}> Ignore</label><br>
+          <label><input type="radio" name="azMode" value="precise" {% if az_mode=='precise' %}checked{% endif %}> Precise</label><br>
+          <label><input type="radio" name="azMode" value="polite" {% if az_mode=='polite' %}checked{% endif %}> Polite</label><br>
+          <label><input type="radio" name="azMode" value="cascade" {% if az_mode=='cascade' %}checked{% endif %}> Cascade</label>
+        </fieldset>
+      </div>
+      <div style="flex:1; max-width:300px; text-align:left;">
+        <fieldset>
+          <legend>Alt / Dec</legend>
+          <label><input type="radio" name="altMode" value="ignore" {% if alt_mode=='ignore' %}checked{% endif %}> Ignore</label><br>
+          <label><input type="radio" name="altMode" value="precise" {% if alt_mode=='precise' %}checked{% endif %}> Precise</label><br>
+          <label><input type="radio" name="altMode" value="polite" {% if alt_mode=='polite' %}checked{% endif %}> Polite</label><br>
+          <label><input type="radio" name="altMode" value="cascade" {% if alt_mode=='cascade' %}checked{% endif %}> Cascade</label>
+        </fieldset>
+      </div>
+    </div>
+
+    <div style="text-align:center; margin-bottom:20px;">
+      <label><input type="checkbox" id="dragModeCheckbox" {% if drag_mode %}checked{% endif %}> Drag Mode</label>
+      <label style="margin-left:20px;"><input type="checkbox" id="noWrapCheckbox" {% if no_wrap %}checked{% endif %}> Az/RA No Wrap</label>
+    </div>
+
+    <div style="text-align:center;">
+      <textarea id="configTextarea" name="config" rows="20" cols="80">{{ config }}</textarea><br>
+      <input type="submit" class="btn btn-large" value="Save Config">
+    </div>
+  </form>
+
+  <div class="grid-container">
+
+    <!-- Misc section -->
+    <div class="grid-item">
+      <h2>Misc</h2>
+      <div style="text-align:center; margin-bottom:10px;">
+        <a href="{{ url_for('download_model') }}" class="btn btn-large">Download Model</a>
+      </div>
+      <div style="text-align:center;">
+        <button id="setParkButton" type="button" class="btn btn-large" style="min-width:14ch;">Set Park</button>
+      </div>
+    </div>
+
+    <!-- System Time section -->
+    <div class="grid-item">
+      <h2>System Time</h2>
+      <div style="text-align:center;">
+        <input type="text" id="timeInput" placeholder="HH:MM"
+               style="width:calc(100% - 10ch); display:inline-block;">
+      </div>
+      <div style="text-align:center; margin-top:10px;">
+        <button id="setTimeBtn" class="btn">Set</button>
+        <button id="syncTimeBtn" class="btn">Sync</button>
+      </div>
+    </div>
+
+    <!-- Wi-Fi Settings section -->
+    <div class="grid-item">
+      <h2>Wi-Fi Settings</h2>
+      <div style="text-align:center; margin-bottom:10px;">
+        <label for="wifiSsidInput">SSID:</label>
+        <input type="text" id="wifiSsidInput" value="{{ wifi_ssid }}"
+               style="width:calc(100% - 10ch); display:inline-block; margin-left:5px;">
+      </div>
+      <div style="text-align:center; margin-bottom:10px;">
+        <label for="wifiPassphraseInput">Pass:</label>
+        <input type="text" id="wifiPassphraseInput" value="{{ wifi_passphrase }}"
+               style="width:calc(100% - 10ch); display:inline-block; margin-left:5px;">
+      </div>
+      <div style="text-align:center;">
+        <button id="saveWifiBtn" class="btn">Save</button>
+      </div>
+    </div>
+
+    <!-- Handpad Settings section -->
+    <div class="grid-item">
+      <h2>Handpad Settings</h2>
+      <div style="text-align:center;">
+        <label style="margin-right:20px;">
+          <input type="checkbox" id="vibrateToggle" {% if vibration_enabled %}checked{% endif %}> Vibration
+        </label>
+        <label>
+          <input type="checkbox" id="tiltToggle" {% if tilt_enabled %}checked{% endif %}> Tilt
+        </label>
+      </div>
+    </div>
+
+    <!-- Versions section -->
+    <div class="grid-item">
+      <h2>Versions</h2>
+      <div>SiTech Version: {{ site_version }}</div>
+      <div>SiPi Version: {{ sipi_version }}</div>
+      <div style="text-align:center; margin-top:10px;">
+        <button id="updateSipiBtn" class="btn btn-large">Update SiPi</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+$(function(){
+  // Mount type mapping
+  $('input[name="mountType"]').change(function(){
+    const mode = this.value;
+    const lines = $('#configTextarea').val().split('\n').map(l =>
+      l.startsWith('AlignmentMode=') ? 'AlignmentMode='+mode : l
+    );
+    $('#configTextarea').val(lines.join('\n'));
+  });
+
+  // Encoder options mapping
+  $('input[name="azMode"], input[name="altMode"], #dragModeCheckbox, #noWrapCheckbox').change(function(){
+    const az     = $('input[name="azMode"]:checked').val();
+    const alt    = $('input[name="altMode"]:checked').val();
+    const drag   = $('#dragModeCheckbox').is(':checked');
+    const noWrap = $('#noWrapCheckbox').is(':checked');
+    let ob = 0, o2 = 0;
+    if (az==='ignore')   ob |= 1;
+    if (az==='precise')  ob |= 2;
+    if (az==='polite')   ob |= 4;
+    if (az==='cascade')  o2 |= 1<<23;
+    if (alt==='ignore')  ob |= 1<<17;
+    if (alt==='precise') ob |= 1<<18;
+    if (alt==='polite')  ob |= 1<<19;
+    if (alt==='cascade') o2 |= 1<<22;
+    if (drag)            ob |= 8;
+    if (noWrap)          ob |= 1<<24;
+    const lines = $('#configTextarea').val().split('\n').map(l => {
+      if (l.startsWith('OptionBits='))   return 'OptionBits='+ob;
+      if (l.startsWith('Option2Bits='))  return 'Option2Bits='+o2;
+      return l;
+    });
+    $('#configTextarea').val(lines.join('\n'));
+  });
+
+  // Set Park
+  $('#setParkButton').click(() => $.post('/setpark'));
+
+  // System Time handlers
+  $('#setTimeBtn').click(() => {
+    $.post('/settime',{time:$('#timeInput').val()});
+  });
+  $('#syncTimeBtn').click(() => {
+    const now = new Date(),
+          hh  = String(now.getHours()).padStart(2,'0'),
+          mm  = String(now.getMinutes()).padStart(2,'0'),
+          t   = hh+':'+mm;
+    $('#timeInput').val(t);
+    $.post('/settime',{time:t});
+  });
+
+  // Wi-Fi Save
+  $('#saveWifiBtn').click(() => {
+    $.post('/update_wifi',{
+      ssid: $('#wifiSsidInput').val(),
+      pass: $('#wifiPassphraseInput').val()
+    });
+  });
+
+  // Handpad toggles
+  $('#vibrateToggle').change(e => {
+    $.post('/toggle_vibration',{enabled:e.target.checked});
+  });
+  $('#tiltToggle').change(e => {
+    $.post('/toggle_tilt',{enabled:e.target.checked});
+  });
+
+  // Update SiPi
+  $('#updateSipiBtn').click(function(){
+    $.post('/check_updates', {}, function(resp){
+      if (!resp.updates_available) {
+        alert("SiPi is up to date.");
+      } else {
+        const msg = "New version available: " + resp.latest_version +
+                    "\nCurrent: " + resp.current_version +
+                    "\n\nProceed with update?";
+        if (confirm(msg)) {
+          $.post('/apply_updates', {}, function(res2){
+            alert(res2.message);
+          }, 'json');
+        }
+      }
+    }, 'json');
+  });
+});
+</script>
+</body>
+</html>

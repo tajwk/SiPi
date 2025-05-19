@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SiPi Telescope Control</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Modern Avalon-inspired stylesheet -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+  <!-- Layout & style overrides -->
+  <style>
+    :root { --gap: 12px; --shadow: rgba(0,0,0,0.1); }
+
+    /* Separator line */
+    .separator {
+      border: 0;
+      border-top: 1px solid var(--shadow);
+      margin: var(--gap) 0;
+    }
+
+    /* Center header buttons */
+    .control-buttons {
+      display: flex;
+      justify-content: center;
+      gap: var(--gap);
+      margin: var(--gap) 0;
+    }
+
+    /* Single spacer (~3em) */
+    .spacer {
+      height: 3em;
+    }
+
+    /* Center search form rows */
+    .search-form {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--gap);
+    }
+    .search-form__row,
+    .search-actions {
+      display: flex;
+      gap: var(--gap);
+      justify-content: center;
+    }
+
+    /* Blank spacer after SkyView/Model */
+    .small-spacer {
+      height: var(--gap);
+    }
+
+    /* Center GoTo & Close buttons */
+    #goToBtn,
+    #closeResultsBtn {
+      display: inline-block;
+      margin: var(--gap) 0.5em var(--gap) 0.5em;
+    }
+
+    /* Status panel layout */
+    .status-panel {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: var(--gap);
+    }
+    .status-panel__left,
+    .status-panel__right {
+      display: flex;
+      flex-direction: column;
+    }
+    .status-panel__right {
+      text-align: right;
+    }
+
+    /* Center & style Model panel */
+    .model-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .model-panel__info,
+    .model-panel__actions {
+      display: flex;
+      gap: var(--gap);
+      justify-content: center;
+    }
+
+    /* Style all buttons */
+    .btn {
+      background-color: var(--surface);
+      color: var(--fg);
+      border: 1px solid var(--accent);
+      padding: 0.5em 1em;
+      cursor: pointer;
+    }
+
+    /* Handpad: make controls 50% larger */
+    .btn--control {
+      width: calc(var(--control-size) * 1.5) !important;
+      height: calc(var(--control-size) * 1.5) !important;
+      font-size: 1.5rem;
+    }
+
+    /* Space before Start/Park row */
+    .handpad__row--actions {
+      display: flex;
+      justify-content: center;
+      gap: calc(var(--gap) * 2) !important;
+      margin-top: var(--gap);
+    }
+
+    /* Handpad SVG, arcs, and center styling */
+    .handpad {
+      width: 300px;
+      height: 300px;
+      margin: var(--gap) auto;
+    }
+    .handpad svg {
+      width: 100%;
+      height: 100%;
+    }
+    .handpad-arc,
+    .handpad-center {
+      fill: var(--surface) !important;
+      stroke: var(--accent) !important;
+      stroke-width: 2;
+      cursor: pointer;
+      fill-opacity: 0.3;
+    }
+    .handpad-arc:hover,
+    .handpad-center:hover {
+      fill: var(--accent) !important;
+      fill-opacity: 0.4;
+    }
+
+    /* Speed label styling (larger & bold) */
+    .speed-label {
+      font-size: 1.25rem;
+      font-weight: bold;
+      fill: var(--fg) !important;
+      pointer-events: none;
+    }
+  </style>
+
+  <script src="{{ url_for('static', filename='js/jquery-3.6.0.min.js') }}"></script>
+
+  <!-- Injected settings flags -->
+  <script>
+    var vibrationEnabled = {{ vibration_enabled|tojson }};
+    var tiltEnabled      = {{ tilt_enabled|tojson }};
+    console.log("vibrationEnabled =", vibrationEnabled, "tiltEnabled =", tiltEnabled);
+  </script>
+</head>
+<body>
+  <div class="container">
+
+    <!-- STATUS PANEL -->
+    <div id="status" class="status-panel"></div>
+
+    <hr class="separator">
+
+    <!-- SEARCH + SKYVIEW / MODEL -->
+    <div id="controlPanel" class="control-panel">
+      <form id="searchForm" class="search-form" autocomplete="off">
+        <!-- Search row -->
+        <div class="search-form__row">
+          <input type="text"
+                 id="searchQuery"
+                 class="search-form__input"
+                 placeholder="Enter object name…"
+                 required
+                 autocomplete="off">
+          <button type="submit" class="btn btn--primary">Search</button>
+        </div>
+        <div id="results" class="search-results"></div>
+        <!-- SkyView/Model row -->
+        <div class="search-actions">
+          <button type="button" id="skyviewButton" class="btn btn--secondary">SkyView</button>
+          <button type="button" id="modelButton"   class="btn btn--secondary">Model</button>
+        </div>
+        <div class="small-spacer"></div>
+      </form>
+
+      <div id="modelPanel" class="model-panel hidden">
+        <div class="model-panel__info">
+          <span>Cal Pts: <strong id="modelCalPts">0</strong></span>
+          <span>RMS:    <strong id="modelRMS">0</strong></span>
+        </div>
+        <div class="model-panel__actions">
+          <button id="syncButton"  class="btn">Sync</button>
+          <button id="calptButton" class="btn">+ Cal Pt</button>
+          <button id="clearButton" class="btn">Clear</button>
+          <button id="saveButton"  class="btn">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <hr class="separator">
+
+    <!-- HANDPAD / MOVEMENT CONTROLS -->
+    <div id="directionControl" class="handpad"></div>
+
+    <!-- Single spacer -->
+    <div class="spacer"></div>
+
+    <!-- Config/Fullscreen/Day-Night -->
+    <div class="control-buttons"></div>
+
+    <!-- MODAL DIALOG -->
+    <div id="customModal" class="modal hidden">
+      <div class="modal__content"></div>
+    </div>
+  </div>
+
+  <script>
+  $(function(){
+    // Insert header buttons
+    $('.control-buttons').html(`
+      <button class="btn btn--icon" id="editConfigBtn"    title="Settings">⚙</button>
+      <button class="btn btn--icon" id="toggleFullScreen" title="Fullscreen">⛶</button>
+      <button class="btn btn--icon" id="toggleMode"        title="Day/Night">🌙</button>
+    `);
+
+    // Modal helpers
+    function showModal(html) {
+      $('#customModal .modal__content').html(html);
+      $('#customModal').removeClass('hidden');
+    }
+    function hideModal() {
+      $('#customModal').addClass('hidden');
+    }
+    window.hideModal = hideModal;
+
+    function customAlert(msg) {
+      showModal(
+        '<div class="modal__body">' + msg + '</div>' +
+        '<div class="modal__footer">' +
+          '<button class="btn" onclick="hideModal()">OK</button>' +
+        '</div>'
+      );
+    }
+
+    // Night-mode toggle
+    function applyNight(){
+      var on = localStorage.getItem('nightMode')==='enabled';
+      $('body').toggleClass('night-mode', on);
+      $('#toggleMode').text(on?'☀':'🌙');
+    }
+    applyNight();
+    window.addEventListener('storage', function(e){
+      if(e.key==='nightMode') applyNight();
+    });
+    $('#toggleMode').click(function(){
+      var on = !$('body').hasClass('night-mode');
+      localStorage.setItem('nightMode', on?'enabled':'disabled');
+      applyNight();
+    });
+
+    // Fullscreen & Settings
+    $('#toggleFullScreen').click(function(){
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+      else document.exitFullscreen();
+    });
+    $('#editConfigBtn').click(function(){
+      window.location.href = "{{ url_for('edit_config') }}";
+    });
+
+    // Update Status Panel
+    function updateStatus() {
+      $.getJSON('/status', function(d){
+        function hmsToSec(hms) {
+          var p = hms.split(':').map(Number);
+          return p[0]*3600 + p[1]*60 + p[2];
+        }
+        function secToHms(s) {
+          s = ((s % 86400) + 86400) % 86400;
+          var h = Math.floor(s/3600),
+              m = Math.floor((s%3600)/60),
+              sec = Math.floor(s%60);
+          return [h,m,sec].map(x => String(x).padStart(2,'0')).join(':');
+        }
+        var haSec = hmsToSec(d.sidereal) - hmsToSec(d.ra),
+            haStr = secToHms(haSec);
+
+        $('#status').html(
+          '<div class="status-panel__left">'+
+            '<div>RA: '+d.ra+' | DEC: '+d.dec+'</div>'+
+            '<div>Alt: '+d.alt+' | Az: '+d.az+'</div>'+
+            '<div>Status: '+d.tracking+'</div>'+
+          '</div>'+
+          '<div class="status-panel__right">'+
+            '<div>Time: '+d.time+'</div>'+
+            '<div>LST:  '+d.sidereal+'</div>'+
+            '<div>HA:   '+haStr+'</div>'+
+          '</div>'
+        );
+
+        $('#trackToggleButton').text(d.tracking==='Stopped'?'START':'STOP');
+        $('#parkToggleButton').text((d.tracking==='Parking'||d.tracking==='Parked')?'Unpark':'Park');
+        $('#modeToggleButton').text(d.tracking==='Blinky'?'Auto':'Manual');
+      });
+    }
+    setInterval(updateStatus, 500);
+    updateStatus();
+
+    // Search handler
+    $('#searchForm').submit(function(e){
+      e.preventDefault();
+      var q = $('#searchQuery').val().trim();
+      if(!q) return customAlert("Enter an object name.");
+      $.post('/search',{query:q}, function(data){
+        window.searchResults = data.results;
+        if(data.results.length>1){
+          var html = '<div class="modal__body"><h3>Select result</h3>';
+          data.results.forEach((it,i) => {
+            html += '<button class="btn btn--full" onclick="selectSearchResult('+i+')">'+it.rawResult+'</button>';
+          });
+          html += '</div>';
+          showModal(html);
+        } else if(data.results.length===1){
+          selectSearchResult(0);
+        } else {
+          $('#results').html('<div class="search-results__none">No results found.</div>');
+        }
+      }, 'json');
+    });
+
+    // Select & display a single result
+    window.selectSearchResult = function(i) {
+      var it = window.searchResults[i];
+      window.currentRA  = it.raw_ra;
+      window.currentDEC = it.raw_dec;
+      $('#results').html(
+        '<div class="search-results__info">'+
+          'RA: '+it.ra+' | DEC: '+it.dec+
+          (it.alt?' | Alt: '+it.alt:'')+
+          (it.az?' | Az: '+it.az:'')+
+          (it.info?' | '+it.info:'')+
+        '</div>'+
+        '<button id="goToBtn" class="btn btn--primary">GoTo</button>'+
+        '<button id="closeResultsBtn" class="btn btn--secondary">X</button>'
+      );
+      $('#goToBtn').off('click').on('click',function(){
+        $.post('/goto',{ra:it.raw_ra,dec:it.raw_dec});
+      });
+      $('#closeResultsBtn').off('click').on('click',function(){
+        $('#results').empty();
+      });
+      hideModal();
+    };
+
+    // SkyView button
+    $('#skyviewButton').click(function(){
+      var sel = $('#results .result.selected');
+      if(sel.length){
+        var it = sel.data('item');
+        window.open(it.skyview_url,'_blank');
+      }
+    });
+
+    // Model panel controls
+    $('#modelButton').click(function(){
+      var panel = $('#modelPanel');
+      panel.toggleClass('hidden');
+      if(!panel.hasClass('hidden')) updateModelInfo();
+    });
+    function updateModelInfo(){
+      $.post('/getModelInfo', function(d){
+        $('#modelCalPts').text(d.cal_pts);
+        $('#modelRMS').text(d.rms);
+      }, 'json');
+    }
+    setInterval(()=>{ if(!$('#modelPanel').hasClass('hidden')) updateModelInfo(); },5000);
+
+    $('#syncButton').click(()=>{ if(window.currentRA&&window.currentDEC) $.post('/sync',{ra:window.currentRA,dec:window.currentDEC}); });
+    $('#calptButton').click(()=>{ if(window.currentRA&&window.currentDEC) $.post('/calpoint',{ra:window.currentRA,dec:window.currentDEC}); });
+    $('#clearButton').click(()=>$.post('/clear_model'));
+    $('#saveButton').click(()=>$.post('/save_model', ()=>customAlert("Model saved"), 'json'));
+
+    // Movement controls
+    function sendMove(axis,arg){ $.post('/moveaxis',{axis:axis,arg:arg}); }
+    function startMove(axis,dir,btn){
+      var code = window.currentSpeed==="Slew"
+        ? ((dir==="up"||dir==="right")?"S":"s")
+        : window.currentSpeed==="Pan"
+          ? ((dir==="up"||dir==="right")?"P":"p")
+          : ((dir==="up"||dir==="right")?"G":"g");
+      sendMove(axis,code);
+      if(vibrationEnabled) navigator.vibrate?.(150);
+      var id = setInterval(()=>{
+        sendMove(axis,code);
+        if(vibrationEnabled) navigator.vibrate?.(150);
+      },200);
+      $(btn).data('intervalId',id);
+    }
+    function stopMove(axis,btn){
+      var id = $(btn).data('intervalId');
+      if(id) clearInterval(id);
+      if(vibrationEnabled) navigator.vibrate?.(0);
+      sendMove(axis,"");
+    }
+    var speeds=["Slew","Pan","Guide"];
+    window.currentSpeedIndex=0;
+    window.currentSpeed=speeds[0];
+
+    // Render handpad SVG + action row
+    $('#directionControl').html(`
+      <svg class="handpad" viewBox="0 0 300 300">
+        <path id="upButton"    class="handpad-arc" d="M 51 249 A 140 140 0 0 0 249 249 L 220.71 220.71 A 100 100 0 0 1 79.29 220.71 Z"/>
+        <path id="rightButton" class="handpad-arc" d="M 249 249 A 140 140 0 0 0 249 51  L 220.71 79.29  A 100 100 0 0 1 220.71 220.71 Z"/>
+        <path id="downButton"  class="handpad-arc" d="M 249 51  A 140 140 0 0 0 51 51   L 79.29 79.29   A 100 100 0 0 1 220.71 79.29 Z"/>
+        <path id="leftButton"  class="handpad-arc" d="M 51 51   A 140 140 0 0 0 51 249  L 79.29 220.71 A 100 100 0 0 1 79.29 79.29 Z"/>
+        <circle id="speedButton" class="handpad-center" cx="150" cy="150" r="60"/>
+        <text x="150" y="150" text-anchor="middle" dominant-baseline="middle" class="speed-label">Slew</text>
+      </svg>
+      <div class="handpad__row handpad__row--actions">
+        <button id="trackToggleButton" class="btn btn--primary">STOP</button>
+        <button id="modeToggleButton"  class="btn btn--secondary">Auto</button>
+        <button id="parkToggleButton"  class="btn btn--secondary">Park</button>
+      </div>
+    `);
+
+    // Bind directional arcs
+    ['up','right','down','left'].forEach(dir=>{
+      let axis = (dir==='up'||dir==='down')?"Sec":"Pri";
+      $('#'+dir+'Button')
+        .on('mousedown touchstart', e=>{ e.preventDefault(); startMove(axis,dir,e.currentTarget); })
+        .on('mouseup touchend mouseleave', e=>{ stopMove(axis,e.currentTarget); });
+    });
+
+    // Speed toggle
+    $('#speedButton').click(function(){
+      window.currentSpeedIndex=(window.currentSpeedIndex+1)%speeds.length;
+      window.currentSpeed=speeds[window.currentSpeedIndex];
+      $('.speed-label').text(window.currentSpeed);
+    });
+
+    // Track/Park
+    $('#trackToggleButton').click(function(){
+      $.post($(this).text()==='STOP'?'/abort':'/start');
+    });
+    $('#parkToggleButton').click(function(){
+      $.post($(this).text()==='Park'?'/park':'/unpark');
+    });
+
+    // Auto/Manual
+    $('#modeToggleButton').click(function(){
+      $.post('/toggle_mode',{},function(data){
+        $('#modeToggleButton').text(data.mode==='Auto'?'Manual':'Auto');
+      },'json');
+    });
+
+    // Dismiss modal if backdrop clicked
+    $('#customModal').click(e=>{ if(e.target.id==='customModal') hideModal(); });
+
+    // Remove focus outline after click
+    $('button').click(function(){ this.blur(); });
+  });
+  </script>
+</body>
+</html>

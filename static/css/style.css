@@ -1,0 +1,329 @@
+/*==============================================================================
+  style.css — Modern Avalonia-inspired UI for SiPi
+==============================================================================*/
+
+/*----------------------------------------------------------------------------
+  1. CSS Variables (Light & Dark Themes)
+----------------------------------------------------------------------------*/
+:root {
+  /* Color palette */
+  --bg:                #ffffff;
+  --fg:                #000000;
+  --surface:           #f3f3f3;
+  --surface-alt:       #ffffff;
+  --accent:            #0078d7;
+  --accent-secondary:  #005a9e;
+  --shadow:            rgba(0, 0, 0, 0.1);
+
+  /* Spacing & sizing */
+  --radius:            4px;
+  --gap:               12px;
+  --padding:           12px;
+  --control-size:      48px;
+
+  /* Typography */
+  --font-family:       system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-size-base:    1rem;
+  --transition:        background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+body.night-mode {
+  --bg:                #000000;
+  --fg:                #ff0000;
+  --surface:           #1a1a1a;
+  --surface-alt:       #262626;
+  --accent:            #ff0000;
+  --accent-secondary:  #cc0000;
+  --shadow:            rgba(255, 0, 0, 0.2);
+}
+
+/*----------------------------------------------------------------------------
+  2. Global Resets & Base Styles
+----------------------------------------------------------------------------*/
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/*----------------------------------------------------------------------------
+  3. App Layout
+----------------------------------------------------------------------------*/
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Header */
+.app__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--padding);
+  background-color: var(--surface);
+  border-bottom: 1px solid var(--shadow);
+}
+
+.app__title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 500;
+}
+
+.app__header-controls {
+  display: flex;
+  gap: var(--gap);
+}
+
+/* Main */
+.app__main {
+  flex: 1;
+  overflow: auto;
+  padding: var(--padding);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+/*----------------------------------------------------------------------------
+  4. Buttons
+----------------------------------------------------------------------------*/
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5em 1em;
+  border: none;
+  border-radius: var(--radius);
+  background-color: var(--surface);
+  color: var(--fg);
+  transition: var(--transition);
+}
+
+.btn:hover,
+.btn:focus {
+  background-color: var(--surface-alt);
+}
+
+.btn--primary {
+  background-color: var(--accent);
+  color: var(--bg);
+}
+
+.btn--primary:hover,
+.btn--primary:focus {
+  background-color: var(--accent-secondary);
+}
+
+.btn--secondary {
+  background-color: var(--accent-secondary);
+  color: var(--bg);
+}
+
+.btn--secondary:hover,
+.btn--secondary:focus {
+  background-color: var(--accent);
+}
+
+.btn--icon {
+  width: var(--control-size);
+  height: var(--control-size);
+  padding: 0;
+  font-size: 1.25rem;
+  background-color: transparent;
+  color: var(--fg);
+}
+
+.btn--icon:hover,
+.btn--icon:focus {
+  background-color: var(--surface-alt);
+}
+
+.btn--control {
+  width: var(--control-size);
+  height: var(--control-size);
+  font-size: 1.25rem;
+  background-color: var(--surface);
+  color: var(--fg);
+}
+
+.btn--control:hover,
+.btn--control:focus {
+  background-color: var(--surface-alt);
+}
+
+.btn--full {
+  width: 100%;
+}
+
+/*----------------------------------------------------------------------------
+  5. Status Panel
+----------------------------------------------------------------------------*/
+.status-panel {
+  background-color: var(--surface);
+  padding: var(--padding);
+  border-radius: var(--radius);
+  box-shadow: 0 2px 4px var(--shadow);
+}
+
+.status-panel__text > div {
+  margin-bottom: 0.25em;
+}
+
+/*----------------------------------------------------------------------------
+  6. Search Form & Results
+----------------------------------------------------------------------------*/
+.search-form {
+  display: flex;
+  gap: var(--gap);
+}
+
+.search-form__input {
+  flex: 1;
+  padding: 0.5em;
+  border: 1px solid var(--shadow);
+  border-radius: var(--radius);
+  background-color: var(--surface);
+  color: var(--fg);
+  transition: var(--transition);
+}
+
+.search-form__input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.search-form__button {
+  /* inherits .btn styles */
+}
+
+.search-results {
+  margin-top: var(--gap);
+}
+
+.search-results__none {
+  padding: var(--padding);
+  background-color: var(--surface);
+  border-radius: var(--radius);
+  color: var(--fg);
+}
+
+.search-results__info {
+  margin-bottom: var(--gap);
+}
+
+/*----------------------------------------------------------------------------
+  7. Model Panel
+----------------------------------------------------------------------------*/
+.model-panel {
+  background-color: var(--surface);
+  padding: var(--padding);
+  border-radius: var(--radius);
+  box-shadow: 0 2px 4px var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+.model-panel__info {
+  display: flex;
+  gap: var(--gap);
+}
+
+.model-panel__actions {
+  display: flex;
+  gap: var(--gap);
+}
+
+/*----------------------------------------------------------------------------
+  8. Handpad / Movement Controls
+----------------------------------------------------------------------------*/
+.handpad {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--gap);
+}
+
+.handpad__row {
+  display: flex;
+  gap: var(--gap);
+}
+
+.handpad__row--actions {
+  gap: calc(var(--gap) * 1.5);
+}
+
+/*----------------------------------------------------------------------------
+  9. Modal Dialog
+----------------------------------------------------------------------------*/
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal__content {
+  background-color: var(--surface-alt);
+  padding: var(--padding);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 8px var(--shadow);
+  max-width: 90%;
+  width: 300px;
+}
+
+.modal__body {
+  margin-bottom: var(--gap);
+}
+
+.modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--gap);
+}
+
+/*----------------------------------------------------------------------------
+  10. Form Element Selection Styling
+----------------------------------------------------------------------------*/
+/* Text selection */
+body.night-mode input::selection,
+body.night-mode textarea::selection {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+/* Placeholder text */
+body.night-mode ::placeholder {
+  color: var(--accent);
+}
