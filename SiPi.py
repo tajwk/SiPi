@@ -14,7 +14,7 @@ from flask import (
 )
 
 # Initial SiPi version (bump patch for simple fixes)
-__version__ = "0.1.0"
+__version__ = "0.0.0"
 
 # Base directory for Git operations
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -490,7 +490,13 @@ def apply_updates():
     try:
         result = subprocess.run(['git','pull','--ff-only'], cwd=BASE_DIR, capture_output=True, text=True)
         if result.returncode == 0:
-            return jsonify(success=True, message=result.stdout.strip())
+            # ---- Auto-restart SiPi after update ----
+            try:
+                subprocess.run(['systemctl', 'restart', 'sipi'], check=False)
+                restart_msg = "\n[sipi.service restarted]"
+            except Exception as e:
+                restart_msg = f"\n[Failed to restart sipi.service: {e}]"
+            return jsonify(success=True, message=result.stdout.strip() + restart_msg)
         else:
             return jsonify(success=False, message=result.stderr.strip())
     except Exception as e:
