@@ -14,7 +14,7 @@ from flask import (
 )
 
 # Initial SiPi version (bump patch for simple fixes)
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 # Base directory for Git operations
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -191,11 +191,13 @@ def send_command(command, timeout=5, retries=1, terminator=None):
                     if not data:
                         break
                     decoded = data.decode('ascii')
+                    #print("RECV DEBUG:", repr(decoded))  # <--- INSERT THIS LINE
                     response += decoded
                     if terminator and terminator in response:
                         break  # Early exit
                 except socket.timeout:
                     break
+
             return response
         except:
             try: s.close()
@@ -300,14 +302,18 @@ def status():
         alt=alt, az=az, tracking=track
     )
 
-@app.route('/search', methods=['POST'])
+@app.route('/search', methods=['POST'])    
 def search():
     q = request.form.get('query','')
     if not q:
         return jsonify(results=[])
-    raw = send_command(f"SearchDatabase {q}\n", timeout=5, retries=1, terminator='~')
+    # --- Debug print: command being sent ---
+    print(f"[SiPi SEARCH DEBUG] Sending: SearchDatabase {q}\\n")
+    raw = send_command(f"SearchDatabase {q}\n", timeout=5, retries=1, terminator="\n")
+    # --- Debug print: raw reply received ---
+    print(f"[SiPi SEARCH DEBUG] Reply: {repr(raw)}")
     lines = raw.split('~') if '~' in raw else raw.splitlines()
-    results = []
+    results = []    
     for ln in lines:
         ln = ln.strip()
         if not ln:
@@ -328,7 +334,7 @@ def search():
             if site_latitude is not None:
                 altf, azf = eq_to_alt_az(raf, dcf, lst, site_latitude)
                 alts = f"{altf:.2f}"
-                azs  = f"{altf:.2f}"
+                azs  = f"{azf:.2f}"
             else:
                 alts = azs = "N/A"
             results.append({
@@ -349,20 +355,21 @@ def goto():
         return jsonify(response="Invalid RA or Dec")
     return jsonify(response=send_command(f"GoTo {ra} {dec}\n"))
 
-@app.route('/sync', methods=['POST'])
-def sync():
-    ra = request.form.get('ra',''); dec = request.form.get('dec','')
-    if not ra or not dec:
-        return jsonify(response="Missing parameters")
-    return jsonify(response=send_command(f"Sync {ra} {dec} 1\n"))
-
 @app.route('/calpt', methods=['POST'])
 def calpt():
-    with status_lock:
-        f = scope_status.split(';')
-    if len(f) < 3:
-        return jsonify(response="Status not available")
-    return jsonify(response=send_command(f"Sync {f[1]} {f[2]} 2\n"))
+    ra = request.form.get('ra','')
+    dec = request.form.get('dec','')
+    if not ra or not dec:
+        return jsonify(response="Missing RA or Dec")
+    return jsonify(response=send_command(f"Sync {ra} {dec} 2\n", timeout=5, terminator="\n"))
+
+@app.route('/clear', methods=['POST'])
+def clear():
+    return jsonify(response=send_command("ClearAllCalPoints\n", timeout=5, terminator="\n"))
+
+@app.route('/save_model', methods=['POST'])
+def save_model():
+    return jsonify(response=send_command("SaveModel AutoLoad.PXP\n", timeout=5, terminator="\n"))
 
 @app.route('/moveaxis', methods=['POST'])
 def moveaxis():
@@ -419,14 +426,6 @@ def get_model_info():
     if rms.startswith("RMS="):
         rms = rms[4:]
     return jsonify(cal_pts=cal_pts, rms=rms)
-
-@app.route('/clear', methods=['POST'])
-def clear():
-    return jsonify(response=send_command("ClearAllCalPoints\n"))
-
-@app.route('/save_model', methods=['POST'])
-def save_model():
-    return jsonify(response=send_command("SaveModel\n"))
 
 @app.route('/settime', methods=['POST'])
 def set_time():
