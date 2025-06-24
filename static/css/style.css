@@ -327,3 +327,19 @@ body.night-mode textarea::selection {
 body.night-mode ::placeholder {
   color: var(--accent);
 }
+
+
+html, body {
+  min-height: 100vh;
+  background-color: var(--bg) !important;
+}
+
+body.night-mode,
+body.night-mode .container {
+  background-color: var(--bg) !important;
+}
+
+.container {
+  min-height: 100vh;
+  background-color: var(--bg);
+}

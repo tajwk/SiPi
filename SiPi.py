@@ -14,7 +14,7 @@ from flask import (
 )
 
 # Initial SiPi version (bump patch for simple fixes)
-__version__ = "0.2.1"
+__version__ = "0.3.1"
 
 # Base directory for Git operations
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -51,11 +51,14 @@ web_config = load_web_config()
 scope_status            = "No status yet"
 status_lock             = threading.Lock()
 site_latitude           = None
+site_longitude          = None  
 persistent_socket       = None
 move_socket             = None
 command_socket          = None
 move_socket_lock        = threading.Lock()
 command_socket_lock     = threading.Lock()
+MESSIER_FILE            = os.path.join(BASE_DIR, "messier.json")
+
 
 # Formatting helpers
 def format_hms(value):
@@ -88,7 +91,7 @@ def format_hms_no_decimals(value):
     return f"{sign}{h:02d}:{m:02d}:{s:02d}"
 
 def get_site_location():
-    global site_latitude
+    global site_latitude, site_longitude
     try:
         s = socket.socket()
         s.connect((SI_TECH_HOST, SI_TECH_PORT))
@@ -97,27 +100,34 @@ def get_site_location():
         data = s.recv(1024).decode('ascii')
         s.close()
         parts = data.split(';')
-        site_latitude = float(parts[0].strip()) if parts else 0.0
+        # first element is latitude, second is longitude
+        site_latitude  = float(parts[0].strip()) if len(parts) > 0 else 0.0
+        site_longitude = float(parts[1].strip()) if len(parts) > 1 else 0.0
     except:
-        site_latitude = 0.0
+        site_latitude  = 0.0
+        site_longitude = 0.0
+
 
 def eq_to_alt_az(ra, dec, lst, lat):
-    ha = ((lst - ra)*15 + 180) % 360 - 180
+    # Convert all to degrees
+    ha = (lst - ra) * 15  # Hour angle in degrees
     ha_r = math.radians(ha)
     dec_r = math.radians(dec)
     lat_r = math.radians(lat)
-    alt_r = math.asin(
-        math.sin(dec_r)*math.sin(lat_r) +
-        math.cos(dec_r)*math.cos(lat_r)*math.cos(ha_r)
-    )
-    az_r = math.atan2(
-        math.sin(ha_r),
-        math.cos(ha_r)*math.sin(lat_r) - math.tan(dec_r)*math.cos(lat_r)
-    )
-    az = math.degrees(az_r)
+
+    # Altitude
+    sin_alt = math.sin(dec_r) * math.sin(lat_r) + math.cos(dec_r) * math.cos(lat_r) * math.cos(ha_r)
+    alt = math.asin(sin_alt)
+
+    # Azimuth (measured from North, increasing eastward)
+    cos_az = (math.sin(dec_r) - math.sin(alt) * math.sin(lat_r)) / (math.cos(alt) * math.cos(lat_r))
+    sin_az = -math.sin(ha_r) * math.cos(dec_r) / math.cos(alt)
+    az = math.atan2(sin_az, cos_az)
+    az = math.degrees(az)
     if az < 0:
         az += 360
-    return math.degrees(alt_r), az
+    alt = math.degrees(alt)
+    return alt, az
 
 # Version helper for SiPi
 def get_sipi_version():
@@ -256,15 +266,51 @@ def status_update_loop():
 
 @app.route('/')
 def index():
+    # Ensure site location is up to date for SkyView
+    get_site_location()
     return render_template(
         'index.html',
         vibration_enabled=web_config['vibration_enabled'],
-        tilt_enabled=web_config['tilt_enabled']
+        tilt_enabled=web_config['tilt_enabled'],
+        site_latitude=site_latitude,
+        site_longitude=site_longitude
     )
 
 @app.route('/skyview')
 def skyview():
-    return render_template('skyview.html')
+    # Refresh site location from the mount on every request
+    get_site_location()
+    return render_template(
+        'skyview.html',
+        site_latitude=site_latitude,
+        site_longitude=site_longitude
+    )
+
+@app.route('/messier-data')
+def messier_data():
+    with open(MESSIER_FILE, 'r') as f:
+        data = json.load(f)
+    return jsonify(data)
+
+@app.route('/stars-data')
+def stars_data():
+    """
+    Serve the pre-generated star catalog for SkyView.
+    Expects static/stars.json to exist.
+    """
+    stars_path = os.path.join(BASE_DIR, 'static', 'stars.json')
+    with open(stars_path, 'r') as f:
+        stars = json.load(f)
+    return jsonify(stars)
+    
+@app.route('/constellations-data')
+def constellations_data():
+    return send_from_directory(
+        os.path.join(BASE_DIR, 'static'),
+        'constellations.json',
+        mimetype='application/json'
+    )
+
 
 @app.route('/download_model')
 def download_model():
@@ -348,12 +394,38 @@ def search():
             results.append({'result': ln, 'rawResult': ln})
     return jsonify(results=results)
 
+@app.route('/sync', methods=['POST'])
+def sync():
+    ra = request.form.get('ra','')
+    dec = request.form.get('dec','')
+    if not ra or not dec:
+        return jsonify(response="Missing RA or Dec")
+    return jsonify(response=send_command(f"Sync {ra} {dec} 1\n", timeout=5, terminator="\n"))
+
 @app.route('/goto', methods=['POST'])
 def goto():
     ra = request.form.get('ra',''); dec = request.form.get('dec','')
     if not ra or not dec:
         return jsonify(response="Invalid RA or Dec")
     return jsonify(response=send_command(f"GoTo {ra} {dec}\n"))
+
+@app.route('/goto-altaz', methods=['POST'])
+def goto_altaz():
+    # Accepts JSON body with 'alt' and 'az' (degrees)
+    data = request.get_json(force=True)
+    alt = data.get('alt', None)
+    az = data.get('az', None)
+    if alt is None or az is None:
+        return jsonify(response="Missing alt or az"), 400
+    try:
+        alt = float(alt)
+        az = float(az)
+    except Exception:
+        return jsonify(response="Invalid alt or az"), 400
+    # Command format: GoToAltAz Az Alt\n
+    cmd = f"GoToAltAz {az:.6f} {alt:.6f}\n"
+    result = send_command(cmd)
+    return jsonify(response=result)
 
 @app.route('/calpt', methods=['POST'])
 def calpt():
@@ -369,7 +441,7 @@ def clear():
 
 @app.route('/save_model', methods=['POST'])
 def save_model():
-    return jsonify(response=send_command("SaveModel AutoLoad.PXP\n", timeout=5, terminator="\n"))
+    return jsonify(response=send_command("SaveModel\n", timeout=5, terminator="\n"))
 
 @app.route('/moveaxis', methods=['POST'])
 def moveaxis():
@@ -430,8 +502,16 @@ def get_model_info():
 @app.route('/settime', methods=['POST'])
 def set_time():
     t = request.form.get('time','')
-    resp = send_command(f"SetTime {t}\n")
-    return jsonify(response=resp)
+    # Accepts "HH:MM" (24-hour). Optionally add validation.
+    try:
+        # Run as root so this works; may require sudoers config for passwordless sudo
+        result = subprocess.run(['sudo', 'date', '+%H:%M', '-s', t], capture_output=True, text=True)
+        if result.returncode == 0:
+            return jsonify(response=f"System time set to {t}")
+        else:
+            return jsonify(response=f"Failed to set time: {result.stderr.strip()}")
+    except Exception as e:
+        return jsonify(response=f"Error: {e}")
 
 @app.route('/update_wifi', methods=['POST'])
 def update_wifi():
@@ -473,8 +553,17 @@ def toggle_tilt():
 def check_updates():
     try:
         subprocess.run(['git','fetch'], cwd=BASE_DIR, capture_output=True, text=True)
-        local = subprocess.run(['git','rev-parse','HEAD'], cwd=BASE_DIR, capture_output=True, text=True).stdout.strip()
-        remote = subprocess.run(['git','rev-parse','origin/HEAD'], cwd=BASE_DIR, capture_output=True, text=True).stdout.strip()
+        # Find current branch
+        current_branch = subprocess.run(
+            ['git','rev-parse','--abbrev-ref','HEAD'],
+            cwd=BASE_DIR, capture_output=True, text=True).stdout.strip()
+        # Get hashes
+        local = subprocess.run(
+            ['git','rev-parse','HEAD'],
+            cwd=BASE_DIR, capture_output=True, text=True).stdout.strip()
+        remote = subprocess.run(
+            ['git','rev-parse',f'origin/{current_branch}'],
+            cwd=BASE_DIR, capture_output=True, text=True).stdout.strip()
         available = (local != remote)
         return jsonify(
             updates_available=available,
@@ -483,6 +572,7 @@ def check_updates():
         )
     except Exception as e:
         return jsonify(updates_available=False, current_version="", latest_version="", error=str(e))
+
 
 @app.route('/apply_updates', methods=['POST'])
 def apply_updates():

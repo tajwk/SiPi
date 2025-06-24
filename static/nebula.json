@@ -1,0 +1,2039 @@
+[
+  {
+    "RtAsc": 0.057803,
+    "Declin": 67.56526,
+    "Mag": 20.0,
+    "Size": "12",
+    "Name": "NGC7822"
+  },
+  {
+    "RtAsc": 0.771753,
+    "Declin": -73.24894,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC248"
+  },
+  {
+    "RtAsc": 0.774275,
+    "Declin": -72.94586,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC249"
+  },
+  {
+    "RtAsc": 0.779751,
+    "Declin": -73.3762,
+    "Mag": 12.7,
+    "Size": "0",
+    "Name": "NGC256"
+  },
+  {
+    "RtAsc": 0.789429,
+    "Declin": -72.97234,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC261"
+  },
+  {
+    "RtAsc": 0.815547,
+    "Declin": -73.14329,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC267"
+  },
+  {
+    "RtAsc": 0.90816,
+    "Declin": 56.76255,
+    "Mag": 7.0,
+    "Size": "27.5",
+    "Name": "Pacman Nebula NGC281"
+  },
+  {
+    "RtAsc": 0.90477,
+    "Declin": -72.06571,
+    "Mag": 11.0,
+    "Size": "0",
+    "Name": "NGC299"
+  },
+  {
+    "RtAsc": 0.918542,
+    "Declin": -72.1111,
+    "Mag": 12.0,
+    "Size": "0",
+    "Name": "NGC306"
+  },
+  {
+    "RtAsc": 0.970972,
+    "Declin": 61.20671,
+    "Mag": 19.99,
+    "Size": "5",
+    "Name": "gamma Cas nebula IC59"
+  },
+  {
+    "RtAsc": 0.998645,
+    "Declin": -72.04767,
+    "Mag": 10.3,
+    "Size": "12.5",
+    "Name": "NGC346"
+  },
+  {
+    "RtAsc": 1.017803,
+    "Declin": 60.95643,
+    "Mag": 19.99,
+    "Size": "5",
+    "Name": "gamma Cas nebula IC63"
+  },
+  {
+    "RtAsc": 1.071638,
+    "Declin": -71.92808,
+    "Mag": 20.0,
+    "Size": "3.75",
+    "Name": "NGC371"
+  },
+  {
+    "RtAsc": 1.098867,
+    "Declin": -71.86821,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC395"
+  },
+  {
+    "RtAsc": 1.240552,
+    "Declin": -73.16357,
+    "Mag": 20.0,
+    "Size": "15",
+    "Name": "NGC456"
+  },
+  {
+    "RtAsc": 1.255224,
+    "Declin": -73.16145,
+    "Mag": 12.5,
+    "Size": "0",
+    "Name": "NGC460"
+  },
+  {
+    "RtAsc": 1.500132,
+    "Declin": -73.43394,
+    "Mag": 20.0,
+    "Size": "1.7",
+    "Name": "NGC602"
+  },
+  {
+    "RtAsc": 1.577237,
+    "Declin": 30.88054,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "IC131"
+  },
+  {
+    "RtAsc": 1.577211,
+    "Declin": 30.59719,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "IC135"
+  },
+  {
+    "RtAsc": 1.577214,
+    "Declin": 30.63048,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "IC136"
+  },
+  {
+    "RtAsc": 1.578923,
+    "Declin": 31.08049,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "IC132"
+  },
+  {
+    "RtAsc": 1.578917,
+    "Declin": 31.01385,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "IC133"
+  },
+  {
+    "RtAsc": 1.583891,
+    "Declin": 30.64705,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "IC137"
+  },
+  {
+    "RtAsc": 1.588919,
+    "Declin": 30.88036,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "IC142"
+  },
+  {
+    "RtAsc": 1.592262,
+    "Declin": 30.9136,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "IC143"
+  },
+  {
+    "RtAsc": 1.951287,
+    "Declin": -74.10294,
+    "Mag": 20.0,
+    "Size": "1.7",
+    "Name": "NGC796"
+  },
+  {
+    "RtAsc": 2.456983,
+    "Declin": 62.13524,
+    "Mag": 20.0,
+    "Size": "20",
+    "Name": "NGC896"
+  },
+  {
+    "RtAsc": 2.474322,
+    "Declin": 62.1824,
+    "Mag": 20.0,
+    "Size": "10",
+    "Name": "IC1795"
+  },
+  {
+    "RtAsc": 2.577755,
+    "Declin": 61.56288,
+    "Mag": 6.5,
+    "Size": "30",
+    "Name": "Heart Nebula IC1805"
+  },
+  {
+    "RtAsc": 2.886687,
+    "Declin": 60.53871,
+    "Mag": 6.5,
+    "Size": "30",
+    "Name": "Soul Nebula IC1848"
+  },
+  {
+    "RtAsc": 3.513951,
+    "Declin": 31.47072,
+    "Mag": 20.0,
+    "Size": "8",
+    "Name": "NGC1333"
+  },
+  {
+    "RtAsc": 3.768474,
+    "Declin": 32.36155,
+    "Mag": 7.3,
+    "Size": "5",
+    "Name": "IC348"
+  },
+  {
+    "RtAsc": 3.789144,
+    "Declin": 24.44542,
+    "Mag": 19.99,
+    "Size": "50",
+    "Name": "Maia nebula NGC1432"
+  },
+  {
+    "RtAsc": 3.794768,
+    "Declin": 23.84182,
+    "Mag": 19.99,
+    "Size": "30",
+    "Name": "Merope nebula NGC1435"
+  },
+  {
+    "RtAsc": 3.796994,
+    "Declin": 24.0101,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "IC349"
+  },
+  {
+    "RtAsc": 3.942352,
+    "Declin": 25.55561,
+    "Mag": 20.0,
+    "Size": "90",
+    "Name": "IC353"
+  },
+  {
+    "RtAsc": 4.081939,
+    "Declin": 36.43592,
+    "Mag": 19.99,
+    "Size": "100",
+    "Name": "California nebula NGC1499"
+  },
+  {
+    "RtAsc": 4.086043,
+    "Declin": 51.38519,
+    "Mag": 20.0,
+    "Size": "7.5",
+    "Name": "NGC1491"
+  },
+  {
+    "RtAsc": 4.242566,
+    "Declin": 25.69575,
+    "Mag": 20.0,
+    "Size": "90",
+    "Name": "IC360"
+  },
+  {
+    "RtAsc": 4.386975,
+    "Declin": 19.57803,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "Struve's Lost nebula NGC1554"
+  },
+  {
+    "RtAsc": 4.390645,
+    "Declin": 19.59148,
+    "Mag": 19.99,
+    "Size": "0.25",
+    "Name": "Hind's variable nebula NGC1555"
+  },
+  {
+    "RtAsc": 4.532018,
+    "Declin": 35.33276,
+    "Mag": 20.0,
+    "Size": "10",
+    "Name": "NGC1579"
+  },
+  {
+    "RtAsc": 4.692814,
+    "Declin": 25.78024,
+    "Mag": 20.0,
+    "Size": "2",
+    "Name": "IC2087"
+  },
+  {
+    "RtAsc": 4.709552,
+    "Declin": 50.50916,
+    "Mag": 11.8,
+    "Size": "2.5",
+    "Name": "NGC1624"
+  },
+  {
+    "RtAsc": 4.822322,
+    "Declin": -69.16165,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "IC2105"
+  },
+  {
+    "RtAsc": 4.848268,
+    "Declin": -69.36995,
+    "Mag": 20.0,
+    "Size": "1.3",
+    "Name": "NGC1712"
+  },
+  {
+    "RtAsc": 4.863643,
+    "Declin": -69.36302,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "IC2111"
+  },
+  {
+    "RtAsc": 4.870938,
+    "Declin": -66.87198,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC1715"
+  },
+  {
+    "RtAsc": 4.860709,
+    "Declin": -69.3612,
+    "Mag": 13.2,
+    "Size": "0.5",
+    "Name": "NGC1722"
+  },
+  {
+    "RtAsc": 4.868942,
+    "Declin": -69.30189,
+    "Mag": 11.1,
+    "Size": "1.25",
+    "Name": "NGC1727"
+  },
+  {
+    "RtAsc": 4.883948,
+    "Declin": -68.01665,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC1736"
+  },
+  {
+    "RtAsc": 4.893577,
+    "Declin": -66.88936,
+    "Mag": 9.9,
+    "Size": "4",
+    "Name": "NGC1731"
+  },
+  {
+    "RtAsc": 4.899731,
+    "Declin": -69.16313,
+    "Mag": 20.0,
+    "Size": "2",
+    "Name": "NGC1743"
+  },
+  {
+    "RtAsc": 4.898277,
+    "Declin": -69.13501,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC1737"
+  },
+  {
+    "RtAsc": 4.904622,
+    "Declin": -69.12319,
+    "Mag": 20.0,
+    "Size": "2",
+    "Name": "NGC1745"
+  },
+  {
+    "RtAsc": 4.906079,
+    "Declin": -69.14845,
+    "Mag": 20.0,
+    "Size": "0.5",
+    "Name": "NGC1748"
+  },
+  {
+    "RtAsc": 4.920758,
+    "Declin": -67.1338,
+    "Mag": 9.4,
+    "Size": "6.5",
+    "Name": "NGC1747"
+  },
+  {
+    "RtAsc": 4.939452,
+    "Declin": -69.36618,
+    "Mag": 10.6,
+    "Size": "0.8",
+    "Name": "NGC1767"
+  },
+  {
+    "RtAsc": 4.945501,
+    "Declin": -66.44479,
+    "Mag": 9.9,
+    "Size": "0.6",
+    "Name": "NGC1761"
+  },
+  {
+    "RtAsc": 4.947286,
+    "Declin": -66.49298,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC1760"
+  },
+  {
+    "RtAsc": 4.946354,
+    "Declin": -69.52169,
+    "Mag": 11.0,
+    "Size": "0.75",
+    "Name": "NGC1772"
+  },
+  {
+    "RtAsc": 4.948771,
+    "Declin": -66.375,
+    "Mag": 20.0,
+    "Size": "12.5",
+    "Name": "NGC1763"
+  },
+  {
+    "RtAsc": 4.954064,
+    "Declin": -68.38402,
+    "Mag": 9.0,
+    "Size": "0.8",
+    "Name": "NGC1770"
+  },
+  {
+    "RtAsc": 4.953395,
+    "Declin": -66.36599,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "IC2115"
+  },
+  {
+    "RtAsc": 4.952961,
+    "Declin": -68.41607,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "IC2117"
+  },
+  {
+    "RtAsc": 4.958377,
+    "Declin": -66.38277,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "IC2116"
+  },
+  {
+    "RtAsc": 4.962687,
+    "Declin": -69.35838,
+    "Mag": 10.5,
+    "Size": "0.6",
+    "Name": "NGC1782"
+  },
+  {
+    "RtAsc": 4.964092,
+    "Declin": -66.42995,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC1769"
+  },
+  {
+    "RtAsc": 4.971553,
+    "Declin": -66.32593,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC1773"
+  },
+  {
+    "RtAsc": 5.06363,
+    "Declin": -67.27049,
+    "Mag": 9.0,
+    "Size": "0.5",
+    "Name": "NGC1814"
+  },
+  {
+    "RtAsc": 5.064853,
+    "Declin": -67.23042,
+    "Mag": 9.0,
+    "Size": "0.5",
+    "Name": "NGC1816"
+  },
+  {
+    "RtAsc": 5.069322,
+    "Declin": -70.70165,
+    "Mag": 20.0,
+    "Size": "1",
+    "Name": "NGC1833"
+  },
+  {
+    "RtAsc": 5.082476,
+    "Declin": -68.02574,
+    "Mag": 8.0,
+    "Size": "1.05",
+    "Name": "NGC1829"
+  },
+  {
+    "RtAsc": 5.078805,
+    "Declin": -70.68422,
+    "Mag": 10.6,
+    "Size": "0.7",
+    "Name": "NGC1837"
+  },
+  {
+    "RtAsc": 5.136098,
+    "Declin": -3.31103,
+    "Mag": 20.0,
+    "Size": "4",
+    "Name": "NGC1788"
+  },
+  {
+    "RtAsc": 5.135706,
+    "Declin": -7.18703,
+    "Mag": 19.99,
+    "Size": "90",
+    "Name": "Witch Head nebula IC2118"
+  },
+  {
+    "RtAsc": 5.164489,
+    "Declin": -68.87314,
+    "Mag": 9.9,
+    "Size": "2.5",
+    "Name": "NGC1858"
+  },
+  {
+    "RtAsc": 5.218431,
+    "Declin": -69.35058,
+    "Mag": 20.0,
+    "Size": "0.5",
+    "Name": "NGC1874"
+  },
+  {
+    "RtAsc": 5.220204,
+    "Declin": -69.33632,
+    "Mag": 11.7,
+    "Size": "0",
+    "Name": "NGC1876"
+  },
+  {
+    "RtAsc": 5.220985,
+    "Declin": -69.35239,
+    "Mag": 20.0,
+    "Size": "1.5",
+    "Name": "NGC1877"
+  },
+  {
+    "RtAsc": 5.225278,
+    "Declin": -69.27461,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC1881"
+  },
+  {
+    "RtAsc": 5.225593,
+    "Declin": -69.35942,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC1880"
+  },
+  {
+    "RtAsc": 5.231422,
+    "Declin": -67.42813,
+    "Mag": 10.1,
+    "Size": "1.05",
+    "Name": "NGC1871"
+  },
+  {
+    "RtAsc": 5.232614,
+    "Declin": -67.31014,
+    "Mag": 10.4,
+    "Size": "1.75",
+    "Name": "NGC1873"
+  },
+  {
+    "RtAsc": 5.232759,
+    "Declin": -67.35369,
+    "Mag": 20.0,
+    "Size": "7",
+    "Name": "NGC1869"
+  },
+  {
+    "RtAsc": 5.298216,
+    "Declin": 34.29207,
+    "Mag": 19.99,
+    "Size": "15",
+    "Name": "Flaming Star nebula IC405 C31"
+  },
+  {
+    "RtAsc": 5.281653,
+    "Declin": -67.30727,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC1895"
+  },
+  {
+    "RtAsc": 5.289961,
+    "Declin": -71.23357,
+    "Mag": 12.0,
+    "Size": "1.05",
+    "Name": "NGC1914"
+  },
+  {
+    "RtAsc": 5.29669,
+    "Declin": -67.87847,
+    "Mag": 20.0,
+    "Size": "0.35",
+    "Name": "NGC1899"
+  },
+  {
+    "RtAsc": 5.310219,
+    "Declin": -69.21053,
+    "Mag": 11.2,
+    "Size": "4.5",
+    "Name": "NGC1910"
+  },
+  {
+    "RtAsc": 5.338936,
+    "Declin": -66.86063,
+    "Mag": 20.0,
+    "Size": "0.85",
+    "Name": "NGC1919"
+  },
+  {
+    "RtAsc": 5.343465,
+    "Declin": -66.75822,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC1920"
+  },
+  {
+    "RtAsc": 5.361636,
+    "Declin": -65.46681,
+    "Mag": 11.2,
+    "Size": "0.5",
+    "Name": "NGC1923"
+  },
+  {
+    "RtAsc": 5.360332,
+    "Declin": -67.89215,
+    "Mag": 20.0,
+    "Size": "17.5",
+    "Name": "NGC1929"
+  },
+  {
+    "RtAsc": 5.364104,
+    "Declin": -65.77401,
+    "Mag": 20.0,
+    "Size": "5",
+    "Name": "NGC1925"
+  },
+  {
+    "RtAsc": 5.366007,
+    "Declin": -67.93761,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC1935"
+  },
+  {
+    "RtAsc": 5.370375,
+    "Declin": -67.95667,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC1936"
+  },
+  {
+    "RtAsc": 5.404754,
+    "Declin": 33.53809,
+    "Mag": 19.99,
+    "Size": "20",
+    "Name": "Tadpole Nebula IC410 NGC1893"
+  },
+  {
+    "RtAsc": 5.407253,
+    "Declin": 33.44163,
+    "Mag": 7.5,
+    "Size": "5.5",
+    "Name": "NGC1893"
+  },
+  {
+    "RtAsc": 5.379567,
+    "Declin": -68.03091,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "IC2128"
+  },
+  {
+    "RtAsc": 5.386757,
+    "Declin": -66.3598,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC1941"
+  },
+  {
+    "RtAsc": 5.417141,
+    "Declin": -68.45336,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC1949"
+  },
+  {
+    "RtAsc": 5.416491,
+    "Declin": -66.43934,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC1945"
+  },
+  {
+    "RtAsc": 5.430912,
+    "Declin": -66.24962,
+    "Mag": 11.6,
+    "Size": "3",
+    "Name": "NGC1948"
+  },
+  {
+    "RtAsc": 5.102774,
+    "Declin": -7.23474,
+    "Mag": 20.0,
+    "Size": "120",
+    "Name": "NGC1909"
+  },
+  {
+    "RtAsc": 5.436235,
+    "Declin": -67.47998,
+    "Mag": 9.0,
+    "Size": "0.95",
+    "Name": "NGC1955"
+  },
+  {
+    "RtAsc": 5.456309,
+    "Declin": -67.44745,
+    "Mag": 9.0,
+    "Size": "0.55",
+    "Name": "NGC1968"
+  },
+  {
+    "RtAsc": 5.465281,
+    "Declin": -67.40995,
+    "Mag": 9.0,
+    "Size": "0.85",
+    "Name": "NGC1974 NGC1991"
+  },
+  {
+    "RtAsc": 5.496671,
+    "Declin": 34.45138,
+    "Mag": 20.0,
+    "Size": "6.5",
+    "Name": "IC417"
+  },
+  {
+    "RtAsc": 5.480604,
+    "Declin": -66.21928,
+    "Mag": 10.7,
+    "Size": "3.05",
+    "Name": "NGC1978"
+  },
+  {
+    "RtAsc": 5.466964,
+    "Declin": -67.40657,
+    "Mag": 9.0,
+    "Size": "0.85",
+    "Name": "NGC1991"
+  },
+  {
+    "RtAsc": 5.508173,
+    "Declin": -71.05384,
+    "Mag": 10.9,
+    "Size": "21.5",
+    "Name": "NGC2018"
+  },
+  {
+    "RtAsc": 5.552139,
+    "Declin": 34.26098,
+    "Mag": 10.1,
+    "Size": "0.5",
+    "Name": "NGC1931"
+  },
+  {
+    "RtAsc": 5.53871,
+    "Declin": -67.67609,
+    "Mag": 9.0,
+    "Size": "0.9",
+    "Name": "NGC2014"
+  },
+  {
+    "RtAsc": 5.553341,
+    "Declin": -67.70239,
+    "Mag": 20.0,
+    "Size": "1",
+    "Name": "NGC2020"
+  },
+  {
+    "RtAsc": 5.578447,
+    "Declin": -0.60277,
+    "Mag": 20.0,
+    "Size": "3",
+    "Name": "IC423"
+  },
+  {
+    "RtAsc": 5.601208,
+    "Declin": 22.02824,
+    "Mag": 8.4,
+    "Size": "5",
+    "Name": "M1 NGC1952"
+  },
+  {
+    "RtAsc": 5.575317,
+    "Declin": -69.73549,
+    "Mag": 11.6,
+    "Size": "0.3",
+    "Name": "NGC2033"
+  },
+  {
+    "RtAsc": 5.605777,
+    "Declin": -4.71917,
+    "Mag": 20.0,
+    "Size": "5",
+    "Name": "NGC1973"
+  },
+  {
+    "RtAsc": 5.596212,
+    "Declin": -69.63768,
+    "Mag": 20.0,
+    "Size": "0.25",
+    "Name": "NGC2048"
+  },
+  {
+    "RtAsc": 5.589042,
+    "Declin": -67.55639,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC2032"
+  },
+  {
+    "RtAsc": 5.592307,
+    "Declin": -67.5737,
+    "Mag": 20.0,
+    "Size": "3",
+    "Name": "NGC2035"
+  },
+  {
+    "RtAsc": 5.609528,
+    "Declin": -4.6718,
+    "Mag": 20.0,
+    "Size": "7.5",
+    "Name": "NGC1975"
+  },
+  {
+    "RtAsc": 5.609107,
+    "Declin": -5.3782,
+    "Mag": 4.0,
+    "Size": "75",
+    "Name": "M42 NGC1976"
+  },
+  {
+    "RtAsc": 5.611467,
+    "Declin": -5.89718,
+    "Mag": 20.0,
+    "Size": "6.5",
+    "Name": "NGC1980"
+  },
+  {
+    "RtAsc": 5.583252,
+    "Declin": -67.54416,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC2029"
+  },
+  {
+    "RtAsc": 5.595971,
+    "Declin": -66.02394,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC2030"
+  },
+  {
+    "RtAsc": 5.608814,
+    "Declin": -4.83178,
+    "Mag": 20.0,
+    "Size": "32.5",
+    "Name": "NGC1977"
+  },
+  {
+    "RtAsc": 5.613062,
+    "Declin": -5.255,
+    "Mag": 9.0,
+    "Size": "17.5",
+    "Name": "M43 NGC1982"
+  },
+  {
+    "RtAsc": 5.602061,
+    "Declin": -67.55628,
+    "Mag": 20.0,
+    "Size": "3",
+    "Name": "NGC2040"
+  },
+  {
+    "RtAsc": 5.627836,
+    "Declin": -6.70389,
+    "Mag": 19.99,
+    "Size": "2",
+    "Name": "NGC1999"
+  },
+  {
+    "RtAsc": 5.635192,
+    "Declin": -0.23817,
+    "Mag": 20.0,
+    "Size": "2.5",
+    "Name": "IC426"
+  },
+  {
+    "RtAsc": 5.617087,
+    "Declin": -69.7616,
+    "Mag": 20.0,
+    "Size": "15",
+    "Name": "NGC2052"
+  },
+  {
+    "RtAsc": 5.628272,
+    "Declin": -69.16267,
+    "Mag": 9.6,
+    "Size": "1.75",
+    "Name": "NGC2060"
+  },
+  {
+    "RtAsc": 5.657736,
+    "Declin": 32.00083,
+    "Mag": 20.0,
+    "Size": "0.583335",
+    "Name": "NGC1985"
+  },
+  {
+    "RtAsc": 5.635156,
+    "Declin": -70.67556,
+    "Mag": 11.5,
+    "Size": "1",
+    "Name": "NGC2075"
+  },
+  {
+    "RtAsc": 5.644551,
+    "Declin": -68.96442,
+    "Mag": 20.0,
+    "Size": "20",
+    "Name": "NGC2069"
+  },
+  {
+    "RtAsc": 5.662382,
+    "Declin": -7.07266,
+    "Mag": 19.99,
+    "Size": "5.5",
+    "Name": "IC430"
+  },
+  {
+    "RtAsc": 5.64219,
+    "Declin": -69.08409,
+    "Mag": 8.2,
+    "Size": "32.5",
+    "Name": "Tarantula nebula NGC2070 C103"
+  },
+  {
+    "RtAsc": 5.648709,
+    "Declin": -69.48826,
+    "Mag": 20.0,
+    "Size": "13",
+    "Name": "NGC2074"
+  },
+  {
+    "RtAsc": 5.657477,
+    "Declin": -69.64786,
+    "Mag": 20.0,
+    "Size": "15",
+    "Name": "NGC2077"
+  },
+  {
+    "RtAsc": 5.658242,
+    "Declin": -69.7344,
+    "Mag": 20.0,
+    "Size": "13",
+    "Name": "NGC2078"
+  },
+  {
+    "RtAsc": 5.658394,
+    "Declin": -69.7642,
+    "Mag": 20.0,
+    "Size": "13",
+    "Name": "NGC2079"
+  },
+  {
+    "RtAsc": 5.659745,
+    "Declin": -69.63591,
+    "Mag": 20.0,
+    "Size": "13",
+    "Name": "NGC2080"
+  },
+  {
+    "RtAsc": 5.663825,
+    "Declin": -69.7283,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC2083"
+  },
+  {
+    "RtAsc": 5.665973,
+    "Declin": -69.75015,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC2084"
+  },
+  {
+    "RtAsc": 5.664289,
+    "Declin": -69.39656,
+    "Mag": 20.0,
+    "Size": "13",
+    "Name": "NGC2081"
+  },
+  {
+    "RtAsc": 5.666849,
+    "Declin": -69.66366,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC2085"
+  },
+  {
+    "RtAsc": 5.693325,
+    "Declin": -1.44033,
+    "Mag": 19.99,
+    "Size": "2.5",
+    "Name": "IC431"
+  },
+  {
+    "RtAsc": 5.667695,
+    "Declin": -69.6591,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC2086"
+  },
+  {
+    "RtAsc": 5.67079,
+    "Declin": -69.65749,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "IC2145"
+  },
+  {
+    "RtAsc": 5.703328,
+    "Declin": -1.47403,
+    "Mag": 19.99,
+    "Size": "4",
+    "Name": "IC432"
+  },
+  {
+    "RtAsc": 5.704821,
+    "Declin": -2.39077,
+    "Mag": 19.99,
+    "Size": "30",
+    "Name": "Horsehead nebula IC434"
+  },
+  {
+    "RtAsc": 5.69551,
+    "Declin": -68.9135,
+    "Mag": 11.6,
+    "Size": "0.85",
+    "Name": "NGC2093"
+  },
+  {
+    "RtAsc": 5.715501,
+    "Declin": -2.25033,
+    "Mag": 19.99,
+    "Size": "9",
+    "Name": "NGC2023"
+  },
+  {
+    "RtAsc": 5.689634,
+    "Declin": -71.32494,
+    "Mag": 20.0,
+    "Size": "3.5",
+    "Name": "NGC2103"
+  },
+  {
+    "RtAsc": 5.716713,
+    "Declin": -1.84758,
+    "Mag": 19.99,
+    "Size": "30",
+    "Name": "NGC2024"
+  },
+  {
+    "RtAsc": 5.738181,
+    "Declin": -2.30866,
+    "Mag": 19.99,
+    "Size": "2.5",
+    "Name": "IC435"
+  },
+  {
+    "RtAsc": 5.754117,
+    "Declin": -69.76815,
+    "Mag": 12.3,
+    "Size": "1.35",
+    "Name": "NGC2113"
+  },
+  {
+    "RtAsc": 5.793717,
+    "Declin": 0.01187,
+    "Mag": 20.0,
+    "Size": "10",
+    "Name": "NGC2064"
+  },
+  {
+    "RtAsc": 5.797443,
+    "Declin": 0.13701,
+    "Mag": 19.99,
+    "Size": "5.5",
+    "Name": "NGC2067"
+  },
+  {
+    "RtAsc": 5.801292,
+    "Declin": 0.08493,
+    "Mag": 8.0,
+    "Size": "7",
+    "Name": "M78 NGC2068"
+  },
+  {
+    "RtAsc": 5.807286,
+    "Declin": 0.29971,
+    "Mag": 19.99,
+    "Size": "6",
+    "Name": "NGC2071"
+  },
+  {
+    "RtAsc": 5.811462,
+    "Declin": -70.06583,
+    "Mag": 10.4,
+    "Size": "5.5",
+    "Name": "NGC2122"
+  },
+  {
+    "RtAsc": 5.92851,
+    "Declin": -68.20151,
+    "Mag": 12.9,
+    "Size": "0.1",
+    "Name": "NGC2147"
+  },
+  {
+    "RtAsc": 6.07887,
+    "Declin": -9.73514,
+    "Mag": 20.0,
+    "Size": "2.5",
+    "Name": "NGC2149"
+  },
+  {
+    "RtAsc": 6.137133,
+    "Declin": -6.20916,
+    "Mag": 20.0,
+    "Size": "2",
+    "Name": "NGC2167"
+  },
+  {
+    "RtAsc": 6.14623,
+    "Declin": -6.40505,
+    "Mag": 20.0,
+    "Size": "5",
+    "Name": "NGC2170"
+  },
+  {
+    "RtAsc": 6.155491,
+    "Declin": 18.65058,
+    "Mag": 20.0,
+    "Size": "1.25",
+    "Name": "NGC2163"
+  },
+  {
+    "RtAsc": 6.179436,
+    "Declin": -6.33458,
+    "Mag": 20.0,
+    "Size": "2.5",
+    "Name": "NGC2182"
+  },
+  {
+    "RtAsc": 6.182028,
+    "Declin": 20.65155,
+    "Mag": 20.0,
+    "Size": "2.5",
+    "Name": "NGC2174"
+  },
+  {
+    "RtAsc": 6.186426,
+    "Declin": 20.47943,
+    "Mag": 6.8,
+    "Size": "35",
+    "Name": "Monkey Head Nebula NGC2175"
+  },
+  {
+    "RtAsc": 6.190382,
+    "Declin": 20.3918,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "IC2159"
+  },
+  {
+    "RtAsc": 6.200616,
+    "Declin": -6.22094,
+    "Mag": 20.0,
+    "Size": "2",
+    "Name": "NGC2183"
+  },
+  {
+    "RtAsc": 6.204357,
+    "Declin": -6.23608,
+    "Mag": 20.0,
+    "Size": "3",
+    "Name": "NGC2185"
+  },
+  {
+    "RtAsc": 6.239933,
+    "Declin": 17.97324,
+    "Mag": 20.0,
+    "Size": "7.5",
+    "Name": "IC2162"
+  },
+  {
+    "RtAsc": 6.307523,
+    "Declin": 22.77081,
+    "Mag": 19.99,
+    "Size": "25",
+    "Name": "IC443"
+  },
+  {
+    "RtAsc": 6.365938,
+    "Declin": 23.252,
+    "Mag": 20.0,
+    "Size": "4",
+    "Name": "IC444"
+  },
+  {
+    "RtAsc": 6.537897,
+    "Declin": 5.02799,
+    "Mag": 20.0,
+    "Size": "90",
+    "Name": "Rosette nebula NGC2237 C49"
+  },
+  {
+    "RtAsc": 6.533919,
+    "Declin": 4.99202,
+    "Mag": 20.0,
+    "Size": "70",
+    "Name": "Rosette nebula NGC2238"
+  },
+  {
+    "RtAsc": 6.54028,
+    "Declin": 10.42878,
+    "Mag": 20.0,
+    "Size": "2.5",
+    "Name": "IC446"
+  },
+  {
+    "RtAsc": 6.543511,
+    "Declin": 9.87867,
+    "Mag": 20.0,
+    "Size": "12.5",
+    "Name": "IC2169"
+  },
+  {
+    "RtAsc": 6.554801,
+    "Declin": 4.92126,
+    "Mag": 4.8,
+    "Size": "12",
+    "Name": "Rosette Nebula NGC2244 C50"
+  },
+  {
+    "RtAsc": 6.565411,
+    "Declin": 5.10615,
+    "Mag": 20.0,
+    "Size": "70",
+    "Name": "Rosette nebula NGC2246"
+  },
+  {
+    "RtAsc": 6.568342,
+    "Declin": 10.13439,
+    "Mag": 20.0,
+    "Size": "2",
+    "Name": "NGC2245"
+  },
+  {
+    "RtAsc": 6.5681,
+    "Declin": 7.29441,
+    "Mag": 20.0,
+    "Size": "7.5",
+    "Name": "IC448"
+  },
+  {
+    "RtAsc": 6.575016,
+    "Declin": 10.29916,
+    "Mag": 20.0,
+    "Size": "2",
+    "Name": "NGC2247"
+  },
+  {
+    "RtAsc": 6.675968,
+    "Declin": 8.71801,
+    "Mag": 9.0,
+    "Size": "1.5",
+    "Name": "Hubble's variable neb NGC2261 C46"
+  },
+  {
+    "RtAsc": 6.70637,
+    "Declin": 9.86827,
+    "Mag": 4.1,
+    "Size": "10",
+    "Name": "Cone nebula NGC2264"
+  },
+  {
+    "RtAsc": 6.803025,
+    "Declin": 1.28422,
+    "Mag": 20.0,
+    "Size": "3",
+    "Name": "NGC2282"
+  },
+  {
+    "RtAsc": 6.830011,
+    "Declin": -16.93308,
+    "Mag": 13.0,
+    "Size": "0.5",
+    "Name": "NGC2296"
+  },
+  {
+    "RtAsc": 6.988076,
+    "Declin": -7.98229,
+    "Mag": 20.0,
+    "Size": "0.4",
+    "Name": "NGC2313"
+  },
+  {
+    "RtAsc": 7.015531,
+    "Declin": -7.81303,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC2317"
+  },
+  {
+    "RtAsc": 7.015339,
+    "Declin": -7.81606,
+    "Mag": 20.0,
+    "Size": "2",
+    "Name": "NGC2316"
+  },
+  {
+    "RtAsc": 7.088769,
+    "Declin": -11.35495,
+    "Mag": 20.0,
+    "Size": "10",
+    "Name": "NGC2327"
+  },
+  {
+    "RtAsc": 7.105218,
+    "Declin": -10.74138,
+    "Mag": 20.0,
+    "Size": "60",
+    "Name": "IC2177"
+  },
+  {
+    "RtAsc": 7.164556,
+    "Declin": -4.36019,
+    "Mag": 20.0,
+    "Size": "0.5",
+    "Name": "IC466"
+  },
+  {
+    "RtAsc": 7.311503,
+    "Declin": -13.19848,
+    "Mag": 20.0,
+    "Size": "10",
+    "Name": "IC468"
+  },
+  {
+    "RtAsc": 7.326469,
+    "Declin": -13.25841,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC2361"
+  },
+  {
+    "RtAsc": 7.328415,
+    "Declin": -13.27629,
+    "Mag": 20.0,
+    "Size": "7.5",
+    "Name": "NGC2359"
+  },
+  {
+    "RtAsc": 7.892695,
+    "Declin": -26.4973,
+    "Mag": 7.1,
+    "Size": "7.5",
+    "Name": "NGC2467"
+  },
+  {
+    "RtAsc": 7.955309,
+    "Declin": -59.18505,
+    "Mag": 19.99,
+    "Size": "8",
+    "Name": "Toby Jug nebula IC2220"
+  },
+  {
+    "RtAsc": 8.364468,
+    "Declin": -36.29844,
+    "Mag": 7.5,
+    "Size": "5",
+    "Name": "NGC2579"
+  },
+  {
+    "RtAsc": 8.607721,
+    "Declin": -40.76009,
+    "Mag": 20.0,
+    "Size": "5",
+    "Name": "NGC2626"
+  },
+  {
+    "RtAsc": 9.019899,
+    "Declin": -46.04647,
+    "Mag": 20.0,
+    "Size": "18.5",
+    "Name": "NGC2736"
+  },
+  {
+    "RtAsc": 10.305728,
+    "Declin": -58.04542,
+    "Mag": 20.0,
+    "Size": "22",
+    "Name": "NGC3199"
+  },
+  {
+    "RtAsc": 10.638516,
+    "Declin": -58.78777,
+    "Mag": 6.7,
+    "Size": "2.5",
+    "Name": "NGC3324"
+  },
+  {
+    "RtAsc": 10.769252,
+    "Declin": -59.99698,
+    "Mag": 19.99,
+    "Size": "120",
+    "Name": "eta Car nebula NGC3372 C92"
+  },
+  {
+    "RtAsc": 11.039401,
+    "Declin": -59.97892,
+    "Mag": 20.0,
+    "Size": "3",
+    "Name": "NGC3503"
+  },
+  {
+    "RtAsc": 11.210894,
+    "Declin": -61.49503,
+    "Mag": 20.0,
+    "Size": "0.5",
+    "Name": "NGC3576"
+  },
+  {
+    "RtAsc": 11.218351,
+    "Declin": -61.37591,
+    "Mag": 20.0,
+    "Size": "17.5",
+    "Name": "NGC3579"
+  },
+  {
+    "RtAsc": 11.218996,
+    "Declin": -61.43492,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC3581"
+  },
+  {
+    "RtAsc": 11.221838,
+    "Declin": -61.40687,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC3582"
+  },
+  {
+    "RtAsc": 11.223992,
+    "Declin": -61.36162,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC3584"
+  },
+  {
+    "RtAsc": 11.226814,
+    "Declin": -61.48539,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC3586"
+  },
+  {
+    "RtAsc": 11.388679,
+    "Declin": 13.99298,
+    "Mag": 20.0,
+    "Size": "0.15",
+    "Name": "IC2752"
+  },
+  {
+    "RtAsc": 11.388679,
+    "Declin": 14.00965,
+    "Mag": 20.0,
+    "Size": "0.25",
+    "Name": "IC2754"
+  },
+  {
+    "RtAsc": 11.393681,
+    "Declin": 14.04297,
+    "Mag": 20.0,
+    "Size": "0.05",
+    "Name": "IC2761"
+  },
+  {
+    "RtAsc": 11.395323,
+    "Declin": 14.0763,
+    "Mag": 20.0,
+    "Size": "0.05",
+    "Name": "IC2765"
+  },
+  {
+    "RtAsc": 11.428636,
+    "Declin": 13.70946,
+    "Mag": 20.0,
+    "Size": "0.2",
+    "Name": "IC2799"
+  },
+  {
+    "RtAsc": 11.502868,
+    "Declin": -63.08419,
+    "Mag": 20.0,
+    "Size": "6",
+    "Name": "IC2872"
+  },
+  {
+    "RtAsc": 11.630105,
+    "Declin": -63.16828,
+    "Mag": 4.5,
+    "Size": "37.5",
+    "Name": "lambda Cen nebula IC2944 C100"
+  },
+  {
+    "RtAsc": 11.666915,
+    "Declin": -63.66855,
+    "Mag": 19.99,
+    "Size": "30",
+    "Name": "lambda Cen nebula IC2948"
+  },
+  {
+    "RtAsc": 11.861117,
+    "Declin": -65.0353,
+    "Mag": 20.0,
+    "Size": "1.5",
+    "Name": "IC2966"
+  },
+  {
+    "RtAsc": 12.339648,
+    "Declin": 13.84197,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "IC3142"
+  },
+  {
+    "RtAsc": 12.612638,
+    "Declin": 74.10628,
+    "Mag": 20.0,
+    "Size": "0.5",
+    "Name": "IC802"
+  },
+  {
+    "RtAsc": 13.736883,
+    "Declin": 55.46977,
+    "Mag": 20.0,
+    "Size": "0.05",
+    "Name": "IC922"
+  },
+  {
+    "RtAsc": 13.743542,
+    "Declin": 55.48655,
+    "Mag": 20.0,
+    "Size": "0.05",
+    "Name": "IC928"
+  },
+  {
+    "RtAsc": 13.745217,
+    "Declin": 55.48658,
+    "Mag": 20.0,
+    "Size": "0.05",
+    "Name": "IC931"
+  },
+  {
+    "RtAsc": 13.987479,
+    "Declin": -40.09633,
+    "Mag": 20.0,
+    "Size": "6.5",
+    "Name": "NGC5367"
+  },
+  {
+    "RtAsc": 16.224157,
+    "Declin": -19.52779,
+    "Mag": 20.0,
+    "Size": "75",
+    "Name": "IC4592"
+  },
+  {
+    "RtAsc": 16.357638,
+    "Declin": -20.09009,
+    "Mag": 20.0,
+    "Size": "10",
+    "Name": "IC4601"
+  },
+  {
+    "RtAsc": 16.451749,
+    "Declin": -24.52006,
+    "Mag": 20.0,
+    "Size": "10",
+    "Name": "IC4603"
+  },
+  {
+    "RtAsc": 16.451566,
+    "Declin": -23.48679,
+    "Mag": 19.99,
+    "Size": "30",
+    "Name": "rho Oph nebula IC4604"
+  },
+  {
+    "RtAsc": 16.528554,
+    "Declin": -25.15081,
+    "Mag": 20.0,
+    "Size": "15",
+    "Name": "IC4605"
+  },
+  {
+    "RtAsc": 16.592304,
+    "Declin": -48.12716,
+    "Mag": 20.0,
+    "Size": "0.65",
+    "Name": "NGC6164"
+  },
+  {
+    "RtAsc": 16.598254,
+    "Declin": -48.20001,
+    "Mag": 20.0,
+    "Size": "1.5",
+    "Name": "NGC6165"
+  },
+  {
+    "RtAsc": 16.699315,
+    "Declin": -48.70631,
+    "Mag": 20.0,
+    "Size": "16",
+    "Name": "NGC6188"
+  },
+  {
+    "RtAsc": 16.978735,
+    "Declin": -40.36812,
+    "Mag": 20.0,
+    "Size": "45",
+    "Name": "IC4628"
+  },
+  {
+    "RtAsc": 17.374941,
+    "Declin": -36.12382,
+    "Mag": 20.0,
+    "Size": "27.5",
+    "Name": "NGC6334"
+  },
+  {
+    "RtAsc": 17.439441,
+    "Declin": -34.22022,
+    "Mag": 20.0,
+    "Size": "17.5",
+    "Name": "NGC6357"
+  },
+  {
+    "RtAsc": 17.943186,
+    "Declin": -21.80102,
+    "Mag": 20.0,
+    "Size": "2.5",
+    "Name": "IC4670"
+  },
+  {
+    "RtAsc": 18.064231,
+    "Declin": -23.02384,
+    "Mag": 6.3,
+    "Size": "20",
+    "Name": "Trifid nebula M20 NGC6514"
+  },
+  {
+    "RtAsc": 18.093721,
+    "Declin": -24.43745,
+    "Mag": 20.0,
+    "Size": "20",
+    "Name": "NGC6526"
+  },
+  {
+    "RtAsc": 18.086796,
+    "Declin": -24.37605,
+    "Mag": 5.8,
+    "Size": "37.5",
+    "Name": "M8 NGC6523"
+  },
+  {
+    "RtAsc": 18.100618,
+    "Declin": -24.35332,
+    "Mag": 4.6,
+    "Size": "7",
+    "Name": "NGC6530"
+  },
+  {
+    "RtAsc": 18.093101,
+    "Declin": -24.3925,
+    "Mag": 20.0,
+    "Size": "65",
+    "Name": "NGC6533"
+  },
+  {
+    "RtAsc": 18.176827,
+    "Declin": -23.40921,
+    "Mag": 20.0,
+    "Size": "1.5",
+    "Name": "IC4684"
+  },
+  {
+    "RtAsc": 18.180258,
+    "Declin": -23.97574,
+    "Mag": 20.0,
+    "Size": "5",
+    "Name": "IC4685"
+  },
+  {
+    "RtAsc": 18.183533,
+    "Declin": -23.72564,
+    "Mag": 20.0,
+    "Size": "4.5",
+    "Name": "IC1274"
+  },
+  {
+    "RtAsc": 18.191053,
+    "Declin": -24.09842,
+    "Mag": 20.0,
+    "Size": "12.5",
+    "Name": "NGC6559"
+  },
+  {
+    "RtAsc": 18.191879,
+    "Declin": -23.82532,
+    "Mag": 20.0,
+    "Size": "5",
+    "Name": "IC1275"
+  },
+  {
+    "RtAsc": 18.298901,
+    "Declin": -16.72154,
+    "Mag": 20.0,
+    "Size": "30",
+    "Name": "IC4701"
+  },
+  {
+    "RtAsc": 18.30647,
+    "Declin": -19.76514,
+    "Mag": 20.0,
+    "Size": "4",
+    "Name": "NGC6589"
+  },
+  {
+    "RtAsc": 18.30916,
+    "Declin": -19.85391,
+    "Mag": 20.0,
+    "Size": "3.5",
+    "Name": "NGC6590 ngc6595"
+  },
+  {
+    "RtAsc": 18.30916,
+    "Declin": -19.85391,
+    "Mag": 7.0,
+    "Size": "3.5",
+    "Name": "NGC6595"
+  },
+  {
+    "RtAsc": 18.312764,
+    "Declin": -19.72103,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "IC1283"
+  },
+  {
+    "RtAsc": 18.319436,
+    "Declin": -19.65409,
+    "Mag": 20.0,
+    "Size": "5",
+    "Name": "IC1284"
+  },
+  {
+    "RtAsc": 18.323949,
+    "Declin": -12.2304,
+    "Mag": 6.5,
+    "Size": "2",
+    "Name": "NGC6604"
+  },
+  {
+    "RtAsc": 18.336781,
+    "Declin": -13.79404,
+    "Mag": 6.0,
+    "Size": "72.5",
+    "Name": "EAGLE NEBULA M16 NGC6611"
+  },
+  {
+    "RtAsc": 18.338419,
+    "Declin": -13.77015,
+    "Mag": 19.99,
+    "Size": "0",
+    "Name": "Star Queen nebula IC4703 M16"
+  },
+  {
+    "RtAsc": 18.370226,
+    "Declin": -16.1573,
+    "Mag": 6.0,
+    "Size": "17.5",
+    "Name": "Omega nebula M17 NGC6618"
+  },
+  {
+    "RtAsc": 18.460874,
+    "Declin": -18.41566,
+    "Mag": 20.0,
+    "Size": "15",
+    "Name": "IC4715"
+  },
+  {
+    "RtAsc": 18.544554,
+    "Declin": -10.81267,
+    "Mag": 20.0,
+    "Size": "22",
+    "Name": "IC1287"
+  },
+  {
+    "RtAsc": 19.046158,
+    "Declin": -37.02843,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "IC4812"
+  },
+  {
+    "RtAsc": 19.055202,
+    "Declin": -36.85228,
+    "Mag": 20.0,
+    "Size": "2",
+    "Name": "NGC6726"
+  },
+  {
+    "RtAsc": 19.055695,
+    "Declin": -36.83811,
+    "Mag": 20.0,
+    "Size": "2",
+    "Name": "NGC6727"
+  },
+  {
+    "RtAsc": 19.059493,
+    "Declin": -36.91464,
+    "Mag": 20.0,
+    "Size": "0.5",
+    "Name": "NGC6729 C68"
+  },
+  {
+    "RtAsc": 19.689599,
+    "Declin": 27.37066,
+    "Mag": 20.0,
+    "Size": "0.5",
+    "Name": "NGC6813"
+  },
+  {
+    "RtAsc": 19.725301,
+    "Declin": 23.15063,
+    "Mag": 20.0,
+    "Size": "0.5",
+    "Name": "NGC6820"
+  },
+  {
+    "RtAsc": 19.736881,
+    "Declin": 23.36296,
+    "Mag": 7.1,
+    "Size": "6",
+    "Name": "NGC6823"
+  },
+  {
+    "RtAsc": 19.960192,
+    "Declin": 30.2833,
+    "Mag": 20.0,
+    "Size": "0",
+    "Name": "NGC6847"
+  },
+  {
+    "RtAsc": 20.045811,
+    "Declin": 33.59927,
+    "Mag": 20.0,
+    "Size": "3",
+    "Name": "NGC6857"
+  },
+  {
+    "RtAsc": 20.096651,
+    "Declin": 29.32492,
+    "Mag": 20.0,
+    "Size": "12.5",
+    "Name": "IC4954"
+  },
+  {
+    "RtAsc": 20.185859,
+    "Declin": 41.29489,
+    "Mag": 13.0,
+    "Size": "30",
+    "Name": "IC1311"
+  },
+  {
+    "RtAsc": 20.216674,
+    "Declin": 38.43406,
+    "Mag": 19.99,
+    "Size": "15",
+    "Name": "Crescent nebula NGC6888 C27"
+  },
+  {
+    "RtAsc": 20.426236,
+    "Declin": 42.56844,
+    "Mag": 20.0,
+    "Size": "1.5",
+    "Name": "NGC6914"
+  },
+  {
+    "RtAsc": 20.861494,
+    "Declin": 42.61494,
+    "Mag": 19.99,
+    "Size": "40",
+    "Name": "IC5068"
+  },
+  {
+    "RtAsc": 20.861068,
+    "Declin": 44.44837,
+    "Mag": 19.99,
+    "Size": "40",
+    "Name": "Pelican nebula IC5070"
+  },
+  {
+    "RtAsc": 20.945481,
+    "Declin": 47.51746,
+    "Mag": 20.0,
+    "Size": "4.5",
+    "Name": "IC5076"
+  },
+  {
+    "RtAsc": 20.953823,
+    "Declin": 31.16686,
+    "Mag": 20.0,
+    "Size": "12.5",
+    "Name": "IC1340"
+  },
+  {
+    "RtAsc": 21.044772,
+    "Declin": 44.3033,
+    "Mag": 19.99,
+    "Size": "80",
+    "Name": "North America nebula NGC7000 C20"
+  },
+  {
+    "RtAsc": 21.030958,
+    "Declin": 68.27392,
+    "Mag": 7.0,
+    "Size": "2.5",
+    "Name": "Iris Nebula NGC7023 C4"
+  },
+  {
+    "RtAsc": 21.664336,
+    "Declin": 57.61857,
+    "Mag": 3.5,
+    "Size": "85",
+    "Name": "Elephant's Trunk Nebula IC1396"
+  },
+  {
+    "RtAsc": 21.725517,
+    "Declin": 66.23354,
+    "Mag": 12.0,
+    "Size": "1.35",
+    "Name": "NGC7129"
+  },
+  {
+    "RtAsc": 21.905941,
+    "Declin": 47.38992,
+    "Mag": 7.2,
+    "Size": "6",
+    "Name": "Cocoon nebula IC5146 C19"
+  },
+  {
+    "RtAsc": 22.805796,
+    "Declin": 58.27024,
+    "Mag": 7.2,
+    "Size": "6",
+    "Name": "Wizard Nebula NGC7380"
+  },
+  {
+    "RtAsc": 23.104223,
+    "Declin": 60.39104,
+    "Mag": 20.0,
+    "Size": "7.5",
+    "Name": "IC1470"
+  },
+  {
+    "RtAsc": 23.245385,
+    "Declin": 61.65504,
+    "Mag": 20.0,
+    "Size": "7.5",
+    "Name": "NGC7538"
+  },
+  {
+    "RtAsc": 23.364539,
+    "Declin": 61.3556,
+    "Mag": 19.99,
+    "Size": "11.5",
+    "Name": "Bubble nebula NGC7635 C11"
+  },
+  {
+    "RtAsc": 22.97128,
+    "Declin": 62.61585,
+    "Mag": 7.7,
+    "Size": "40",
+    "Name": "Cave Nebula C9"
+  }
+]
