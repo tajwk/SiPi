@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SiPi Telescope Control – Quick Start Manual</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    :root {
+      --primary: #204080;
+      --secondary: #4573c3;
+      --accent: #0078d7;
+      --bg: #f8f9fb;
+      --panel: #fff;
+      --text: #202326;
+      --border: #d2d6e0;
+      --shadow: 0 4px 24px rgba(32,64,128,0.04);
+      --radius: 10px;
+      --header-height: 64px;
+      --max-width: 840px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --primary: #ff5555;
+        --secondary: #b1001e;
+        --accent: #ff6600;
+        --bg: #1a1c23;
+        --panel: #232634;
+        --text: #e9ecf1;
+        --border: #444a5c;
+        --shadow: 0 4px 24px rgba(16,24,32,0.45);
+      }
+    }
+    html, body {
+      margin: 0; padding: 0;
+      font-family: system-ui, "Segoe UI", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      min-height: 100vh;
+    }
+    .header {
+      background: var(--primary);
+      color: #fff;
+      padding: 0 32px;
+      height: var(--header-height);
+      display: flex;
+      align-items: center;
+      box-shadow: var(--shadow);
+    }
+    .header__title {
+      font-size: 1.5rem;
+      font-weight: 600;
+      letter-spacing: 1px;
+      margin: 0;
+    }
+    .container {
+      max-width: var(--max-width);
+      margin: 36px auto 36px auto;
+      background: var(--panel);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 32px 24px 24px 24px;
+      border: 1px solid var(--border);
+    }
+    h1, h2, h3 {
+      color: var(--primary);
+      font-family: inherit;
+      font-weight: 700;
+      margin-top: 2.2em;
+      margin-bottom: .7em;
+    }
+    h1 {
+      margin-top: 0;
+      font-size: 2.2rem;
+      color: var(--secondary);
+    }
+    h2 { font-size: 1.35rem; }
+    h3 { font-size: 1.1rem; }
+    p {
+      margin: 1em 0;
+    }
+    ol, ul {
+      margin: 0 0 1em 1.4em;
+    }
+    .steps {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin: 24px 0;
+    }
+    .tip {
+      background: #eaf4fc;
+      color: #0a2744;
+      border-left: 5px solid var(--accent);
+      padding: 12px 18px;
+      margin: 1.5em 0;
+      border-radius: 7px;
+      font-size: 0.98em;
+    }
+    @media (prefers-color-scheme: dark) {
+      .tip {
+        background: #222d38;
+        color: #d2e8ff;
+        border-left: 5px solid var(--accent);
+      }
+    }
+    .callout {
+      font-weight: 600;
+      color: var(--accent);
+      font-size: 1.08em;
+      margin-top: 16px;
+    }
+    .panel {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin: 2em 0;
+      padding: 20px 24px;
+    }
+    .img-demo {
+      display: block;
+      margin: 20px auto;
+      max-width: 95%;
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 8px rgba(32,64,128,0.05);
+    }
+    code, pre {
+      background: #e4e6f0;
+      color: #233;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: "JetBrains Mono", "Fira Mono", "Menlo", monospace;
+      font-size: 0.98em;
+    }
+    @media (prefers-color-scheme: dark) {
+      code, pre { background: #252c34; color: #fff2e0; }
+    }
+    .footer {
+      max-width: var(--max-width);
+      margin: 40px auto 12px auto;
+      color: #7b7c89;
+      text-align: center;
+      font-size: 0.97em;
+    }
+    .logo {
+      width: 40px;
+      height: 40px;
+      margin-right: 14px;
+      vertical-align: middle;
+    }
+    @media (max-width:600px) {
+      .container { padding: 8vw 2vw; }
+      .header { padding: 0 4vw; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <h1>SiPi Quick Start Guide</h1>
+    <p>
+      Welcome to SiPi, your browser-based interface for Sidereal Technology telescope control. This manual will help you set up, connect, and start operating your telescope quickly and confidently.
+    </p>
+
+    <h2>1. System Setup</h2>
+    <div class="steps">
+      <ol>
+        <li>Power on your Raspberry Pi running SiPi.</li>
+        <li>
+          On your device (tablet, or phone, or PC), connect to the Pi's Wi-Fi network.<br>
+          <code>SSID</code> and <code>password</code> can be configured in the settings if needed.
+        </li>
+        <li>
+          Open your browser and go to:<br>
+          <code>http://192.168.11.1:5000</code>
+        </li>
+      </ol>
+    </div>
+    <div class="tip">
+      If the page does not load, confirm that you are on the correct Wi-Fi and the Pi is fully booted.
+    </div>
+
+    <h2>2. Main Interface Overview</h2>
+    <ul>
+      <li><strong>Status Panel:</strong> Live RA/Dec, Alt/Az, Controller Status, Time, LST, and HA</li>
+      <li><strong>Object Search:</strong> Search for stars, Messier objects, planets, and more.</li>
+      <li><strong>Model Panel:</strong> Manage mount calibration and alignment points.</li>
+      <li><strong>Handpad Controls:</strong> Slew or nudge the telescope with on-screen arrows.</li>
+      <li><strong>Settings:</strong> Gear icon for advanced mount and network configuration.</li>
+	  <li><strong>Full Screen:</strong> [ ] icon to toggle full screen.</li>
+	  <li><strong>Night Mode:</strong> * Icon to toggle between Day and Night Modes</li>
+    </ul>
+
+    <h2>3. Sync on an Object</h2>
+    <div class="steps">
+      <ol>
+	    <li>Slew to a known object and center it in the eyepiece</li>
+        <li>Enter the object name (e.g., <code>Vega</code>, <code>M13</code>) in the search bar.</li>
+        <li>Click <b>Search</b>. Select your desired object from the results if prompted.</li>
+        <li>Click <b>Model</b> and then Click <b>Sync</b> </li>
+		<li>The mount status should now indicated that it's Tracking
+      </ol>
+    </div>
+
+    <h2>4. Model Building</h2>
+    <div class="steps">
+      <ol>
+        <li><b>Search</b> for an object and perform a <b>GoTo</b></li>
+        <li>Use the handpad to center the object in the eyepiece and then press <b>+Cal Pt</b>.</li>
+        <li>Repeat with additional stars across the sky.<br></li>
+        <li>When done, click <b>Save</b> to save your pointing model.</li>
+		<li>To create a new model, click <b>Clear</b> to remove all calibration points</li>
+      </ol>
+    </div>
+    <div class="tip">
+      Do not add a calibration point on your sync star; use different objects for each step.<br></div>
+	 <div>
+	 <div class="tip">
+	  If the mount remains stationary between uses, the model can be reused. If the mount is transported, a new model is needed.<br>
+    </div>
+
+    <h2>5. Handpad Control</h2>
+    <div class="panel">
+      <b>Use the on-screen handpad to:</b>
+      <ul>
+        <li><b>Move Up/Down:</b> Secondary axis (Declination/Altitude).</li>
+        <li><b>Move Left/Right:</b> Primary axis (RA/Azimuth).</li>
+        <li><b>Change Speed:</b> Tap the center to toggle Slew, Pan, or Guide modes.</li>
+        <li><b>STOP</b> Halts all motion instantly. <b>START</b> begins Tracking</li>
+		<li><b>AUTO</b> is used for normal operation. <b>MANUAL</b> disengages the motors for maintenance, adjustment or after parking</li>
+      
+    </div>
+
+    <h2>7. Advanced Settings & Updates</h2>
+    <div class="panel">
+      <b>Click the gear (<b>⚙</b>) icon to access the configuration:</b>
+      <ul>
+        <li>Click the SiTechExe Config button to show/hide the SiTechExe options.
+        <li>Set your Mount Type and Scope Encoder Settings </li>
+        <li>In the textbox, enter your <b>SiteLongitude</b> and <b>SiteLatitude</b> </li><br>
+		<span class="callout">Always click <b>Save Config</b> after making changes to SiTechExe!</span><br><br>
+		<li>System Time can be set by entering a time HH:MM and Clicking <b>Set</b>. Clicking <b>Sync</b> will enter your device. </li>
+        <li>Set your Wi-Fi SSID and password if desired. </li>
+        <li>Hanpad tilt and vibration settings can be set here. (Note these features are not supported by all web browsers)</li>
+        <li>Check for and apply SiPi updates</li>
+      </ul>
+      
+    </div>
+
+    <h2>8. SkyView Planetarium</h2>
+    <div class="steps">
+      <ol>
+        <li>Click <b>SkyView</b> to open a live sky map</li>
+        <li>Pan/zoom to explore, click objects for info or GoTo.</li>
+		<li>The Objects menu has checkboxes that allow you to enable/disable each type</li>
+		<li>Click the refresh button for default zoom or the back button to return to the main screen </li>
+      </ol>
+    </div>
+
+    <h2>9. Troubleshooting</h2>
+    <ul>
+      <li><b>Page won’t load?</b> Check Wi-Fi and Pi power.</li>
+      <li><b>No telescope response?</b> Ensure SiTechExe is running and configured for TCP/IP.</li>
+      <li><b>Slow or unresponsive UI?</b> Wait a minute after boot for initialization.</li>
+    </ul>
+
+    <h2>10. Typical Workflow</h2>
+    <ol>
+      <li>Power on your Pi and telescope.</li>
+      <li>Connect to the Pi’s Wi-Fi and open SiPi.</li>
+      <li>Search for and slew to a bright star.</li>
+      <li>Center, then Sync.</li>
+      <li>Add more calibration points with additional objects.</li>
+      <li>Save the model.</li>
+      <li>Ready for GoTos all night!</li>
+    </ol>
+
+    <div class="footer">
+      &copy; 2025 <br> For support please visit  
+      <a href="https://siderealtechnology.com" style="color:var(--accent);text-decoration:none;">siderealtechnology.com</a>
+    </div>
+  </div>
+</body>
+</html>

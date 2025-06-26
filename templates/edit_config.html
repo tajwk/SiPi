@@ -55,7 +55,7 @@
     }
 
     .btn {
-      border: 1px solid var(--accent);
+      border: 2px solid var(--accent); /* Match border width to Back button */
       padding: 0.5em 1em;
       border-radius: var(--radius);
       background-color: var(--surface);
@@ -63,7 +63,7 @@
       font: inherit;
       cursor: pointer;
       transition: var(--transition);
-      font-size: 1rem;
+      font-size: 1.1rem; /* Match text size to Back button */
     }
     .btn:hover,
     .btn:focus {
@@ -114,6 +114,35 @@
     #toggleConfigBtn {
       margin-bottom: 12px;
     }
+
+    .help-btn-fixed {
+      position: absolute;
+      top: 18px;
+      right: 24px;
+      z-index: 1000;
+      border: 2px solid var(--accent); /* Match border width to Back button */
+      background: var(--surface);
+      color: var(--fg);
+      font-weight: bold;
+      transition: background 0.2s, color 0.2s, border 0.2s;
+      padding: 0.5em 1em;
+      font-size: 1.1rem; /* Match text size to Back button */
+      border-radius: var(--radius);
+      height: auto;
+      min-width: 0;
+      min-height: 0;
+      box-sizing: border-box;
+    }
+    .help-btn-fixed:hover, .help-btn-fixed:focus {
+      background: var(--surface-alt);
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+    body.night-mode .help-btn-fixed {
+      background: var(--surface);
+      color: var(--fg);
+      border-color: var(--accent);
+    }
   </style>
 </head>
 <body>
@@ -129,6 +158,11 @@
     }
   });
 </script>
+
+<!-- Help button at top right -->
+<div>
+  <a href="{{ url_for('quickstart') }}" target="_blank" class="btn help-btn-fixed">Help</a>
+</div>
 
 <div class="container">
   <div style="text-align:left; margin-bottom: 20px;">

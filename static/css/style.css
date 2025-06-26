@@ -231,6 +231,7 @@ button {
 
 .search-results__info {
   margin-bottom: var(--gap);
+  color: var(--fg);
 }
 
 /*----------------------------------------------------------------------------
@@ -249,6 +250,7 @@ button {
 .model-panel__info {
   display: flex;
   gap: var(--gap);
+  color: var(--fg);
 }
 
 .model-panel__actions {

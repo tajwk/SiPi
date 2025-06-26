@@ -4,7 +4,6 @@ import threading
 import time
 import subprocess
 import os
-import re
 import datetime
 import math
 import json
@@ -14,7 +13,7 @@ from flask import (
 )
 
 # Initial SiPi version (bump patch for simple fixes)
-__version__ = "0.4.2"
+__version__ = "0.1"
 
 # Base directory for Git operations
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -552,42 +551,79 @@ def toggle_tilt():
 @app.route('/check_updates', methods=['POST'])
 def check_updates():
     try:
-        subprocess.run(['git','fetch'], cwd=BASE_DIR, capture_output=True, text=True)
+        env = os.environ.copy()
+        # Print working directory and environment
+        print(f"[DEBUG] os.getcwd(): {os.getcwd()}")
+        print(f"[DEBUG] BASE_DIR: {BASE_DIR}")
+        # Print git remote -v
+        try:
+            remote_v = subprocess.run(['git', 'remote', '-v'], cwd=BASE_DIR, capture_output=True, text=True, env=env).stdout.strip()
+        except Exception as e:
+            remote_v = f"[error running git remote -v: {e}]"
+        print(f"[DEBUG] git remote -v:\n{remote_v}")
+        # Fetch updates using HTTPS
+        fetch_result = subprocess.run(
+            ['git', 'fetch', '--prune', 'origin', '+refs/heads/*:refs/remotes/origin/*', '--verbose'],
+            cwd=BASE_DIR, capture_output=True, text=True, env=env)
+        print(f"[DEBUG] git fetch stdout: {fetch_result.stdout}")
+        print(f"[DEBUG] git fetch stderr: {fetch_result.stderr}")
         # Find current branch
         current_branch = subprocess.run(
             ['git','rev-parse','--abbrev-ref','HEAD'],
-            cwd=BASE_DIR, capture_output=True, text=True).stdout.strip()
+            cwd=BASE_DIR, capture_output=True, text=True, env=env).stdout.strip()
+        print(f"[DEBUG] current_branch: {current_branch}")
         # Get hashes
         local = subprocess.run(
             ['git','rev-parse','HEAD'],
-            cwd=BASE_DIR, capture_output=True, text=True).stdout.strip()
+            cwd=BASE_DIR, capture_output=True, text=True, env=env).stdout.strip()
+        print(f"[DEBUG] local HEAD: {local}")
         remote = subprocess.run(
             ['git','rev-parse',f'origin/{current_branch}'],
-            cwd=BASE_DIR, capture_output=True, text=True).stdout.strip()
+            cwd=BASE_DIR, capture_output=True, text=True, env=env).stdout.strip()
+        print(f"[DEBUG] remote HEAD: {remote}")
+        # Also print git status for more info
+        status = subprocess.run(
+            ['git','status','-b','-s','-uall'],
+            cwd=BASE_DIR, capture_output=True, text=True, env=env).stdout.strip()
+        print(f"[DEBUG] git status: {status}")
         available = (local != remote)
         return jsonify(
             updates_available=available,
             current_version=local,
-            latest_version=remote
+            latest_version=remote,
+            git_status=status,
+            fetch_stdout=fetch_result.stdout,
+            fetch_stderr=fetch_result.stderr,
+            remote_v=remote_v
         )
     except Exception as e:
+        print(f"[DEBUG] check_updates: Exception: {e}")
         return jsonify(updates_available=False, current_version="", latest_version="", error=str(e))
 
 
 @app.route('/apply_updates', methods=['POST'])
 def apply_updates():
     try:
-        result = subprocess.run(['git','pull','--ff-only'], cwd=BASE_DIR, capture_output=True, text=True)
-        if result.returncode == 0:
+        env = os.environ.copy()
+        # Print working directory and environment
+        print(f"[DEBUG] os.getcwd(): {os.getcwd()}")
+        print(f"[DEBUG] BASE_DIR: {BASE_DIR}")
+        # Pull latest changes using HTTPS
+        pull = subprocess.run(
+            ['git', 'pull', 'origin', 'main'],
+            cwd=BASE_DIR, capture_output=True, text=True, env=env)
+        print(f"[DEBUG] git pull stdout: {pull.stdout}")
+        print(f"[DEBUG] git pull stderr: {pull.stderr}")
+        if pull.returncode == 0:
             # ---- Auto-restart SiPi after update ----
             try:
-                subprocess.run(['systemctl', 'restart', 'sipi'], check=False)
+                subprocess.run(['systemctl', 'restart', 'sipi'], check=False, env=env)
                 restart_msg = "\n[sipi.service restarted]"
             except Exception as e:
                 restart_msg = f"\n[Failed to restart sipi.service: {e}]"
-            return jsonify(success=True, message=result.stdout.strip() + restart_msg)
+            return jsonify(success=True, message=pull.stdout.strip() + restart_msg)
         else:
-            return jsonify(success=False, message=result.stderr.strip())
+            return jsonify(success=False, message=pull.stderr.strip())
     except Exception as e:
         return jsonify(success=False, message=str(e))
 
@@ -660,6 +696,10 @@ def wait_for_ip(interface='wlan0'):
         if 'inet ' in result.stdout:
             return
         time.sleep(0.5)
+
+@app.route('/quickstart')
+def quickstart():
+    return render_template('quickstart.html')
 
 if __name__ == '__main__':
     get_site_location()

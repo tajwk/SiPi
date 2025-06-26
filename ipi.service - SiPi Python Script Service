@@ -1,0 +1,18 @@
+○ sipi.service - SiPi Python Script Service
+     Loaded: loaded (]8;;file://SiPiDev/etc/systemd/system/sipi.service/etc/systemd/system/sipi.service]8;;; [0;1;32menabled[0m; preset: [0;1;32menabled[0m)
+     Active: inactive (dead) since Tue 2025-06-24 15:07:53 PDT; 6min ago
+   Duration: 22min 43.069s
+    Process: 49752 ExecStart=/usr/bin/python3 /opt/SiTech/SiPi/SiPi.py (code=exited, status=0/SUCCESS)
+   Main PID: 49752 (code=exited, status=0/SUCCESS)
+        CPU: 47.735s
+
+Jun 24 15:06:17 SiPiDev python3[49758]: 192.168.51.57 - - [24/Jun/2025 15:06:17] "GET /status HTTP/1.1" 200 -
+Jun 24 15:06:17 SiPiDev python3[49758]: 192.168.51.57 - - [24/Jun/2025 15:06:17] "GET /status HTTP/1.1" 200 -
+Jun 24 15:07:01 SiPiDev python3[49758]: 192.168.51.88 - - [24/Jun/2025 15:07:01] "POST /check_updates HTTP/1.1" 200 -
+Jun 24 15:07:04 SiPiDev python3[49758]: 192.168.51.88 - - [24/Jun/2025 15:07:04] "POST /check_updates HTTP/1.1" 200 -
+Jun 24 15:07:17 SiPiDev python3[49758]: 192.168.51.57 - - [24/Jun/2025 15:07:17] "GET /status HTTP/1.1" 200 -
+Jun 24 15:07:17 SiPiDev python3[49758]: 192.168.51.57 - - [24/Jun/2025 15:07:17] "GET /status HTTP/1.1" 200 -
+Jun 24 15:07:52 SiPiDev systemd[1]: Stopping sipi.service - SiPi Python Script Service...
+Jun 24 15:07:53 SiPiDev systemd[1]: sipi.service: Deactivated successfully.
+Jun 24 15:07:53 SiPiDev systemd[1]: Stopped sipi.service - SiPi Python Script Service.
+Jun 24 15:07:53 SiPiDev systemd[1]: sipi.service: Consumed 47.735s CPU time.

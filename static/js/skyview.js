@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const HIT_PADDING = 4;
   // zoom limits
   const MIN_SCALE   = 0.5;
-  const MAX_SCALE   = 50;
+  const MAX_SCALE   = 100;
 
   // Convert degrees → “DDD:MM:SS”
   function degToDMS(deg) {
@@ -774,6 +774,46 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (toggleNebula) toggleNebula.addEventListener('change',()=>{ console.log('[SkyView] toggleNebula:', toggleNebula.checked); draw(); });
   if (togglePlanetary) togglePlanetary.addEventListener('change',()=>{ console.log('[SkyView] togglePlanetary:', togglePlanetary.checked); draw(); });
   if (toggleConstLabels) toggleConstLabels.addEventListener('change',()=>{ console.log('[SkyView] toggleConstLabels:', toggleConstLabels.checked); draw(); });
+
+  // --- Object toggle persistence ---
+  const toggleDefaults = {
+    toggleStars: true,
+    toggleConst: true,
+    toggleConstLabels: false,
+    toggleGal: false,
+    toggleOpen: false,
+    toggleGlobular: false,
+    toggleNebula: false,
+    togglePlanetary: false
+  };
+  function saveToggles() {
+    const state = {};
+    Object.keys(toggleDefaults).forEach(id => {
+      const el = window[id];
+      if (el) state[id] = el.checked;
+    });
+    localStorage.setItem('skyviewToggles', JSON.stringify(state));
+  }
+  function restoreToggles() {
+    let state = {};
+    try {
+      state = JSON.parse(localStorage.getItem('skyviewToggles')) || {};
+    } catch {}
+    Object.keys(toggleDefaults).forEach(id => {
+      const el = window[id];
+      if (el) {
+        // Use saved value if present, else default
+        el.checked = (id in state) ? state[id] : toggleDefaults[id];
+      }
+    });
+  }
+  // Restore on load
+  restoreToggles();
+  // Save on change
+  Object.keys(toggleDefaults).forEach(id => {
+    const el = window[id];
+    if (el) el.addEventListener('change', saveToggles);
+  });
 
   // transformEvent → world coords (robust, correct order, screen space)
   function transformEvent(e) {
