@@ -13,7 +13,7 @@ from flask import (
 )
 
 # Initial SiPi version (bump patch for simple fixes)
-__version__ = "0.6"
+__version__ = "0.7"
 
 # Base directory for Git operations
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -707,4 +707,4 @@ if __name__ == '__main__':
     connect_persistent_socket()
     wait_for_ip()
     threading.Thread(target=status_update_loop, daemon=True).start()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000)
