@@ -167,9 +167,14 @@
     /* Center header buttons */
     .control-buttons {
       display: flex;
-      justify-content: center;
+      justify-content: space-between;
       gap: var(--gap);
       margin: var(--gap) 0;
+    }
+    .control-buttons-left, .control-buttons-right {
+      display: flex;
+      gap: var(--gap);
+      align-items: center;
     }
 
     /* Single spacer (~3em) */
@@ -417,6 +422,61 @@
       align-items: center;
       justify-content: center;
     }
+
+    /* Search results styling */
+    .search-results__info {
+      background: #222;
+      color: #f33;
+      padding: 12px 18px;
+      border-radius: 8px 8px 0 0;
+      text-align: center;
+      font-size: 1.08em;
+      margin-top: 10px;
+    }
+    .search-results__actions {
+      background: #222;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 0 18px 0;
+      border-radius: 0 0 8px 8px;
+      margin-bottom: 10px;
+    }
+    .search-results__actions--horizontal {
+      flex-direction: row !important;
+      justify-content: center;
+      align-items: center;
+      gap: 18px;
+      padding: 14px 0 18px 0;
+    }
+    .search-results__actions .btn {
+      min-width: 70px;
+      min-height: 38px;
+      height: 38px;
+      font-size: 1.08em;
+      border-radius: 6px;
+      background: var(--surface, #222);
+      color: var(--fg, #f33);
+      border: 1.5px solid var(--accent, #f33);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      text-align: center;
+      padding: 0 16px;
+    }
+    .search-results__actions .btn:active {
+      background: #333;
+    }
+    .search-results__none {
+      background: #222;
+      color: #f33;
+      padding: 14px 18px;
+      border-radius: 8px;
+      text-align: center;
+      margin-top: 10px;
+    }
   </style>
 
   <script src="{{ url_for('static', filename='js/jquery-3.6.0.min.js') }}"></script>
@@ -466,7 +526,6 @@
             <span>RMS:    <strong id="modelRMS">0</strong></span>
           </div>
           <div class="model-panel__actions">
-            <button id="syncButton"  class="btn">Sync</button>
             <button id="calptButton" class="btn">+ Cal Pt</button>
             <button id="clearButton" class="btn">Clear</button>
             <button id="saveButton"  class="btn">Save</button>
@@ -533,9 +592,15 @@
   $(function(){
     // Insert header buttons
     $('.control-buttons').html(`
-      <button class="btn btn--icon" id="editConfigBtn"    title="Settings">⚙</button>
-      <button class="btn btn--icon" id="toggleFullScreen" title="Fullscreen">⛶</button>
-      <button class="btn btn--icon" id="toggleMode"        title="Day/Night">🌙</button>
+      <div class="control-buttons-left">
+        <button class="btn btn--icon" id="editConfigBtn"    title="Settings">⚙</button>
+        <button class="btn btn--icon" id="toggleFullScreen" title="Fullscreen">⛶</button>
+        <button class="btn btn--icon" id="toggleMode"        title="Day/Night">🌙</button>
+      </div>
+      <div class="control-buttons-right">
+        <button class="btn btn--icon" id="modeToggleButton"  title="Manual/Auto">A</button>
+        <button class="btn btn--icon" id="parkToggleButton"  title="Park/Unpark">P</button>
+      </div>
     `);
 
     // Modal helpers
@@ -613,12 +678,25 @@
         );
 
         $('#trackToggleButton').text(d.tracking==='Stopped'?'START':'STOP');
-        $('#parkToggleButton').text((d.tracking==='Parking'||d.tracking==='Parked')?'Unpark':'Park');
-        $('#modeToggleButton').text(d.tracking==='Blinky'?'Auto':'Manual');
+        // Remove old label updates for mode/park buttons
+        // $('#parkToggleButton').text((d.tracking==='Parking'||d.tracking==='Parked')?'Unpark':'Park');
+        // $('#modeToggleButton').text(d.tracking==='Blinky'?'Auto':'Manual');
       });
     }
     setInterval(updateStatus, 500);
     updateStatus();
+
+    // Ensure only M/A and P/U are set
+    function updateModeAndParkButtons() {
+      $.getJSON('/status', function(d) {
+        var isManual = d.tracking === 'Blinky';
+        $('#modeToggleButton').text(isManual ? 'M' : 'A');
+        var isParked = d.tracking === 'Parking' || d.tracking === 'Parked';
+        $('#parkToggleButton').text(isParked ? 'U' : 'P');
+      });
+    }
+    setInterval(updateModeAndParkButtons, 500);
+    updateModeAndParkButtons();
 
     // Search handler
     $('#searchForm').submit(function(e){
@@ -654,9 +732,16 @@
           (it.az?' | Az: '+it.az:'')+
           (it.info?' | '+it.info:'')+
         '</div>'+
-        '<button id="goToBtn" class="btn btn--primary">GoTo</button>'+
-        '<button id="closeResultsBtn" class="btn btn--secondary">X</button>'
+        '<div class="search-results__actions search-results__actions--horizontal">'+
+          '<button id="syncButton" class="btn">Sync</button>'+ 
+          '<button id="goToBtn" class="btn btn--primary">GoTo</button>'+ 
+          '<button id="closeResultsBtn" class="btn btn--secondary">X</button>'+ 
+        '</div>'
       );
+      $('#syncButton').off('click').on('click',function(){
+        if(window.currentRA && window.currentDEC)
+          $.post('/sync',{ra:window.currentRA,dec:window.currentDEC});
+      });
       $('#goToBtn').off('click').on('click',function(){
         $.post('/goto',{ra:it.raw_ra,dec:it.raw_dec});
       });
@@ -706,7 +791,6 @@
     }
     setInterval(()=>{ if(!$('#modelPanel').hasClass('hidden')) updateModelInfo(); },5000);
 
-    $('#syncButton').click(()=>{ if(window.currentRA&&window.currentDEC) $.post('/sync',{ra:window.currentRA,dec:window.currentDEC}); });
     $('#calptButton').click(()=>{ if(window.currentRA&&window.currentDEC) $.post('/calpt',{ra:window.currentRA,dec:window.currentDEC}); });
     // --- Clear Model button with confirmation ---
     $('#clearButton').click(function(){
@@ -769,8 +853,6 @@
       </svg>
       <div class="handpad__row handpad__row--actions">
         <button id="trackToggleButton" class="btn btn--primary">STOP</button>
-        <button id="modeToggleButton"  class="btn btn--secondary">Auto</button>
-        <button id="parkToggleButton"  class="btn btn--secondary">Park</button>
       </div>
     `);
 
@@ -794,13 +876,13 @@
       $.post($(this).text()==='STOP'?'/abort':'/start');
     });
     $('#parkToggleButton').click(function(){
-      $.post($(this).text()==='Park'?'/park':'/unpark');
+      $.post($(this).text()==='P'?'/park':'/unpark');
     });
 
     // Auto/Manual
     $('#modeToggleButton').click(function(){
-      $.post('/toggle_mode',{},function(data){
-        $('#modeToggleButton').text(data.mode==='Auto'?'Manual':'Auto');
+      $.post('/toggle_mode',{},function(){
+        updateModeAndParkButtons();
       },'json');
     });
 
