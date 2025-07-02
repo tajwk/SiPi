@@ -40,7 +40,6 @@
       border-radius: 3px;
       cursor: pointer;
     }
-    #fullscreenBtn { right: 12px; }
     #refreshBtn { right: 90px; }
     #starAttributes {
       position:absolute; top:60px; left:10px; z-index:20;
@@ -129,16 +128,22 @@
     }
     #skyviewCanvas {
       display: block;
-      margin: 0 auto;
-      position: relative;
-      left: 0;
-      right: 0;
-      top: 0;
-      bottom: 0;
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      /* Place as low as possible above the Objects tray, with minimal gap */
+      bottom: 18px;
       background: black;
       box-sizing: border-box;
-      max-width: 100vw;
-      max-height: 100vh;
+      /* Maximize size: use all available width and height above tray, but always a circle */
+      width: min(calc(100vw - 12px), calc(100vh - 110px));
+      height: min(calc(100vw - 12px), calc(100vh - 110px));
+      min-width: 200px;
+      min-height: 200px;
+      aspect-ratio: 1 / 1;
+      z-index: 10;
+      border-radius: 50%;
+      box-shadow: 0 4px 24px 0 rgba(0,0,0,0.7);
     }
     #popup {
       position:absolute; background:rgba(0,0,0,0.8);
@@ -410,7 +415,7 @@
       color: #f33 !important;
     }
     /* Ensure all buttons are square and rounded */
-    #refreshBtn, #fullscreenBtn {
+    #refreshBtn {
       border-radius: 8px !important;
       width: 38px;
       height: 38px;
@@ -502,15 +507,66 @@
       <div id="controlPanel" class="control-panel">
         <form id="searchForm" class="search-form" autocomplete="off">
           <!-- Search row -->
-          <div class="search-form__row">
-            <input type="text"
-                   id="searchQuery"
-                   class="search-form__input"
-                   placeholder="Enter object name…"
-                   required
-                   autocomplete="off">
+          <div class="search-form__row search-form__row--with-clear search-form__row--relative">
+            <div class="search-input-wrapper">
+              <input type="text"
+                     id="searchQuery"
+                     class="search-form__input"
+                     placeholder="Enter object name…"
+                     required
+                     autocomplete="off">
+              <button type="button" id="clearSearchBtn" aria-label="Clear search">&times;</button>
+            </div>
             <button type="submit" class="btn btn--primary">Search</button>
           </div>
+  <style>
+    .search-form__row--relative { position: relative; }
+    .search-input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: stretch;
+      flex: 1 1 auto;
+      width: 100%;
+      height: 2.4em; /* Match input height */
+    }
+    .search-form__input {
+      width: 18em;
+      min-width: 120px;
+      padding-right: 2.2em;
+      box-sizing: border-box;
+      height: 2.4em;
+      line-height: 2.4em;
+      font-size: 1em;
+      /* Remove vertical-align if present */
+    }
+    #clearSearchBtn {
+      display: none;
+      position: absolute;
+      right: 0.35em;
+      top: 50%;
+      transform: translateY(-50%);
+      background: transparent;
+      border: none;
+      font-size: 1.25em;
+      color: #888;
+      cursor: pointer;
+      z-index: 2;
+      padding: 0;
+      line-height: 1;
+      height: 1.6em;
+      width: 1.6em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #clearSearchBtn:active { color: #f33; }
+    .search-form__row--with-clear .btn--primary {
+      margin-left: 0.5em;
+    }
+    @media (max-width: 600px) {
+      .search-form__input { width: 100%; min-width: 0; }
+    }
+  </style>
           <div id="results" class="search-results"></div>
           <!-- SkyView/Model row -->
           <div class="search-actions">
@@ -558,8 +614,14 @@
       <label>Az:  <input id="gotoAz"  type="text" placeholder="DD:MM:SS"></label>
       <button id="gotoCoordsBtn">GoTo</button>
     </div>
+    <button id="stopBtn" title="Stop" aria-label="Stop" style="top:12px; right:12px; position:absolute; z-index:30; background:transparent; color:white; border:none; border-radius:8px; width:48px; height:48px; min-width:48px; min-height:48px; padding:0; font-size:1.2em; display:inline-flex; align-items:center; justify-content:center;">
+      <!-- SVG regular octagon with STOP text inside -->
+      <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="12.07,2 27.93,2 38,12.07 38,27.93 27.93,38 12.07,38 2,27.93 2,12.07" fill="#e33" stroke="#a00" stroke-width="2"/>
+        <text x="20" y="24" text-anchor="middle" font-size="13" font-family="Arial, sans-serif" fill="black" font-weight="bold">STOP</text>
+      </svg>
+    </button>
     <button id="refreshBtn" title="Back" aria-label="Back">&#8592;</button>
-    <button id="fullscreenBtn" title="Fullscreen" aria-label="Fullscreen">&#x26F6;</button>
     <div id="starAttributes">
       <div id="nameInfo">Name: </div>
       <div id="hipInfo">HIP: </div>
@@ -743,7 +805,7 @@
           $.post('/sync',{ra:window.currentRA,dec:window.currentDEC});
       });
       $('#goToBtn').off('click').on('click',function(){
-        $.post('/goto',{ra:it.raw_ra,dec:it.raw_dec});
+        $.post('/goto',{ra:it.raw_ra,dec:window.currentDEC});
       });
       $('#closeResultsBtn').off('click').on('click',function(){
         $('#results').empty();
@@ -761,6 +823,10 @@
           window.dispatchEvent(new Event('resize'));
         }, 100);
       }
+    });
+    // SkyView Stop button
+    $('#stopBtn').off('click').on('click', function() {
+      $.post('/abort');
     });
     // Back arrow in SkyView (handled in skyview.js as well)
     $('#refreshBtn').off('click').on('click', function() {
@@ -841,29 +907,80 @@
     window.currentSpeedIndex=0;
     window.currentSpeed=speeds[0];
 
-    // Render handpad SVG + action row
+    // Render SVG handpad with 4 wide, spaced arcs at up/down/left/right (not corners)
+    // Each arc is a quarter of a ring, centered on 0, 90, 180, 270 deg, with square gaps
+    // --- Handpad geometry tweaks for more space and square gaps ---
+    const arcOuterR = 150;
+    const arcInnerR = 85; // increased inner radius for more space from center
+    const arcGapDeg = 22; // larger gap for more square separation
+    const arcSweep = 90 - arcGapDeg;
+    const center = 200;
+    function describeArc(cx, cy, r1, r2, startAngle, sweep) {
+      // Returns SVG path for a ring sector (arc with thickness)
+      const toRad = a => (a-90)*Math.PI/180.0;
+      const endAngle = startAngle + sweep;
+      const x1 = cx + r1 * Math.cos(toRad(startAngle));
+      const y1 = cy + r1 * Math.sin(toRad(startAngle));
+      const x2 = cx + r1 * Math.cos(toRad(endAngle));
+      const y2 = cy + r1 * Math.sin(toRad(endAngle));
+      const x3 = cx + r2 * Math.cos(toRad(endAngle));
+      const y3 = cy + r2 * Math.sin(toRad(endAngle));
+      const x4 = cx + r2 * Math.cos(toRad(startAngle));
+      const y4 = cy + r2 * Math.sin(toRad(startAngle));
+      const largeArc = sweep > 180 ? 1 : 0;
+      return [
+        "M", x1, y1,
+        "A", r1, r1, 0, largeArc, 1, x2, y2,
+        "L", x3, y3,
+        "A", r2, r2, 0, largeArc, 0, x4, y4,
+        "Z"
+      ].join(" ");
+    }
+    const arcDefs = [
+      {id:'upButton',    start: -arcSweep/2,        angle: 0},
+      {id:'rightButton', start: 90-arcSweep/2,      angle: 90},
+      {id:'downButton',  start: 180-arcSweep/2,     angle: 180},
+      {id:'leftButton',  start: 270-arcSweep/2,     angle: 270}
+    ];
+    let arcPaths = arcDefs.map(a => `<path id="${a.id}" class="handpad-arc" d="${describeArc(center,center,arcOuterR,arcInnerR,a.start,arcSweep)}"/>`).join("\n");
+    // --- Speed button: smaller, styled like arcs ---
+    const speedBtnR = arcInnerR - 28; // smaller for more gap
     $('#directionControl').html(`
-      <svg class="handpad" viewBox="0 0 300 300">
-        <path id="upButton"    class="handpad-arc" d="M 51 249 A 140 140 0 0 0 249 249 L 220.71 220.71 A 100 100 0 0 1 79.29 220.71 Z"/>
-        <path id="rightButton" class="handpad-arc" d="M 249 249 A 140 140 0 0 0 249 51  L 220.71 79.29  A 100 100 0 0 1 220.71 220.71 Z"/>
-        <path id="downButton"  class="handpad-arc" d="M 249 51  A 140 140 0 0 0 51 51   L 79.29 79.29   A 100 100 0 0 1 220.71 79.29 Z"/>
-        <path id="leftButton"  class="handpad-arc" d="M 51 51   A 140 140 0 0 0 51 249  L 79.29 220.71 A 100 100 0 0 1 79.29 79.29 Z"/>
-        <circle id="speedButton" class="handpad-center" cx="150" cy="150" r="60"/>
-        <text x="150" y="150" text-anchor="middle" dominant-baseline="middle" class="speed-label">Slew</text>
+      <svg class="handpad" viewBox="0 0 400 400" width="340" height="340">
+        ${arcPaths}
+        <circle id="speedButton" class="handpad-center" cx="200" cy="200" r="${speedBtnR}"/>
+        <text x="200" y="200" text-anchor="middle" dominant-baseline="middle" class="speed-label">${window.currentSpeed}</text>
       </svg>
       <div class="handpad__row handpad__row--actions">
         <button id="trackToggleButton" class="btn btn--primary">STOP</button>
       </div>
     `);
-
+    // Style for arcs and center
+    $("<style id='handpadArcStyle'>\n"
+      + ".handpad-arc, .handpad-center {\n"
+      + "  stroke: none !important;\n"
+      + "  fill: #f33 !important;\n"
+      + "  opacity: 0.7;\n"
+      + "  cursor: pointer;\n"
+      + "  transition: opacity 0.15s, fill 0.15s;\n"
+      + "}\n"
+      + ".handpad-arc:hover, .handpad-center:hover { opacity: 1; fill: #fff !important; }\n"
+      + ".speed-label { font-size: 2.1em; font-weight: bold; fill: #f33 !important; pointer-events: none; }\n"
+      + "</style>").appendTo('head');
+    // Remove any old handpadGridStyle
+    $('style#handpadGridStyle').remove();
     // Bind directional arcs
     ['up','right','down','left'].forEach(dir=>{
       let axis = (dir==='up'||dir==='down')?"Sec":"Pri";
-      $('#'+dir+'Button')
-        .on('mousedown touchstart', e=>{ e.preventDefault(); startMove(axis,dir,e.currentTarget); })
-        .on('mouseup touchend mouseleave', e=>{ stopMove(axis,e.currentTarget); });
+      // Remove any previous handlers to avoid duplicates
+      $('#'+dir+'Button').off('mousedown touchstart').on('mousedown touchstart', function(e){
+        e.preventDefault();
+        startMove(axis,dir,this);
+      });
+      $('#'+dir+'Button').off('mouseup touchend mouseleave').on('mouseup touchend mouseleave', function(e){
+        stopMove(axis,this);
+      });
     });
-
     // Speed toggle
     $('#speedButton').click(function(){
       window.currentSpeedIndex=(window.currentSpeedIndex+1)%speeds.length;
@@ -871,27 +988,107 @@
       $('.speed-label').text(window.currentSpeed);
     });
 
-    // Track/Park
-    $('#trackToggleButton').click(function(){
-      $.post($(this).text()==='STOP'?'/abort':'/start');
-    });
-    $('#parkToggleButton').click(function(){
-      $.post($(this).text()==='P'?'/park':'/unpark');
-    });
-
-    // Auto/Manual
-    $('#modeToggleButton').click(function(){
-      $.post('/toggle_mode',{},function(){
-        updateModeAndParkButtons();
-      },'json');
-    });
-
     // Dismiss modal if backdrop clicked
     $('#customModal').click(e=>{ if(e.target.id==='customModal') hideModal(); });
 
+
     // Remove focus outline after click
     $('button').click(function(){ this.blur(); });
+
+    // --- Search clear button logic ---
+    var $search = $('#searchQuery');
+    var $clearBtn = $('#clearSearchBtn');
+    function toggleClearBtn() {
+      $clearBtn[$search.val().length > 0 ? 'show' : 'hide']();
+    }
+    $search.on('input', toggleClearBtn);
+    $clearBtn.on('click', function() {
+      $search.val('');
+      $search.focus();
+      toggleClearBtn();
+      $('#results').empty();
+    });
+    toggleClearBtn();
+
+    // --- System Time Popup on First Boot ---
+    // Fetch /status to get boot/session ID
+    $.getJSON('/status', function(d) {
+      var bootId = d.boot_id || d.bootid || d.session_id || d.sessionid || d.boot || null;
+      if (!bootId) return; // backend must provide this
+      var lastBootId = localStorage.getItem('lastBootId');
+      if (lastBootId !== bootId) {
+        // Show modal asking to set system time
+        var deviceTime = new Date();
+        var timeStr = deviceTime.toLocaleString();
+        var isNight = $('body').hasClass('night-mode');
+        var modalHtml = `
+          <div class="modal__body${isNight ? ' night-mode' : ''}">
+            <strong>Set System Time?</strong>
+            <div style="margin-top:10px;">Would you like to set the Pi's system time to your device's current time?</div>
+            <div style="margin-top:10px; font-size:1.1em;">Device time: <span style="font-weight:bold;">${timeStr}</span></div>
+          </div>
+          <div class="modal__footer">
+            <button class="btn btn--primary" id="setSystemTimeBtn">Set Time</button>
+            <button class="btn" id="dismissTimeBtn">Dismiss</button>
+          </div>
+        `;
+        showModal(modalHtml);
+        $('#setSystemTimeBtn').off('click').on('click', function() {
+          // Send device time as local dt_str (YYYY-MM-DD HH:MM:SS)
+          function pad(n) { return n.toString().padStart(2, '0'); }
+          const dt_str = deviceTime.getFullYear() + '-' + pad(deviceTime.getMonth()+1) + '-' + pad(deviceTime.getDate()) + ' ' + pad(deviceTime.getHours()) + ':' + pad(deviceTime.getMinutes()) + ':' + pad(deviceTime.getSeconds());
+          $.ajax({
+            url: '/set_time',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ dt_str }),
+            success: function() {
+              customAlert('System time set!');
+              localStorage.setItem('lastBootId', bootId);
+            },
+            error: function() {
+              customAlert('Failed to set system time.');
+            }
+          });
+          hideModal();
+        });
+        $('#dismissTimeBtn').off('click').on('click', function() {
+          localStorage.setItem('lastBootId', bootId);
+          hideModal();
+        });
+      }
+    });
   });
+  </script>
+
+  <script>
+    // --- Track/Stop button logic ---
+    $(document).on('click', '#trackToggleButton', function() {
+      var label = $(this).text().trim().toUpperCase();
+      if(label === 'STOP') {
+        // Send abort/stop command
+        $.post('/abort');
+      } else {
+        // Send start command
+        $.post('/start');
+      }
+    });
+
+    // --- Manual/Auto and Park/Unpark button logic ---
+    $(document).on('click', '#modeToggleButton', function() {
+      $.post('/toggle_mode', function(d) {
+        // Optionally update label immediately
+        $('#modeToggleButton').text(d.mode === 'Manual' ? 'M' : 'A');
+      }, 'json');
+    });
+    $(document).on('click', '#parkToggleButton', function() {
+      var label = $(this).text().trim().toUpperCase();
+      if(label === 'P') {
+        $.post('/park');
+      } else {
+        $.post('/unpark');
+      }
+    });
   </script>
 </body>
 </html>

@@ -335,7 +335,25 @@ $(function(){
     const alt    = $('input[name="altMode"]:checked').val();
     const drag   = $('#dragModeCheckbox').is(':checked');
     const noWrap = $('#noWrapCheckbox').is(':checked');
+    let lines = $('#configTextarea').val().split('\n');
+    // Get current OptionBits and Option2Bits
     let ob = 0, o2 = 0;
+    lines.forEach(line => {
+      if(line.startsWith('OptionBits=')) {
+        let v = line.split('=')[1];
+        if(/^\d+$/.test(v)) ob = parseInt(v,10);
+      }
+      if(line.startsWith('Option2Bits=')) {
+        let v = line.split('=')[1];
+        if(/^\d+$/.test(v)) o2 = parseInt(v,10);
+      }
+    });
+    // Clear only the bits we control, preserve others (including XPXP)
+    // OptionBits: clear bits 0,1,2,3,17,18,19,24
+    ob &= ~(1|2|4|8|(1<<17)|(1<<18)|(1<<19)|(1<<24));
+    // Option2Bits: clear bits 22,23 (cascade bits), preserve all others
+    o2 &= ~((1<<22)|(1<<23));
+    // Set bits according to UI
     if (az==='ignore')   ob |= 1;
     if (az==='precise')  ob |= 2;
     if (az==='polite')   ob |= 4;
@@ -346,12 +364,19 @@ $(function(){
     if (alt==='cascade') o2 |= 1<<22;
     if (drag)            ob |= 8;
     if (noWrap)          ob |= 1<<24;
-    const lines = $('#configTextarea').val().split('\n').map(l => {
+    // Write back
+    lines = lines.map(l => {
       if (l.startsWith('OptionBits='))   return 'OptionBits='+ob;
       if (l.startsWith('Option2Bits='))  return 'Option2Bits='+o2;
       return l;
     });
     $('#configTextarea').val(lines.join('\n'));
+    // Also update XPXP checkbox to reflect preserved bit
+    if ((o2 & 1073741824) !== 0) {
+      $('#xpxpCheckbox').prop('checked', true);
+    } else {
+      $('#xpxpCheckbox').prop('checked', false);
+    }
   });
   // XPXP checkbox logic
   $('#xpxpCheckbox').change(function(){
@@ -367,9 +392,36 @@ $(function(){
   // Set Park
   $('#setParkButton').click(() => $.post('/setpark'));
 
-  // System Time handlers
+  // System Time handlers (use unified /set_time endpoint)
   $('#setTimeBtn').click(() => {
-    $.post('/settime',{time:$('#timeInput').val()});
+    // Use local time string in 'YYYY-MM-DD HH:MM:SS' format
+    const now = new Date();
+    let input = $('#timeInput').val();
+    let dt;
+    if (/^\d{2}:\d{2}$/.test(input)) {
+      // Only time provided, use today's date
+      const [hh, mm] = input.split(':');
+      dt = new Date(now.getFullYear(), now.getMonth(), now.getDate(), Number(hh), Number(mm), 0, 0);
+    } else {
+      // Try to parse as full date/time
+      dt = new Date(input);
+      if (isNaN(dt)) dt = now;
+    }
+    // Format as 'YYYY-MM-DD HH:MM:SS' in local time
+    function pad(n) { return n.toString().padStart(2, '0'); }
+    const dt_str = dt.getFullYear() + '-' + pad(dt.getMonth()+1) + '-' + pad(dt.getDate()) + ' ' + pad(dt.getHours()) + ':' + pad(dt.getMinutes()) + ':' + pad(dt.getSeconds());
+    $.ajax({
+      url: '/set_time',
+      method: 'POST',
+      contentType: 'application/json',
+      data: JSON.stringify({ dt_str }),
+      success: function(resp) {
+        alert(resp.message || 'System time set!');
+      },
+      error: function(xhr) {
+        alert('Failed to set time: ' + (xhr.responseJSON?.error || xhr.statusText));
+      }
+    });
   });
   $('#syncTimeBtn').click(() => {
     const now = new Date(),
@@ -377,7 +429,8 @@ $(function(){
           mm  = String(now.getMinutes()).padStart(2,'0'),
           t   = hh+':'+mm;
     $('#timeInput').val(t);
-    $.post('/settime',{time:t});
+    // Also trigger setTimeBtn click for unified behavior
+    $('#setTimeBtn').click();
   });
 
   // Wi-Fi Save
@@ -407,7 +460,10 @@ $(function(){
                     "\n\nProceed with update?";
         if (confirm(msg)) {
           $.post('/apply_updates', {}, function(res2){
-            alert(res2.message);
+            alert(res2.message + "\nThe page will reload in 2 seconds to complete the update.");
+            setTimeout(function(){
+              location.reload(true);
+            }, 2000);
           }, 'json');
         }
       }

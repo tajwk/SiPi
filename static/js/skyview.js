@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const HIT_PADDING = 4;
   // zoom limits
   const MIN_SCALE   = 0.5;
-  const MAX_SCALE   = 100;
+  const MAX_SCALE   = 50;
 
   // Convert degrees → “DDD:MM:SS”
   function degToDMS(deg) {
@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const nameInfo      = document.getElementById('nameInfo');
   const popup         = document.getElementById('popup');
   const gotoBtn       = document.getElementById('gotoCoordsBtn');
-  const fullscreenBtn = document.getElementById('fullscreenBtn');
+  // const fullscreenBtn = document.getElementById('fullscreenBtn'); // Removed: button no longer exists
   const redrawBtn     = document.getElementById('refreshBtn');
 
   // --- Add Refresh button between Back and Fullscreen immediately ---
@@ -107,11 +107,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Track the currently selected object (star, galaxy, or open cluster)
   let selectedObject = null;
 
-  // Fullscreen toggle
-  fullscreenBtn.addEventListener('click', () => {
-    if (!document.fullscreenElement) document.documentElement.requestFullscreen();
-    else document.exitFullscreen();
-  });
+  // Fullscreen toggle removed: fullscreenBtn no longer exists
 
   // Astronomy utilities
   function toJulian(d){ return d.valueOf()/86400000 + 2440587.5; }
@@ -1026,7 +1022,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   if (redrawBtn && redrawBtn.parentNode !== btnStack) btnStack.appendChild(redrawBtn);
   if (refreshBtn && refreshBtn.parentNode !== btnStack) btnStack.appendChild(refreshBtn);
-  if (fullscreenBtn && fullscreenBtn.parentNode) fullscreenBtn.parentNode.removeChild(fullscreenBtn);
+  // if (fullscreenBtn && fullscreenBtn.parentNode) fullscreenBtn.parentNode.removeChild(fullscreenBtn); // Button no longer exists
   [redrawBtn, refreshBtn].forEach(btn => {
     if (btn) {
       btn.innerHTML = btn === redrawBtn ? '<span style="font-size:1.3em;line-height:1;">&#8592;</span>' : '<span style="font-size:1.3em;line-height:1;">&#8635;</span>';
@@ -1055,6 +1051,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
   // Remove tooltip for fullscreenBtn (button removed)
+  // (No fullscreenBtn present)
 
   // --- Show/hide button stack with SkyView ---
   function updateBtnStackVisibility() {

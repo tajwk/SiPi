@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 import socket
 import threading
 import time
@@ -7,6 +8,7 @@ import os
 import datetime
 import math
 import json
+import uuid
 from flask import (
     Flask, render_template, jsonify, request,
     flash, redirect, url_for, send_from_directory
@@ -23,7 +25,7 @@ app.secret_key = 'your_secret_key_here'  # Replace with a strong secret key
 
 # Paths
 SI_TECH_HOST    = 'localhost'
-SI_TECH_PORT    = 8079
+SI_TECH_PORT    = 8078
 CONFIG_FILE     = "/usr/share/SiTech/SiTechExe/SiTech.cfg"
 HOSTAPD_CONF    = "/etc/hostapd/hostapd.conf"
 WEB_CONFIG_FILE = os.path.join(os.path.dirname(__file__), "web_config.json")
@@ -46,6 +48,7 @@ def save_web_config(cfg):
 
 web_config = load_web_config()
 
+
 # Global state
 scope_status            = "No status yet"
 status_lock             = threading.Lock()
@@ -57,6 +60,9 @@ command_socket          = None
 move_socket_lock        = threading.Lock()
 command_socket_lock     = threading.Lock()
 MESSIER_FILE            = os.path.join(BASE_DIR, "messier.json")
+
+# --- Boot/session ID for first-load logic ---
+BOOT_ID = str(int(time.time())) + "-" + uuid.uuid4().hex[:8]
 
 
 # Formatting helpers
@@ -315,6 +321,7 @@ def constellations_data():
 def download_model():
     return send_from_directory(MODEL_DIR, MODEL_FILE, as_attachment=True)
 
+
 @app.route('/status')
 def status():
     with status_lock:
@@ -344,7 +351,8 @@ def status():
     return jsonify(
         time=time.strftime("%H:%M:%S"),
         sidereal=sid, ra=ra, dec=dec,
-        alt=alt, az=az, tracking=track
+        alt=alt, az=az, tracking=track,
+        boot_id=BOOT_ID
     )
 
 @app.route('/search', methods=['POST'])    
@@ -498,19 +506,34 @@ def get_model_info():
         rms = rms[4:]
     return jsonify(cal_pts=cal_pts, rms=rms)
 
-@app.route('/settime', methods=['POST'])
-def set_time():
-    t = request.form.get('time','')
-    # Accepts "HH:MM" (24-hour). Optionally add validation.
+
+# --- New: Set system time from ISO string (for popup) ---
+@app.route('/set_time', methods=['POST'])
+def set_time_popup():
     try:
-        # Run as root so this works; may require sudoers config for passwordless sudo
-        result = subprocess.run(['sudo', 'date', '+%H:%M', '-s', t], capture_output=True, text=True)
+        data = request.get_json(force=True)
+        # Accept either 'dt_str' (preferred) or 'iso' (legacy)
+        dt_str = data.get('dt_str')
+        if not dt_str:
+            iso = data.get('iso')
+            if not iso:
+                return jsonify(success=False, error='Missing time'), 400
+            # Parse ISO string as local time
+            try:
+                dt = datetime.datetime.fromisoformat(iso.replace('Z','+00:00'))
+            except Exception:
+                return jsonify(success=False, error='Invalid ISO time'), 400
+            dt_str = dt.strftime('%Y-%m-%d %H:%M:%S')
+        # Set system time (requires sudo)
+        result = subprocess.run(['sudo', 'date', '-s', dt_str], capture_output=True, text=True)
+        print(f"[DEBUG] sudo date -s '{dt_str}'\nstdout: {result.stdout}\nstderr: {result.stderr}\nreturncode: {result.returncode}", flush=True)
         if result.returncode == 0:
-            return jsonify(response=f"System time set to {t}")
+            return jsonify(success=True, message=f"System time set to {dt_str}", debug=result.stdout + result.stderr)
         else:
-            return jsonify(response=f"Failed to set time: {result.stderr.strip()}")
+            return jsonify(success=False, error=result.stderr.strip(), debug=result.stdout + result.stderr), 500
     except Exception as e:
-        return jsonify(response=f"Error: {e}")
+        print(f"[DEBUG] Exception in set_time_popup: {e}", flush=True)
+        return jsonify(success=False, error=str(e)), 500
 
 @app.route('/update_wifi', methods=['POST'])
 def update_wifi():
@@ -550,81 +573,97 @@ def toggle_tilt():
 
 @app.route('/check_updates', methods=['POST'])
 def check_updates():
+    import getpass
     try:
         env = os.environ.copy()
-        # Print working directory and environment
-        print(f"[DEBUG] os.getcwd(): {os.getcwd()}")
-        print(f"[DEBUG] BASE_DIR: {BASE_DIR}")
-        # Print git remote -v
-        try:
-            remote_v = subprocess.run(['git', 'remote', '-v'], cwd=BASE_DIR, capture_output=True, text=True, env=env).stdout.strip()
-        except Exception as e:
-            remote_v = f"[error running git remote -v: {e}]"
-        print(f"[DEBUG] git remote -v:\n{remote_v}")
-        # Fetch updates using HTTPS
-        fetch_result = subprocess.run(
-            ['git', 'fetch', '--prune', 'origin', '+refs/heads/*:refs/remotes/origin/*', '--verbose'],
+        if not env.get('HOME'):
+            env['HOME'] = f"/home/{subprocess.run(['whoami'], capture_output=True, text=True).stdout.strip()}"
+        # Always fetch from origin
+        fetch = subprocess.run(
+            ['git', 'fetch', 'origin'],
             cwd=BASE_DIR, capture_output=True, text=True, env=env)
-        print(f"[DEBUG] git fetch stdout: {fetch_result.stdout}")
-        print(f"[DEBUG] git fetch stderr: {fetch_result.stderr}")
-        # Find current branch
-        current_branch = subprocess.run(
-            ['git','rev-parse','--abbrev-ref','HEAD'],
+        # Get local HEAD commit
+        local_hash_proc = subprocess.run(
+            ['git', 'rev-parse', 'HEAD'],
+            cwd=BASE_DIR, capture_output=True, text=True, env=env)
+        local_hash = local_hash_proc.stdout.strip()
+        # Get remote main commit
+        remote_hash_proc = subprocess.run(
+            ['git', 'rev-parse', 'origin/main'],
+            cwd=BASE_DIR, capture_output=True, text=True, env=env)
+        remote_hash = remote_hash_proc.stdout.strip()
+        # Get git status and log for debug
+        git_status = subprocess.run(
+            ['git', 'status', '-b', '-u', '--porcelain'],
             cwd=BASE_DIR, capture_output=True, text=True, env=env).stdout.strip()
-        print(f"[DEBUG] current_branch: {current_branch}")
-        # Get hashes
-        local = subprocess.run(
-            ['git','rev-parse','HEAD'],
+        git_log = subprocess.run(
+            ['git', 'log', '--oneline', '--decorate', '--graph', '-20'],
             cwd=BASE_DIR, capture_output=True, text=True, env=env).stdout.strip()
-        print(f"[DEBUG] local HEAD: {local}")
-        remote = subprocess.run(
-            ['git','rev-parse',f'origin/{current_branch}'],
-            cwd=BASE_DIR, capture_output=True, text=True, env=env).stdout.strip()
-        print(f"[DEBUG] remote HEAD: {remote}")
-        # Also print git status for more info
-        status = subprocess.run(
-            ['git','status','-b','-s','-uall'],
-            cwd=BASE_DIR, capture_output=True, text=True, env=env).stdout.strip()
-        print(f"[DEBUG] git status: {status}")
-        available = (local != remote)
+        updates_available = (local_hash != remote_hash)
+        # Add environment and user info for debugging
+        debug_info = {
+            'user': getpass.getuser(),
+            'cwd': BASE_DIR,
+            'HOME': env.get('HOME'),
+            'PATH': env.get('PATH'),
+            'fetch_stdout': fetch.stdout,
+            'fetch_stderr': fetch.stderr,
+            'local_hash_stdout': local_hash_proc.stdout,
+            'local_hash_stderr': local_hash_proc.stderr,
+            'remote_hash_stdout': remote_hash_proc.stdout,
+            'remote_hash_stderr': remote_hash_proc.stderr,
+            'env': {k: env[k] for k in ('USER','HOME','PATH') if k in env}
+        }
         return jsonify(
-            updates_available=available,
-            current_version=local,
-            latest_version=remote,
-            git_status=status,
-            fetch_stdout=fetch_result.stdout,
-            fetch_stderr=fetch_result.stderr,
-            remote_v=remote_v
+            updates_available=updates_available,
+            current_version=local_hash,
+            latest_version=remote_hash,
+            git_status=git_status,
+            git_log=git_log,
+            debug_info=debug_info
         )
     except Exception as e:
-        print(f"[DEBUG] check_updates: Exception: {e}")
-        return jsonify(updates_available=False, current_version="", latest_version="", error=str(e))
-
+        return jsonify(updates_available=False, error=str(e))
 
 @app.route('/apply_updates', methods=['POST'])
 def apply_updates():
     try:
         env = os.environ.copy()
-        # Print working directory and environment
-        print(f"[DEBUG] os.getcwd(): {os.getcwd()}")
-        print(f"[DEBUG] BASE_DIR: {BASE_DIR}")
-        # Pull latest changes using HTTPS
-        pull = subprocess.run(
-            ['git', 'pull', 'origin', 'main'],
+        if not env.get('HOME'):
+            env['HOME'] = f"/home/{subprocess.run(['whoami'], capture_output=True, text=True).stdout.strip()}"
+        print("[DEBUG] /apply_updates called", flush=True)
+        # Find current branch
+        current_branch = subprocess.run(
+            ['git','rev-parse','--abbrev-ref','HEAD'],
+            cwd=BASE_DIR, capture_output=True, text=True, env=env).stdout.strip()
+        print(f"[DEBUG] current_branch: {current_branch}", flush=True)
+        # Force update: fetch, hard reset, clean, pull
+        fetch = subprocess.run(
+            ['git', 'fetch', '--all'],
             cwd=BASE_DIR, capture_output=True, text=True, env=env)
-        print(f"[DEBUG] git pull stdout: {pull.stdout}")
-        print(f"[DEBUG] git pull stderr: {pull.stderr}")
-        if pull.returncode == 0:
-            # ---- Auto-restart SiPi after update ----
-            try:
-                subprocess.run(['systemctl', 'restart', 'sipi'], check=False, env=env)
-                restart_msg = "\n[sipi.service restarted]"
-            except Exception as e:
-                restart_msg = f"\n[Failed to restart sipi.service: {e}]"
-            return jsonify(success=True, message=pull.stdout.strip() + restart_msg)
-        else:
-            return jsonify(success=False, message=pull.stderr.strip())
+        print(f"[DEBUG] git fetch: {fetch.stdout}\n{fetch.stderr}", flush=True)
+        reset = subprocess.run(
+            ['git', 'reset', '--hard', f'origin/{current_branch}'],
+            cwd=BASE_DIR, capture_output=True, text=True, env=env)
+        print(f"[DEBUG] git reset: {reset.stdout}\n{reset.stderr}", flush=True)
+        clean = subprocess.run(
+            ['git', 'clean', '-fdx'],
+            cwd=BASE_DIR, capture_output=True, text=True, env=env)
+        print(f"[DEBUG] git clean: {clean.stdout}\n{clean.stderr}", flush=True)
+        # Optionally, pull again to ensure all is up to date
+        pull = subprocess.run(
+            ['git', 'pull', 'origin', current_branch],
+            cwd=BASE_DIR, capture_output=True, text=True, env=env)
+        print(f"[DEBUG] git pull: {pull.stdout}\n{pull.stderr}", flush=True)
+        # Restart service
+        try:
+            subprocess.run(['sudo', 'systemctl', 'restart', 'sipi'], check=False, env=env)
+            restart_msg = "\n[sipi.service restarted]"
+        except Exception as e:
+            restart_msg = f"\n[Failed to restart sipi.service: {e}]"
+        return jsonify(success=True, message="Force-updated to latest remote." + restart_msg)
     except Exception as e:
+        print(f"[DEBUG] apply_updates: Exception: {e}", flush=True)
         return jsonify(success=False, message=str(e))
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -633,7 +672,12 @@ def apply_updates():
 def edit_config():
     if request.method == 'POST':
         open(CONFIG_FILE, 'w').write(request.form.get('config',''))
-        flash("Configuration updated", "success")
+        # Send ReloadConfigFile command to SiTechExe after saving config
+        try:
+            send_command('ReloadConfigFile\n')
+            flash("Configuration updated and reload command sent", "success")
+        except Exception as e:
+            flash(f"Configuration updated, but failed to send reload command: {e}", "warning")
         return redirect(url_for('edit_config'))
 
     cfg = open(CONFIG_FILE).read()
@@ -707,4 +751,4 @@ if __name__ == '__main__':
     connect_persistent_socket()
     wait_for_ip()
     threading.Thread(target=status_update_loop, daemon=True).start()
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000, debug=False)
