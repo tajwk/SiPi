@@ -186,25 +186,31 @@
     <ul>
       <li><strong>Status Panel:</strong> Live RA/Dec, Alt/Az, Controller Status, Time, LST, and HA</li>
       <li><strong>Object Search:</strong> Search for stars, Messier objects, planets, and more.</li>
-      <li><strong>Model Panel:</strong> Manage mount calibration and alignment points.</li>
-      <li><strong>Handpad Controls:</strong> Slew or nudge the telescope with on-screen arrows.</li>
-      <li><strong>Settings:</strong> Gear icon for advanced mount and network configuration.</li>
-	  <li><strong>Full Screen:</strong> [ ] icon to toggle full screen.</li>
-	  <li><strong>Night Mode:</strong> * Icon to toggle between Day and Night Modes</li>
+      <li><strong>Model Panel:</strong> Manage mount model</li>
+      <li><strong>Handpad Controls:</strong> Move mount with on-screen arrows. Center button cycles between Slew, Pan and Guide speeds.</li>
+	  <li><strong>START and STOP Buttons:</strong> Start tracking or stop movement of the mount</li>
     </ul>
 
-    <h2>3. Sync on an Object</h2>
+	<h2>4. Side Control Tray</h2>
+    <ul>
+      <li><strong>Manual/Auto:</strong> Pressing Manual discharges the motors and puts the controller into "Blinky" mode. Auto is for normal control.</li>
+      <li><strong>Park/Unpark:</strong> Parks or Unparks the mount. Set Park is found in Settings page </li>
+      <li><strong>Settings:</strong> Gear icon for advanced mount and network configuration.</li>
+	  <li><strong>Full Screen:</strong> [ ] icon to toggle full screen.</li>
+	  <li><strong>Night Mode:</strong> Sun/Moon Icon to toggle between Day and Night Modes</li>
+    </ul>
+    <h2>4. Sync on an Object</h2>
     <div class="steps">
       <ol>
 	    <li>Slew to a known object and center it in the eyepiece</li>
         <li>Enter the object name (e.g., <code>Vega</code>, <code>M13</code>) in the search bar.</li>
         <li>Click <b>Search</b>. Select your desired object from the results if prompted.</li>
-        <li>Click <b>Model</b> and then Click <b>Sync</b> </li>
+        <li>Click <b>Sync</b> </li>
 		<li>The mount status should now indicated that it's Tracking
       </ol>
     </div>
 
-    <h2>4. Model Building</h2>
+    <h2>5. Model Building</h2>
     <div class="steps">
       <ol>
         <li><b>Search</b> for an object and perform a <b>GoTo</b></li>
@@ -221,25 +227,14 @@
 	  If the mount remains stationary between uses, the model can be reused. If the mount is transported, a new model is needed.<br>
     </div>
 
-    <h2>5. Handpad Control</h2>
-    <div class="panel">
-      <b>Use the on-screen handpad to:</b>
-      <ul>
-        <li><b>Move Up/Down:</b> Secondary axis (Declination/Altitude).</li>
-        <li><b>Move Left/Right:</b> Primary axis (RA/Azimuth).</li>
-        <li><b>Change Speed:</b> Tap the center to toggle Slew, Pan, or Guide modes.</li>
-        <li><b>STOP</b> Halts all motion instantly. <b>START</b> begins Tracking</li>
-		<li><b>AUTO</b> is used for normal operation. <b>MANUAL</b> disengages the motors for maintenance, adjustment or after parking</li>
-      
-    </div>
-
-    <h2>7. Advanced Settings & Updates</h2>
+    <h2>6. Advanced Settings & Updates</h2>
     <div class="panel">
       <b>Click the gear (<b>⚙</b>) icon to access the configuration:</b>
       <ul>
-        <li>Click the SiTechExe Config button to show/hide the SiTechExe options.
+        
         <li>Set your Mount Type and Scope Encoder Settings </li>
-        <li>In the textbox, enter your <b>SiteLongitude</b> and <b>SiteLatitude</b> </li><br>
+        <li>In the textboxes, enter your <b>SiteLongitude</b> and <b>SiteLatitude</b> </li><br>
+		<li>Click the SiTechExe Config button to show/hide the advanced SiTechExe options. Only make changes here if you are confident in what you are doing.
 		<span class="callout">Always click <b>Save Config</b> after making changes to SiTechExe!</span><br><br>
 		<li>System Time can be set by entering a time HH:MM and Clicking <b>Set</b>. Clicking <b>Sync</b> will enter your device. </li>
         <li>Set your Wi-Fi SSID and password if desired. </li>
@@ -249,7 +244,7 @@
       
     </div>
 
-    <h2>8. SkyView Planetarium</h2>
+    <h2>7. SkyView Planetarium</h2>
     <div class="steps">
       <ol>
         <li>Click <b>SkyView</b> to open a live sky map</li>
@@ -259,14 +254,14 @@
       </ol>
     </div>
 
-    <h2>9. Troubleshooting</h2>
+    <h2>8. Troubleshooting</h2>
     <ul>
       <li><b>Page won’t load?</b> Check Wi-Fi and Pi power.</li>
       <li><b>No telescope response?</b> Ensure SiTechExe is running and configured for TCP/IP.</li>
       <li><b>Slow or unresponsive UI?</b> Wait a minute after boot for initialization.</li>
     </ul>
 
-    <h2>10. Typical Workflow</h2>
+    <h2>9. Typical Workflow</h2>
     <ol>
       <li>Power on your Pi and telescope.</li>
       <li>Connect to the Pi’s Wi-Fi and open SiPi.</li>

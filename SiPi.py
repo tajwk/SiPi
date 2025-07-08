@@ -339,15 +339,22 @@ def status():
     else:
         ra = dec = sid = alt = az = "N/A"
     bp = int(fields[0]) if fields[0].isdigit() else 0
-    track = (
-        "Communication Fault" if bp & 128 else
-        "Parking"            if bp &   8 else
-        "Parked"             if bp &  16 else
-        "Slewing"            if bp &   4 else
-        "Blinky"             if bp &  64 else
-        "Tracking"           if bp &   2 else
-        "Stopped"
-    )
+    if bp & 0x40000:
+        track = "Below Horizon Limit"
+    elif bp & 128:
+        track = "Communication Fault"
+    elif bp & 8:
+        track = "Parking"
+    elif bp & 16:
+        track = "Parked"
+    elif bp & 4:
+        track = "Slewing"
+    elif bp & 64:
+        track = "Blinky"
+    elif bp & 2:
+        track = "Tracking"
+    else:
+        track = "Stopped"
     return jsonify(
         time=time.strftime("%H:%M:%S"),
         sidereal=sid, ra=ra, dec=dec,

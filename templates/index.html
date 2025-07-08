@@ -286,6 +286,12 @@
       stroke-width: 2;
       cursor: pointer;
       fill-opacity: 0.3;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
     }
     /* Remove hover effect for handpad arcs and center: only activate on press */
     /* .handpad-arc:hover, .handpad-center:hover { fill: var(--accent) !important; fill-opacity: 0.4; } */
@@ -1081,11 +1087,11 @@
     ['up','right','down','left'].forEach(dir=>{
       let axis = (dir==='up'||dir==='down')?"Sec":"Pri";
       // Remove any previous handlers to avoid duplicates
-      $('#'+dir+'Button').off('mousedown touchstart').on('mousedown touchstart', function(e){
+      $('#'+dir+'Button').off('pointerdown').on('pointerdown', function(e){
         e.preventDefault();
         startMove(axis,dir,this);
       });
-      $('#'+dir+'Button').off('mouseup touchend').on('mouseup touchend', function(e){
+      $('#'+dir+'Button').off('pointerup pointercancel pointerleave').on('pointerup pointercancel pointerleave', function(e){
         stopMove(axis,this);
       });
     });
