@@ -180,42 +180,57 @@
   {% endwith %}
 
   <form method="post" action="{{ url_for('edit_config') }}">
+    <!-- Always visible config options -->
+    <div style="display:flex; justify-content:center; gap:40px; margin-bottom:20px; flex-wrap: wrap;">
+      <div style="flex:1; max-width:260px; min-width:200px; text-align:left;">
+        <fieldset>
+          <legend>Site Location</legend>
+          <label for="siteLatitudeInput">Site Latitude:</label>
+          <input type="text" id="siteLatitudeInput" name="siteLatitude" value="" style="width:100%; margin-bottom:10px;"><br>
+          <label for="siteLongitudeInput">Site Longitude:</label>
+          <input type="text" id="siteLongitudeInput" name="siteLongitude" value="" style="width:100%;">
+        </fieldset>
+      </div>
+      <div style="flex:1; max-width:260px; min-width:200px; text-align:left;">
+        <fieldset>
+          <legend>Mount Type</legend>
+          <label><input type="radio" name="mountType" value="0" {% if mount_type=='0' %}checked{% endif %}> Alt/Az</label><br>
+          <label><input type="radio" name="mountType" value="1" {% if mount_type=='1' %}checked{% endif %}> Equatorial</label><br>
+          <label><input type="radio" name="mountType" value="3" {% if mount_type=='3' %}checked{% endif %}> Alt/Alt</label>
+        </fieldset>
+      </div>
+      <div style="flex:1; max-width:260px; min-width:200px; text-align:left;">
+        <fieldset>
+          <legend>Az / RA</legend>
+          <label><input type="radio" name="azMode" value="ignore" {% if az_mode=='ignore' %}checked{% endif %}> Ignore</label><br>
+          <label><input type="radio" name="azMode" value="precise" {% if az_mode=='precise' %}checked{% endif %}> Precise</label><br>
+          <label><input type="radio" name="azMode" value="polite" {% if az_mode=='polite' %}checked{% endif %}> Polite</label><br>
+          <label><input type="radio" name="azMode" value="cascade" {% if az_mode=='cascade' %}checked{% endif %}> Cascade</label>
+        </fieldset>
+      </div>
+      <div style="flex:1; max-width:260px; min-width:200px; text-align:left;">
+        <fieldset>
+          <legend>Alt / Dec</legend>
+          <label><input type="radio" name="altMode" value="ignore" {% if alt_mode=='ignore' %}checked{% endif %}> Ignore</label><br>
+          <label><input type="radio" name="altMode" value="precise" {% if alt_mode=='precise' %}checked{% endif %}> Precise</label><br>
+          <label><input type="radio" name="altMode" value="polite" {% if alt_mode=='polite' %}checked{% endif %}> Polite</label><br>
+          <label><input type="radio" name="altMode" value="cascade" {% if alt_mode=='cascade' %}checked{% endif %}> Cascade</label>
+        </fieldset>
+      </div>
+    </div>
+    <div style="text-align:center; margin-bottom:20px;">
+      <label><input type="checkbox" id="dragModeCheckbox" {% if drag_mode %}checked{% endif %}> Drag Mode</label>
+      <label style="margin-left:20px;"><input type="checkbox" id="noWrapCheckbox" {% if no_wrap %}checked{% endif %}> Az/RA No Wrap</label>
+    </div>
+    <!-- Collapsible SiTechExe config section -->
     <div style="text-align:center;">
       <button type="button" id="toggleConfigBtn" class="btn btn-large">SiTechExe Config</button>
     </div>
     <div id="configSection" class="collapsed">
-      <div style="text-align:center; margin-bottom:20px;">
-        <h2>Mount Type</h2>
-        <div style="display:inline-block; text-align:left;">
-          <label><input type="radio" name="mountType" value="0" {% if mount_type=='0' %}checked{% endif %}> Alt/Az</label><br>
-          <label><input type="radio" name="mountType" value="1" {% if mount_type=='1' %}checked{% endif %}> Equatorial</label><br>
-          <label><input type="radio" name="mountType" value="3" {% if mount_type=='3' %}checked{% endif %}> Alt/Alt</label>
+      <div id="configWarning" style="display:none; text-align:center; margin-bottom:16px;">
+        <div class="config-warning-msg" style="max-width:600px; margin:0 auto; padding:10px 18px; border-radius:8px; background:#fffbe6; color:#b33; border:2px solid #f99; font-size:1.1em;">
+          <strong>Warning:</strong> Editing the configuration below can cause SiTechExe to malfunction. Only modify these settings if you are confident in what you are doing!
         </div>
-      </div>
-      <h2 style="text-align:center;">Scope Encoder Settings</h2>
-      <div style="display:flex; justify-content:center; gap:40px; margin-bottom:20px;">
-        <div style="flex:1; max-width:300px; text-align:left;">
-          <fieldset>
-            <legend>Az / RA</legend>
-            <label><input type="radio" name="azMode" value="ignore" {% if az_mode=='ignore' %}checked{% endif %}> Ignore</label><br>
-            <label><input type="radio" name="azMode" value="precise" {% if az_mode=='precise' %}checked{% endif %}> Precise</label><br>
-            <label><input type="radio" name="azMode" value="polite" {% if az_mode=='polite' %}checked{% endif %}> Polite</label><br>
-            <label><input type="radio" name="azMode" value="cascade" {% if az_mode=='cascade' %}checked{% endif %}> Cascade</label>
-          </fieldset>
-        </div>
-        <div style="flex:1; max-width:300px; text-align:left;">
-          <fieldset>
-            <legend>Alt / Dec</legend>
-            <label><input type="radio" name="altMode" value="ignore" {% if alt_mode=='ignore' %}checked{% endif %}> Ignore</label><br>
-            <label><input type="radio" name="altMode" value="precise" {% if alt_mode=='precise' %}checked{% endif %}> Precise</label><br>
-            <label><input type="radio" name="altMode" value="polite" {% if alt_mode=='polite' %}checked{% endif %}> Polite</label><br>
-            <label><input type="radio" name="altMode" value="cascade" {% if alt_mode=='cascade' %}checked{% endif %}> Cascade</label>
-          </fieldset>
-        </div>
-      </div>
-      <div style="text-align:center; margin-bottom:20px;">
-        <label><input type="checkbox" id="dragModeCheckbox" {% if drag_mode %}checked{% endif %}> Drag Mode</label>
-        <label style="margin-left:20px;"><input type="checkbox" id="noWrapCheckbox" {% if no_wrap %}checked{% endif %}> Az/RA No Wrap</label>
       </div>
       <div style="text-align:center;">
         <textarea id="configTextarea" name="config" rows="20" cols="80">{{ config }}</textarea><br>
@@ -225,9 +240,24 @@
             UseActiveXPXP
           </label>
         </div>
-        <input type="submit" class="btn btn-large" value="Save Config">
       </div>
     </div>
+    <div style="text-align:center; margin-top:12px;">
+      <input type="submit" class="btn btn-large" value="Save Config">
+    </div>
+<style>
+  body.night-mode .config-warning-msg {
+    background: #2a0000 !important;
+    color: #ff6666 !important;
+    border-color: #f33 !important;
+  }
+  body.night-mode #siteLatitudeInput,
+  body.night-mode #siteLongitudeInput {
+    background: #333 !important;
+    color: red !important;
+    border: 2px solid red !important;
+  }
+</style>
   </form>
 
   <div class="grid-container">
@@ -291,14 +321,51 @@
 
 <script>
 $(function(){
-  // Toggle config visibility
+  // --- Collapsible config section with warning ---
   let configVisible = false;
   $('#toggleConfigBtn').click(function(){
     configVisible = !configVisible;
     $('#configSection').toggleClass('collapsed', !configVisible);
-    // Always use same label, or uncomment for toggling text
-    // $(this).text(configVisible ? 'Hide SiTechExe Config' : 'SiTechExe Config');
+    $('#configWarning').toggle(configVisible);
   });
+
+  // --- Extract SiteLatitude and SiteLongitude from config ---
+  function extractSiteCoords(configText) {
+    let lat = '', lon = '';
+    configText.split('\n').forEach(line => {
+      if (line.trim().startsWith('SiteLatitude=')) lat = line.split('=')[1].trim();
+      if (line.trim().startsWith('SiteLongitude=')) lon = line.split('=')[1].trim();
+    });
+    return { lat, lon };
+  }
+  function updateSiteCoordInputs() {
+    const configText = $('#configTextarea').val();
+    const coords = extractSiteCoords(configText);
+    $('#siteLatitudeInput').val(coords.lat);
+    $('#siteLongitudeInput').val(coords.lon);
+  }
+  // On page load, populate site coord inputs
+  updateSiteCoordInputs();
+  // If config textarea changes, update site coord inputs
+  $('#configTextarea').on('input', updateSiteCoordInputs);
+
+  // --- On Save, update config with values from site coord inputs ---
+  $('form').on('submit', function(e){
+    let configText = $('#configTextarea').val();
+    let lines = configText.split('\n');
+    let lat = $('#siteLatitudeInput').val().trim();
+    let lon = $('#siteLongitudeInput').val().trim();
+    let foundLat = false, foundLon = false;
+    lines = lines.map(line => {
+      if (line.trim().startsWith('SiteLatitude=')) { foundLat = true; return 'SiteLatitude=' + lat; }
+      if (line.trim().startsWith('SiteLongitude=')) { foundLon = true; return 'SiteLongitude=' + lon; }
+      return line;
+    });
+    if (!foundLat) lines.push('SiteLatitude=' + lat);
+    if (!foundLon) lines.push('SiteLongitude=' + lon);
+    $('#configTextarea').val(lines.join('\n'));
+  });
+
 
   // Helper: Get Option2Bits from config text
   function getOption2Bits(lines) {

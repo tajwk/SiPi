@@ -287,10 +287,8 @@
       cursor: pointer;
       fill-opacity: 0.3;
     }
-    .handpad-arc:hover,
-    .handpad-center:hover {
-      fill: var(--accent) !important;
-      fill-opacity: 0.4;
+    /* Remove hover effect for handpad arcs and center: only activate on press */
+    /* .handpad-arc:hover, .handpad-center:hover { fill: var(--accent) !important; fill-opacity: 0.4; } */
     }
 
     /* Speed label styling (larger & bold) */
@@ -1066,14 +1064,15 @@
       + "  cursor: pointer;\n"
       + "  transition: opacity 0.15s, fill 0.15s, stroke 0.15s;\n"
       + "}\n"
-      + ".handpad-arc:hover, .handpad-center:hover { fill: #e0eaff !important; }\n"
+      // Remove hover effect for handpad arcs and center: only activate on press
+      // + ".handpad-arc:hover, .handpad-center:hover { fill: #e0eaff !important; }\n"
       + ".speed-label { font-size: 2.1em; font-weight: bold; fill: #111 !important; pointer-events: none; }\n"
       // Night mode: dark bg, red border/text
       + "body.night-mode .handpad-arc, body.night-mode .handpad-center {\n"
       + "  stroke: #f33 !important;\n"
       + "  fill: #222 !important;\n"
       + "}\n"
-      + "body.night-mode .handpad-arc:hover, body.night-mode .handpad-center:hover { fill: #f33 !important; }\n"
+      // + "body.night-mode .handpad-arc:hover, body.night-mode .handpad-center:hover { fill: #f33 !important; }\n"
       + "body.night-mode .speed-label { fill: #f33 !important; }\n"
       + "</style>").appendTo('head');
     // Remove any old handpadGridStyle
@@ -1086,7 +1085,7 @@
         e.preventDefault();
         startMove(axis,dir,this);
       });
-      $('#'+dir+'Button').off('mouseup touchend mouseleave').on('mouseup touchend mouseleave', function(e){
+      $('#'+dir+'Button').off('mouseup touchend').on('mouseup touchend', function(e){
         stopMove(axis,this);
       });
     });
