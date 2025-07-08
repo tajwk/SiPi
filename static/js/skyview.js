@@ -2,6 +2,7 @@
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('📡 SkyView init');
 
+
   // how many extra pixels to expand every hit area by (for easier touch)
   const HIT_PADDING = 4;
   // zoom limits
@@ -52,29 +53,25 @@ document.addEventListener('DOMContentLoaded', async () => {
   const popup         = document.getElementById('popup');
   const gotoBtn       = document.getElementById('gotoCoordsBtn');
   // const fullscreenBtn = document.getElementById('fullscreenBtn'); // Removed: button no longer exists
-  const redrawBtn     = document.getElementById('refreshBtn');
-
-  // --- Add Refresh button between Back and Fullscreen immediately ---
-  let refreshBtn = document.getElementById('centerBtn');
-  if (!refreshBtn) {
-    refreshBtn = document.createElement('button');
-    refreshBtn.id = 'centerBtn';
-    refreshBtn.innerHTML = '<span style="font-size:1.3em;line-height:1;">&#8635;</span>'; // Unicode clockwise open circle arrow, no text
-    refreshBtn.title = 'Center and Reset Zoom';
-    // No sizing/positioning here; will be set below in button stack
-    if (redrawBtn && redrawBtn.parentNode) {
-      redrawBtn.parentNode.appendChild(refreshBtn);
-    } else {
-      document.body.appendChild(refreshBtn);
-    }
+  // Attach event handlers to Back and Redraw buttons (new IDs: backBtn, redrawBtn)
+  const backBtn = document.getElementById('backBtn');
+  if (backBtn) {
+    backBtn.onclick = function() {
+      // Hide SkyView overlay, show main view
+      document.getElementById('skyviewContainer').style.display = 'none';
+      const mainView = document.getElementById('mainViewContainer');
+      if (mainView) mainView.style.display = '';
+    };
   }
-  refreshBtn.onclick = function() {
-    // Reset pan/zoom to center and default zoom
-    canvasScale = 1;
-    translateX = 0;
-    translateY = 0;
-    draw();
-  };
+  const redrawBtn = document.getElementById('redrawBtn');
+  if (redrawBtn) {
+    redrawBtn.onclick = function() {
+      canvasScale = 1;
+      translateX = 0;
+      translateY = 0;
+      draw();
+    };
+  }
 
   // Make GoTo button wider for text
   if (gotoBtn) {
@@ -269,6 +266,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }, { passive: false });
 
   // Drawing helpers
+  // If you need to re-render the handpad/buttons after certain actions, call renderHandpadAndActions() again.
   function drawGrid(r){
     ctx.strokeStyle = '#888'; ctx.lineWidth = 2 / canvasScale; // gray border
     ctx.beginPath(); ctx.arc(cx,cy,r,0,2*Math.PI); ctx.stroke();
@@ -675,7 +673,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       ctx.restore();
     }
 
-    ctx.restore();
+    ctx.restore(); // restore sky circle clip before overlay
+
+    // --- STOP button overlay (drawn on canvas, after main sky objects) ---
+    // Only draw if SkyView overlay is active
+    const skyViewContainer = document.getElementById('skyviewContainer');
+    // Get btnStack safely inside draw to avoid ReferenceError
+    const btnStackDraw = document.getElementById('skyviewBtnStack');
+    if (skyViewContainer && skyViewContainer.style.display !== 'none') {
+      // Removed extra STOP button overlay (red octagon) from canvas drawing
+    }
   }
 
   // === Data loading ===
@@ -1006,66 +1013,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Move and update redraw button
   // (moved to top for immediate creation)
 
-  // --- Style and position the control buttons at the bottom right, next to Objects menu ---
-  let btnStack = document.getElementById('skyviewBtnStack');
-  if (!btnStack) {
-    btnStack = document.createElement('div');
-    btnStack.id = 'skyviewBtnStack';
-    btnStack.style.position = 'fixed';
-    btnStack.style.right = '32px';
-    btnStack.style.bottom = '32px';
-    btnStack.style.display = 'flex';
-    btnStack.style.flexDirection = 'column';
-    btnStack.style.gap = '14px';
-    btnStack.style.zIndex = 100;
-    document.body.appendChild(btnStack);
-  }
-  if (redrawBtn && redrawBtn.parentNode !== btnStack) btnStack.appendChild(redrawBtn);
-  if (refreshBtn && refreshBtn.parentNode !== btnStack) btnStack.appendChild(refreshBtn);
-  // if (fullscreenBtn && fullscreenBtn.parentNode) fullscreenBtn.parentNode.removeChild(fullscreenBtn); // Button no longer exists
-  [redrawBtn, refreshBtn].forEach(btn => {
-    if (btn) {
-      btn.innerHTML = btn === redrawBtn ? '<span style="font-size:1.3em;line-height:1;">&#8592;</span>' : '<span style="font-size:1.3em;line-height:1;">&#8635;</span>';
-      btn.style.position = 'static';
-      btn.style.right = '';
-      btn.style.top = '';
-      btn.style.margin = '0';
-      btn.style.background = '#222';
-      btn.style.color = 'red';
-      btn.style.border = '2px solid red';
-      btn.style.borderRadius = '7px';
-      btn.style.fontWeight = 'bold';
-      btn.style.fontSize = '1.3em';
-      btn.style.padding = '4px 0 4px 0';
-      btn.style.width = '44px';
-      btn.style.height = '44px';
-      btn.style.minWidth = '44px';
-      btn.style.minHeight = '44px';
-      btn.style.boxShadow = 'none';
-      btn.style.outline = 'none';
-      btn.style.cursor = 'pointer';
-      btn.style.transition = 'background 0.2s, color 0.2s, border 0.2s';
-      btn.style.display = 'flex';
-      btn.style.alignItems = 'center';
-      btn.style.justifyContent = 'center';
-    }
-  });
+  // --- Do not move or style the control buttons here; let HTML/CSS handle layout ---
   // Remove tooltip for fullscreenBtn (button removed)
   // (No fullscreenBtn present)
 
-  // --- Show/hide button stack with SkyView ---
-  function updateBtnStackVisibility() {
-    const skyViewContainer = document.getElementById('skyviewContainer');
-    if (skyViewContainer && btnStack) {
-      btnStack.style.display = (skyViewContainer.style.display !== 'none') ? 'flex' : 'none';
-    }
-  }
-  updateBtnStackVisibility();
-  const observer = new MutationObserver(updateBtnStackVisibility);
-  const skyViewContainer = document.getElementById('skyviewContainer');
-  if (skyViewContainer) {
-    observer.observe(skyViewContainer, { attributes: true, attributeFilter: ['style', 'class'] });
-  }
+  // --- Button visibility is handled by HTML/CSS and main page JS ---
 
   // --- Remove tooltips for buttons (desktop) ---
   // Remove any existing tooltip event listeners and do not add new ones

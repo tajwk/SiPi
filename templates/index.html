@@ -491,10 +491,12 @@
   <script src="{{ url_for('static', filename='js/skyview.js') }}" defer></script>
 </head>
 <body>
-  <script>
+  <script type="text/javascript">
     // Injected settings flags
-    var vibrationEnabled = {{ vibration_enabled|tojson }};
-    var tiltEnabled      = {{ tilt_enabled|tojson }};
+    var _vibrationEnabled = typeof vibration_enabled !== "undefined" ? vibration_enabled : false;
+    var vibrationEnabled = typeof _vibrationEnabled !== "undefined" ? _vibrationEnabled : false;
+    var _tiltEnabled = typeof tilt_enabled !== "undefined" ? tilt_enabled : false;
+    var tiltEnabled = (typeof _tiltEnabled !== "undefined") ? _tiltEnabled : false;
     console.log("vibrationEnabled =", vibrationEnabled, "tiltEnabled =", tiltEnabled);
   </script>
 
@@ -600,17 +602,29 @@
       <!-- Control Tray for Mode/Park (right edge, handpad height) -->
       <div id="controlTrayBtn" title="Show/hide controls">&#x25C0;</div>
       <div id="controlTray" class="hide">
+        <button id="controlTrayCollapse" title="Collapse tray" class="tray-collapse-btn">&#x25B6;</button>
         <button class="tray-btn" id="modeToggleButton">Manual</button>
         <button class="tray-btn" id="parkToggleButton">Park</button>
-        <button class="tray-btn" id="startButton">Start</button>
-        <button id="controlTrayCollapse" title="Collapse tray" class="tray-collapse-btn">&#x25B6;</button>
+        <button class="tray-btn" id="editConfigBtn" title="Settings">⚙</button>
+        <button class="tray-btn" id="toggleFullScreen" title="Fullscreen">⛶</button>
+        <button class="tray-btn" id="toggleMode" title="Day/Night">🌙</button>
+      </div>
+
+      <!-- START and STOP BUTTONS below Handpad -->
+      <div class="handpad-action-row">
+        <button id="startButton" class="action-btn start-action-btn">START</button>
+        <button id="trackToggleButton" title="Stop" aria-label="Stop" class="action-btn stop-octagon-btn stop-octagon-btn--xlarge">
+          <svg class="stop-octagon-svg stop-octagon-svg--xlarge" width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <polygon class="stop-octagon-shape" points="30.18,5 69.82,5 95,30.18 95,69.82 69.82,95 30.18,95 5,69.82 5,30.18"/>
+            <text class="stop-octagon-text stop-octagon-text--xlarge" x="50" y="56" text-anchor="middle" font-size="40" font-family="'Arial Black', Arial, sans-serif" font-weight="900" letter-spacing="1.2" fill="#111" dominant-baseline="middle">STOP</text>
+          </svg>
+        </button>
       </div>
 
       <!-- Single spacer -->
       <div class="spacer"></div>
 
-      <!-- Config/Fullscreen/Day-Night -->
-      <div class="control-buttons control-buttons--center"></div>
+      <!-- Config/Fullscreen/Day-Night (removed, now in tray) -->
 
       <!-- MODAL DIALOG -->
       <div id="customModal" class="modal hidden">
@@ -626,14 +640,90 @@
       <label>Az:  <input id="gotoAz"  type="text" placeholder="DD:MM:SS"></label>
       <button id="gotoCoordsBtn">GoTo</button>
     </div>
-    <button id="stopBtn" title="Stop" aria-label="Stop" style="top:12px; right:12px; position:absolute; z-index:30; background:transparent; color:white; border:none; border-radius:8px; width:48px; height:48px; min-width:48px; min-height:48px; padding:0; font-size:1.2em; display:inline-flex; align-items:center; justify-content:center;">
-      <!-- SVG regular octagon with centered STOP text and dark red border -->
-      <svg class="stop-octagon-svg" width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-        <polygon class="stop-octagon-shape" points="12.07,2 27.93,2 38,12.07 38,27.93 27.93,38 12.07,38 2,27.93 2,12.07"/>
-        <text class="stop-octagon-text" x="20" y="21.5" text-anchor="middle" font-size="10" font-family="'Arial Black', Arial, sans-serif" font-weight="900" letter-spacing="0.5" fill="#111" dominant-baseline="middle">STOP</text>
-      </svg>
-    </button>
-    <button id="refreshBtn" title="Back" aria-label="Back">&#8592;</button>
+    <div class="skyview-bottom-btns">
+      <div class="skyview-btn-vertical">
+        <button id="stopBtn" title="Stop" aria-label="Stop" class="skyview-btn skyview-btn--stop">
+          <svg class="stop-octagon-svg" width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+            <polygon class="stop-octagon-shape" points="12.07,2 27.93,2 38,12.07 38,27.93 27.93,38 12.07,38 2,27.93 2,12.07" style="stroke-width:1;"/>
+            <text class="stop-octagon-text" x="20" y="21.5" text-anchor="middle" font-size="5" font-family="'Arial Black', Arial, sans-serif" font-weight="900" letter-spacing="0.5" fill="#111" dominant-baseline="middle">STOP</text>
+          </svg>
+        </button>
+        <button id="backBtn" title="Back" aria-label="Back" class="skyview-btn skyview-btn--icon"><span style="width:40px;height:40px;line-height:40px;display:inline-block;text-align:center;font-size:1.2em;">&#8592;</span></button>
+        <button id="redrawBtn" title="Redraw" aria-label="Redraw" class="skyview-btn skyview-btn--icon"><span style="width:40px;height:40px;line-height:40px;display:inline-block;text-align:center;font-size:1.2em;">&#8635;</span></button>
+      </div>
+    </div>
+  <style>
+    .skyview-bottom-btns {
+      position: absolute;
+      bottom: 18px;
+      right: 18px;
+      z-index: 30;
+    }
+    .skyview-btn-vertical {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 12px;
+    }
+    .skyview-btn {
+      background: #28a;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      width: 40px;
+      height: 40px;
+      min-width: 40px;
+      min-height: 40px;
+      font-size: 1.2em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 0;
+      box-sizing: border-box;
+      transition: background 0.15s, color 0.15s;
+      padding: 0;
+      overflow: hidden;
+    }
+    .skyview-btn--stop {
+      background: transparent;
+      padding: 0;
+    }
+    .skyview-btn--icon {
+      background: #28a;
+    }
+    .stop-octagon-svg {
+      width: 40px;
+      height: 40px;
+      display: block;
+    }
+    @media (max-width: 600px) {
+      .skyview-btn {
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        min-height: 32px;
+        font-size: 1em;
+      }
+      .skyview-bottom-btns {
+        bottom: 56px; /* 1.5 * 32px button height, moves up for visibility */
+        right: 8px;
+      }
+      .skyview-btn-vertical {
+        gap: 8px;
+      }
+      .stop-octagon-svg {
+        width: 32px;
+        height: 32px;
+      }
+      .skyview-btn--icon span {
+        width: 32px !important;
+        height: 32px !important;
+        line-height: 32px !important;
+        font-size: 1em !important;
+      }
+    }
+    /* Remove duplicate STOP/Back/Redraw button rules to prevent hidden/extra buttons */
+  </style>
     <div id="starAttributes">
       <div id="nameInfo">Name: </div>
       <div id="hipInfo">HIP: </div>
@@ -962,101 +1052,29 @@
         <text x="200" y="200" text-anchor="middle" dominant-baseline="middle" class="speed-label">${window.currentSpeed}</text>
       </svg>
       <div class="handpad__row handpad__row--actions">
-        <button id="trackToggleButton" title="Stop" aria-label="Stop" class="stop-octagon-btn">
-          <!-- Updated SVG: black, smaller, centered STOP text -->
-          <svg class="stop-octagon-svg" width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-            <polygon class="stop-octagon-shape" points="12.07,2 27.93,2 38,12.07 38,27.93 27.93,38 12.07,38 2,27.93 2,12.07"/>
-            <text class="stop-octagon-text" x="20" y="21.5" text-anchor="middle" font-size="10" font-family="'Arial Black', Arial, sans-serif" font-weight="900" letter-spacing="0.5" fill="#111" dominant-baseline="middle">STOP</text>
-          </svg>
-        </button>
-  <style>
-    /* STOP Octagon Button Styles (shared for handpad and SkyView) */
-    .stop-octagon-btn, #stopBtn {
-      background: #fff !important;
-      border: 2px solid #a00 !important;
-      border-radius: 8px !important;
-      width: 48px !important;
-      height: 48px !important;
-      min-width: 48px !important;
-      min-height: 48px !important;
-      padding: 0 !important;
-      font-size: 1.2em !important;
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.18) !important;
-      outline: none !important;
-      cursor: pointer;
-    }
-    .stop-octagon-svg {
-      width: 40px;
-      height: 40px;
-      display: block;
-    }
-    .stop-octagon-shape {
-      fill: #e33;
-      stroke: #a00;
-      stroke-width: 2.5;
-      transition: fill 0.15s, stroke 0.15s;
-      filter: drop-shadow(0 0 2px #a00);
-    }
-    .stop-octagon-text {
-      fill: #111;
-      font-family: 'Arial Black', Arial, sans-serif;
-      font-size: 10px;
-      font-weight: 900;
-      letter-spacing: 0.5px;
-      pointer-events: none;
-      user-select: none;
-      text-shadow: none;
-      dominant-baseline: middle;
-    }
-    .stop-octagon-btn:active .stop-octagon-shape,
-    .stop-octagon-btn:focus .stop-octagon-shape,
-    #stopBtn:active .stop-octagon-shape,
-    #stopBtn:focus .stop-octagon-shape {
-      fill: #fff;
-      stroke: #e33;
-      filter: none;
-    }
-    .stop-octagon-btn:active .stop-octagon-text,
-    .stop-octagon-btn:focus .stop-octagon-text,
-    #stopBtn:active .stop-octagon-text,
-    #stopBtn:focus .stop-octagon-text {
-      fill: #e33;
-      text-shadow: none;
-    }
-    body.night-mode .stop-octagon-shape {
-      fill: #e33;
-      stroke: #a00;
-    }
-    body.night-mode .stop-octagon-text {
-      fill: #111;
-      text-shadow: none;
-    }
-    body.night-mode .stop-octagon-btn,
-    body.night-mode #stopBtn {
-      background: #222 !important;
-      border-color: #f33 !important;
-    }
-    /* Ensure STOP button is always visible in both modes */
-    .handpad__row--actions .stop-octagon-btn {
-      margin-top: 0.5em;
-    }
-  </style>
+        <!-- Removed STOP button from here -->
       </div>
     `);
-    // Style for arcs and center
+    // Style for arcs and center (day/night mode aware)
     $("<style id='handpadArcStyle'>\n"
+      // Day mode: blue border, gray background, black text
       + ".handpad-arc, .handpad-center {\n"
-      + "  stroke: none !important;\n"
-      + "  fill: #f33 !important;\n"
-      + "  opacity: 0.7;\n"
+      + "  stroke: #28a !important;\n"
+      + "  stroke-width: 2.5 !important;\n"
+      + "  fill: #f5f5f5 !important;\n"
+      + "  opacity: 1;\n"
       + "  cursor: pointer;\n"
-      + "  transition: opacity 0.15s, fill 0.15s;\n"
+      + "  transition: opacity 0.15s, fill 0.15s, stroke 0.15s;\n"
       + "}\n"
-      + ".handpad-arc:hover, .handpad-center:hover { opacity: 1; fill: #fff !important; }\n"
-      + ".speed-label { font-size: 2.1em; font-weight: bold; fill: #f33 !important; pointer-events: none; }\n"
+      + ".handpad-arc:hover, .handpad-center:hover { fill: #e0eaff !important; }\n"
+      + ".speed-label { font-size: 2.1em; font-weight: bold; fill: #111 !important; pointer-events: none; }\n"
+      // Night mode: dark bg, red border/text
+      + "body.night-mode .handpad-arc, body.night-mode .handpad-center {\n"
+      + "  stroke: #f33 !important;\n"
+      + "  fill: #222 !important;\n"
+      + "}\n"
+      + "body.night-mode .handpad-arc:hover, body.night-mode .handpad-center:hover { fill: #f33 !important; }\n"
+      + "body.night-mode .speed-label { fill: #f33 !important; }\n"
       + "</style>").appendTo('head');
     // Remove any old handpadGridStyle
     $('style#handpadGridStyle').remove();
@@ -1113,12 +1131,14 @@
         var timeStr = deviceTime.toLocaleString();
         var isNight = $('body').hasClass('night-mode');
         var modalHtml = `
-          <div class="modal__body${isNight ? ' night-mode' : ''}">
+          <div class="modal__body${isNight ? ' night-mode' : ''}"
+            style="${isNight ? 'color:#f33; background:#222; border-radius:8px; padding:10px 0;' : 'color:#111; background:#f5f5f5; border-radius:8px; padding:10px 0;'}">
             <strong>Set System Time?</strong>
             <div style="margin-top:10px;">Would you like to set the Pi's system time to your device's current time?</div>
             <div style="margin-top:10px; font-size:1.1em;">Device time: <span style="font-weight:bold;">${timeStr}</span></div>
           </div>
-          <div class="modal__footer">
+          <div class="modal__footer"
+            style="${isNight ? 'background:#222; color:#f33; border-radius:0 0 8px 8px; padding:10px 0; text-align:center;' : 'background:#f5f5f5; color:#111; border-radius:0 0 8px 8px; padding:10px 0; text-align:center;'}">
             <button class="btn btn--primary" id="setSystemTimeBtn">Set Time</button>
             <button class="btn" id="dismissTimeBtn">Dismiss</button>
           </div>
@@ -1189,9 +1209,10 @@
       top: 50%;
       right: 0;
       transform: translateY(-50%);
-      background: #28a;
-      color: #fff;
+      background: #f5f5f5;
+      color: #111;
       border-radius: 8px 0 0 8px;
+      border: 1.5px solid #28a;
       padding: 0 8px;
       font-size: 2.1em;
       cursor: pointer;
@@ -1203,27 +1224,30 @@
       align-items: center;
       justify-content: center;
       user-select: none;
-      transition: background 0.15s, color 0.15s;
+      transition: background 0.15s, color 0.15s, border 0.15s;
     }
     #controlTrayBtn:active, #controlTrayBtn:focus {
-      background: #1a5a8a;
-      color: #eee;
+      background: #e0eaff;
+      color: #111;
+      border-color: #1a5a8a;
     }
     body.night-mode #controlTrayBtn {
       background: #222;
       color: #f33;
       box-shadow: -2px 2px 8px rgba(255,51,51,0.18);
+      border: 1.5px solid #f33;
     }
     body.night-mode #controlTrayBtn:active, body.night-mode #controlTrayBtn:focus {
       background: #f33;
       color: #111;
+      border: 1.5px solid #f33;
     }
     #controlTray {
       position: fixed;
-      top: 50%;
+      top: calc(50% + 160px); /* Move drawer down by about four button heights (incremented again) */
       right: 0;
       transform: translateY(-50%);
-      background: rgba(40,138,170,0.98);
+      background: #f5f5f5;
       border-radius: 16px 0 0 16px;
       box-shadow: -2px 2px 16px rgba(0,0,0,0.22);
       padding: 16px 10px;
@@ -1236,6 +1260,7 @@
       width: 120px;
       max-width: 140px;
       transition: right 0.25s, opacity 0.25s;
+      border: 1.5px solid #28a;
     }
     #controlTray.hide {
       right: -140px;
@@ -1245,27 +1270,33 @@
     body.night-mode #controlTray {
       background: rgba(34,34,34,0.98);
       box-shadow: -2px 2px 16px rgba(255,51,51,0.22);
+      border: 1.5px solid #f33;
     }
     .tray-btn {
       font-size: 1.08em;
       padding: 10px 0;
       border-radius: 8px;
-      background: #28a;
-      color: #fff;
-      border: none;
+      background: #f5f5f5;
+      color: #111;
+      border: 1.5px solid #28a;
       box-shadow: 0 2px 8px rgba(0,0,0,0.18);
       min-width: 90px;
       width: 100%;
       font-weight: bold;
       letter-spacing: 0.04em;
       cursor: pointer;
-      transition: background 0.15s, color 0.15s;
+      transition: background 0.15s, color 0.15s, border 0.15s;
       text-align: center;
     }
+    .tray-btn:active, .tray-btn:focus {
+      background: #e0eaff;
+      color: #111;
+      border-color: #1a5a8a;
+    }
     .tray-collapse-btn {
-      background: transparent !important;
-      color: #fff !important;
-      border: none !important;
+      background: #f5f5f5 !important;
+      color: #111 !important;
+      border: 1.5px solid #28a !important;
       box-shadow: none !important;
       font-size: 2.1em !important;
       width: 38px !important;
@@ -1280,18 +1311,23 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      border-radius: 8px !important;
+      transition: background 0.15s, color 0.15s, border 0.15s;
     }
     .tray-collapse-btn:active, .tray-collapse-btn:focus {
-      color: #1a5a8a !important;
-      background: #eee !important;
+      background: #e0eaff !important;
+      color: #111 !important;
+      border-color: #1a5a8a !important;
     }
     body.night-mode .tray-collapse-btn {
       color: #f33 !important;
       background: transparent !important;
+      border: 1.5px solid #f33 !important;
     }
     body.night-mode .tray-collapse-btn:active, body.night-mode .tray-collapse-btn:focus {
       color: #fff !important;
       background: #f33 !important;
+      border: 1.5px solid #f33 !important;
     }
     .tray-btn:active, .tray-btn:focus {
       background: #1a5a8a;
@@ -1309,7 +1345,7 @@
     }
     @media (max-width: 700px) {
       #controlTray, #controlTrayBtn {
-        top: 50%;
+        top: calc(50% + 80px); /* Move drawer down even more on mobile too (double previous) */
         bottom: unset;
         left: unset;
         right: 0;
@@ -1344,36 +1380,249 @@
         height: 44px;
       }
     }
-  </style>
-  <script>
-    // Control Tray toggle logic
-    $(function(){
-      var $tray = $('#controlTray');
-      var $btn = $('#controlTrayBtn');
-      var $collapse = $('#controlTrayCollapse');
-      function setArrow() {
-        $btn.html($tray.hasClass('hide') ? '&#x25C0;' : '&#x25B6;');
+
+  /* STOP OCTAGON BUTTON (main page, now inline with Start) */
+  .handpad-action-row {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    gap: 5em !important; /* Force more space between START and STOP */
+    margin: 0.2em 0 0 0 !important; /* Move row as high as possible, just below handpad */
+  }
+  .action-btn {
+    background: #f5f5f5;
+    border: 2.5px solid #28a;
+    border-radius: 8px;
+    width: 100px;
+    height: 100px;
+    min-width: 100px;
+    min-height: 100px;
+    font-size: 2em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s, border 0.15s, box-shadow 0.15s;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+    position: relative;
+    z-index: 2101;
+    margin: 0;
+    padding: 0;
+  }
+  .start-action-btn {
+    background: #fff;
+    color: #111;
+    border: 2.5px solid #28a;
+  }
+  .start-action-btn:active, .start-action-btn:focus {
+    background: #e0eaff;
+    color: #111;
+    border-color: #1a5a8a;
+  }
+  body.night-mode .start-action-btn {
+    background: #222;
+    color: #f33;
+    border: 2.5px solid #f33;
+  }
+  body.night-mode .start-action-btn:active, body.night-mode .start-action-btn:focus {
+    background: #f33;
+    color: #fff;
+    border-color: #f33;
+  }
+  .action-btn:active, .action-btn:focus {
+    background: #e0eaff;
+    outline: none;
+    border-color: #1a5a8a;
+  }
+  .stop-octagon-btn {
+    background: transparent;
+    border: 2.5px solid #28a;
+    box-shadow: none;
+    width: 100px;
+    height: 100px;
+    min-width: 100px;
+    min-height: 100px;
+    padding: 0;
+    font-size: 2.7em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+    z-index: 2101;
+    margin: 0;
+  }
+  .stop-octagon-btn:active, .stop-octagon-btn:focus {
+    background: transparent;
+    outline: none;
+    border: 2.5px solid #1a5a8a;
+  }
+  .stop-octagon-svg {
+    width: 80px;
+    height: 80px;
+    display: block;
+  }
+  .stop-octagon-shape {
+    fill: #a11;
+    stroke: #28a;
+    stroke-width: 2.5 !important;
+  }
+  .stop-octagon-text {
+    font-family: 'Arial Black', Arial, sans-serif;
+    font-size: 0.54em;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+    fill: #fff;
+    dominant-baseline: middle;
+    pointer-events: none;
+    user-select: none;
+  }
+  /* Extra large STOP button variant for main page */
+  .stop-octagon-btn--xlarge {
+    width: 100px;
+    height: 100px;
+    min-width: 100px;
+    min-height: 100px;
+  }
+  .stop-octagon-svg--xlarge {
+    width: 100px;
+    height: 100px;
+  }
+  .stop-octagon-text--xlarge {
+    font-size: 40px;
+    letter-spacing: 1.2px;
+    font-family: 'Arial Black', Arial, sans-serif;
+    font-weight: 900;
+    fill: #fff;
+    dominant-baseline: middle;
+    pointer-events: none;
+    user-select: none;
+  }
+  body.night-mode .stop-octagon-btn {
+    background: #222;
+    border: 2.5px solid #f33;
+    box-shadow: 0 2px 8px rgba(255,51,51,0.18);
+  }
+  body.night-mode .stop-octagon-btn:active, body.night-mode .stop-octagon-btn:focus {
+    background: #f33;
+    border-color: #f33;
+  }
+  body.night-mode .stop-octagon-shape {
+    fill: #222;
+    stroke: #f33;
+  }
+  body.night-mode .stop-octagon-text {
+    fill: #f33;
+  }
+  /* Responsive tweaks for STOP button */
+  @media (max-width: 700px) {
+    .handpad-action-row {
+      gap: 5em !important;
+      margin: 1.2em 0 0 0 !important;
+    }
+    .action-btn {
+      width: 80px;
+      height: 80px;
+      min-width: 80px;
+      min-height: 80px;
+      font-size: 1.3em;
+    }
+    .stop-octagon-btn,
+    .stop-octagon-btn--xlarge {
+      width: 80px;
+      height: 80px;
+      min-width: 80px;
+      min-height: 80px;
+    }
+    .stop-octagon-svg,
+    .stop-octagon-svg--xlarge {
+      width: 64px;
+      height: 64px;
+    }
+    .stop-octagon-text--xlarge {
+      font-size: 5vw;
+      letter-spacing: 1px;
+    }
+  }
+  @media (max-width: 500px) {
+    .handpad-action-row {
+      gap: 3em !important;
+      margin: 1em 0 0 0 !important;
+    }
+    .action-btn {
+      width: 60px;
+      height: 60px;
+      min-width: 60px;
+      min-height: 60px;
+      font-size: 1em;
+    }
+    .stop-octagon-btn,
+    .stop-octagon-btn--xlarge {
+      width: 60px;
+      height: 60px;
+      min-width: 60px;
+      min-height: 60px;
+    }
+    .stop-octagon-svg,
+    .stop-octagon-svg--xlarge {
+      width: 44px;
+      height: 44px;
+    }
+    .stop-octagon-text--xlarge {
+      font-size: 7vw;
+      letter-spacing: 0.7px;
+    }
+  }
+  /* End STOP octagon button styles */
+</style>
+<script>
+  // Control Tray toggle logic
+  $(function(){
+    var $tray = $('#controlTray');
+    var $btn = $('#controlTrayBtn');
+    var $collapse = $('#controlTrayCollapse');
+    function setArrow() {
+      $btn.html($tray.hasClass('hide') ? '&#x25C0;' : '&#x25B6;');
+    }
+    $btn.on('click', function(){
+      $tray.toggleClass('hide');
+      setArrow();
+      // If tray is now open, ensure it is visible
+      if (!$tray.hasClass('hide')) {
+        $tray.show();
+      } else {
+        $tray.hide();
       }
-      $btn.on('click', function(){
-        $tray.toggleClass('hide');
-        setArrow();
-      });
-      // Collapse button inside tray (bottom, arrow right)
-      $(document).on('click', '#controlTrayCollapse', function(e) {
-        $tray.addClass('hide');
-        setArrow();
-        e.stopPropagation();
-      });
-      // Allow closing tray by clicking outside tray (optional, but improves UX)
-      $(document).on('mousedown touchstart', function(e) {
-        if (!$tray.hasClass('hide') && !$tray.is(e.target) && $tray.has(e.target).length === 0 && !$btn.is(e.target)) {
-          $tray.addClass('hide');
-          setArrow();
-        }
-      });
-      // Hide tray by default
+    });
+    $(document).on('click', '#controlTrayCollapse', function(e) {
       $tray.addClass('hide');
       setArrow();
+      $tray.hide();
+      e.stopPropagation();
+    });
+    // Removed auto-close tray on outside click: tray now only closes via tray button or collapse button
+    // Show tray by default
+    $tray.removeClass('hide');
+    setArrow();
+  });
+  </script>
+  <script>
+    // --- Control Tray visibility logic ---
+    function updateTrayVisibility() {
+      var mainVisible = document.getElementById('mainViewContainer').style.display !== 'none';
+      document.getElementById('controlTrayBtn').style.display = mainVisible ? '' : 'none';
+      document.getElementById('controlTray').style.display = mainVisible ? '' : 'none';
+    }
+    document.addEventListener('DOMContentLoaded', function() {
+      updateTrayVisibility();
+      // Main to SkyView
+      var skyBtn = document.getElementById('skyviewButton');
+      if (skyBtn) skyBtn.addEventListener('click', updateTrayVisibility);
+      // SkyView to Main
+      document.body.addEventListener('click', function(e) {
+        if (e.target && e.target.id === 'refreshBtn') updateTrayVisibility();
+      });
     });
   </script>
 </body>
