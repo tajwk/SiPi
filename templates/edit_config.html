@@ -1,6 +1,46 @@
 <!doctype html>
 <html>
 <head>
+  <!-- Modal dialog for alerts and confirmations -->
+  <style>
+    .modal-bg {
+      display: none;
+      position: fixed;
+      z-index: 9999;
+      left: 0; top: 0; width: 100vw; height: 100vh;
+      background: rgba(0,0,0,0.4);
+      justify-content: center; align-items: center;
+    }
+    .modal-dialog {
+      background: var(--surface, #fff);
+      color: var(--fg, #222);
+      border: 2px solid var(--accent, #b00);
+      border-radius: 10px;
+      min-width: 260px;
+      max-width: 90vw;
+      padding: 1.5em 1.5em 1em 1.5em;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.25);
+      text-align: center;
+      font-size: 1.1em;
+    }
+    .modal-dialog .modal-btns {
+      margin-top: 1.2em;
+      display: flex;
+      justify-content: center;
+      gap: 1.5em;
+    }
+    .modal-dialog button {
+      min-width: 80px;
+    }
+    body.night-mode .modal-dialog {
+      background: #222;
+      color: red;
+      border-color: red;
+    }
+    body.night-mode .modal-bg {
+      background: rgba(0,0,0,0.7);
+    }
+  </style>
   <meta charset="utf-8">
   <title>Edit Configuration</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
@@ -146,7 +186,39 @@
   </style>
 </head>
 <body>
+<!-- Modal dialog HTML -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal-dialog" id="modalDialog">
+    <div id="modalMsg"></div>
+    <div class="modal-btns" id="modalBtns"></div>
+  </div>
+</div>
 <script>
+// Modal dialog logic for alerts and confirms
+function showModal(msg, cb) {
+  $('#modalMsg').html(msg.replace(/\n/g, '<br>'));
+  $('#modalBtns').html('<button id="modalOkBtn" class="btn btn-large">OK</button>');
+  $('#modalBg').fadeIn(80);
+  $('#modalOkBtn').focus();
+  $('#modalOkBtn').off('click').on('click', function() {
+    $('#modalBg').fadeOut(80);
+    if (cb) cb();
+  });
+}
+function showConfirm(msg, cb) {
+  $('#modalMsg').html(msg.replace(/\n/g, '<br>'));
+  $('#modalBtns').html('<button id="modalYesBtn" class="btn btn-large">Yes</button><button id="modalNoBtn" class="btn btn-large">No</button>');
+  $('#modalBg').fadeIn(80);
+  $('#modalYesBtn').focus();
+  $('#modalYesBtn').off('click').on('click', function() {
+    $('#modalBg').fadeOut(80);
+    cb(true);
+  });
+  $('#modalNoBtn').off('click').on('click', function() {
+    $('#modalBg').fadeOut(80);
+    cb(false);
+  });
+}
   (function(){
     if (localStorage.getItem('nightMode') === 'enabled') {
       document.body.classList.add('night-mode');
@@ -179,7 +251,7 @@
     {% endif %}
   {% endwith %}
 
-  <form method="post" action="{{ url_for('edit_config') }}">
+  <form id="editConfigForm" method="post" action="{{ url_for('edit_config') }}">
     <!-- Always visible config options -->
     <div style="display:flex; justify-content:center; gap:40px; margin-bottom:20px; flex-wrap: wrap;">
       <div style="flex:1; max-width:260px; min-width:200px; text-align:left;">
@@ -271,14 +343,14 @@
       </div>
     </div>
     <div class="grid-item">
-      <h2>System Time</h2>
+      <h2>Device Time</h2>
       <div style="text-align:center;">
         <input type="text" id="timeInput" placeholder="HH:MM"
                style="width:calc(100% - 10ch); display:inline-block;">
       </div>
       <div style="text-align:center; margin-top:10px;">
         <button id="setTimeBtn" class="btn">Set</button>
-        <button id="syncTimeBtn" class="btn">Sync</button>
+        <button id="syncTimeBtn" class="btn">Sync to Device</button>
       </div>
     </div>
     <div class="grid-item">
@@ -350,7 +422,7 @@ $(function(){
   $('#configTextarea').on('input', updateSiteCoordInputs);
 
   // --- On Save, update config with values from site coord inputs ---
-  $('form').on('submit', function(e){
+  $('#editConfigForm').on('submit', function(e){
     let configText = $('#configTextarea').val();
     let lines = configText.split('\n');
     let lat = $('#siteLatitudeInput').val().trim();
@@ -364,6 +436,28 @@ $(function(){
     if (!foundLat) lines.push('SiteLatitude=' + lat);
     if (!foundLon) lines.push('SiteLongitude=' + lon);
     $('#configTextarea').val(lines.join('\n'));
+
+    // AJAX submit for modal popup
+    e.preventDefault();
+    const formData = $(this).serialize();
+    $.ajax({
+      url: $(this).attr('action'),
+      method: 'POST',
+      data: formData,
+      headers: {'X-Requested-With': 'XMLHttpRequest'},
+      success: function(resp) {
+        if (resp && resp.message) {
+          showModal(resp.message);
+        } else {
+          showModal('Configuration saved.');
+        }
+      },
+      error: function(xhr) {
+        let msg = 'Failed to save configuration.';
+        if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+        showModal(msg);
+      }
+    });
   });
 
 
@@ -459,7 +553,7 @@ $(function(){
   // Set Park
   $('#setParkButton').click(() => $.post('/setpark'));
 
-  // System Time handlers (use unified /set_time endpoint)
+  // Device Time handlers (use unified /set_time endpoint)
   $('#setTimeBtn').click(() => {
     // Use local time string in 'YYYY-MM-DD HH:MM:SS' format
     const now = new Date();
@@ -483,10 +577,10 @@ $(function(){
       contentType: 'application/json',
       data: JSON.stringify({ dt_str }),
       success: function(resp) {
-        alert(resp.message || 'System time set!');
+        showModal(resp.message || 'Device time set!');
       },
       error: function(xhr) {
-        alert('Failed to set time: ' + (xhr.responseJSON?.error || xhr.statusText));
+        showModal('Failed to set device time: ' + (xhr.responseJSON?.error || xhr.statusText));
       }
     });
   });
@@ -508,15 +602,13 @@ $(function(){
     $.post('/update_wifi', { ssid, pass })
       .done(function(data) {
         if (data && data.success) {
-          alert('Wi-Fi settings saved!');
-          // Optionally reload to reflect new settings
-          // location.reload();
+          showModal('Wi-Fi settings saved!');
         } else {
-          alert('Failed to save Wi-Fi settings.');
+          showModal('Failed to save Wi-Fi settings.');
         }
       })
       .fail(function(xhr) {
-        alert('Error saving Wi-Fi settings: ' + (xhr.responseText || xhr.statusText));
+        showModal('Error saving Wi-Fi settings: ' + (xhr.responseText || xhr.statusText));
       });
   });
 
@@ -532,19 +624,22 @@ $(function(){
   $('#updateSipiBtn').click(function(){
     $.post('/check_updates', {}, function(resp){
       if (!resp.updates_available) {
-        alert("SiPi is up to date.");
+        showModal("SiPi is up to date.");
       } else {
         const msg = "New version available: " + resp.latest_version +
                     "\nCurrent: " + resp.current_version +
                     "\n\nProceed with update?";
-        if (confirm(msg)) {
-          $.post('/apply_updates', {}, function(res2){
-            alert(res2.message + "\nThe page will reload in 2 seconds to complete the update.");
-            setTimeout(function(){
-              location.reload(true);
-            }, 2000);
-          }, 'json');
-        }
+        showConfirm(msg, function(confirmed) {
+          if (confirmed) {
+            $.post('/apply_updates', {}, function(res2){
+              showModal((res2.message || 'Update complete.') + "<br>The page will reload in 2 seconds to complete the update.", function(){
+                setTimeout(function(){
+                  location.reload(true);
+                }, 2000);
+              });
+            }, 'json');
+          }
+        });
       }
     }, 'json');
   });

@@ -683,9 +683,16 @@ def edit_config():
         # Send ReloadConfigFile command to SiTechExe after saving config
         try:
             send_command('ReloadConfigFile\n')
-            flash("Configuration updated and reload command sent", "success")
+            msg = "Configuration updated and reload command sent"
+            status = "success"
         except Exception as e:
-            flash(f"Configuration updated, but failed to send reload command: {e}", "warning")
+            msg = f"Configuration updated, but failed to send reload command: {e}"
+            status = "warning"
+        # If AJAX, return JSON for modal popup
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify(success=(status=="success"), message=msg)
+        # Otherwise, fallback to flash and redirect
+        flash(msg, status)
         return redirect(url_for('edit_config'))
 
     cfg = open(CONFIG_FILE).read()
