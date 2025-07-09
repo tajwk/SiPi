@@ -306,11 +306,15 @@ function showConfirm(msg, cb) {
       </div>
       <div style="text-align:center;">
         <textarea id="configTextarea" name="config" rows="20" cols="80">{{ config }}</textarea><br>
-        <div class="xpxp-checkbox-container">
+        <div class="xpxp-checkbox-container" style="margin-bottom:12px;">
           <label>
             <input type="checkbox" id="xpxpCheckbox">
             UseActiveXPXP
           </label>
+        </div>
+        <div style="margin-bottom:8px;">
+          <button type="button" id="backupConfigBtn" class="btn">Backup Config</button>
+          <button type="button" id="restoreConfigBtn" class="btn">Restore Config</button>
         </div>
       </div>
     </div>
@@ -393,6 +397,34 @@ function showConfirm(msg, cb) {
 
 <script>
 $(function(){
+  // --- Backup/Restore Config ---
+  $('#backupConfigBtn').on('click', function() {
+    showModal('Backup current SiTech.cfg to backup location?', function() {
+      $.post('/backup_config', function(resp) {
+        if (resp.success) {
+          showModal('Backup successful!');
+        } else {
+          showModal('Backup failed: ' + (resp.error || 'Unknown error'));
+        }
+      }).fail(function(xhr) {
+        showModal('Backup failed: ' + (xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : 'Unknown error'));
+      });
+    });
+  });
+  $('#restoreConfigBtn').on('click', function() {
+    showConfirm('Restore SiTech.cfg from backup? This will overwrite the current config.', function(yes) {
+      if (!yes) return;
+      $.post('/restore_config', function(resp) {
+        if (resp.success) {
+          showModal('Restore successful! Reloading...', function() { location.reload(); });
+        } else {
+          showModal('Restore failed: ' + (resp.error || 'Unknown error'));
+        }
+      }).fail(function(xhr) {
+        showModal('Restore failed: ' + (xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : 'Unknown error'));
+      });
+    });
+  });
   // --- Collapsible config section with warning ---
   let configVisible = false;
   $('#toggleConfigBtn').click(function(){
