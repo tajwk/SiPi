@@ -544,8 +544,13 @@ def set_time_popup():
 
 @app.route('/update_wifi', methods=['POST'])
 def update_wifi():
-    ssid   = request.form.get('ssid','')
-    passwd = request.form.get('pass','')
+    # Accept from form, query, or JSON
+    ssid = request.values.get('ssid', '')
+    passwd = request.values.get('pass', '')
+    if not ssid and request.is_json:
+        data = request.get_json(force=True)
+        ssid = data.get('ssid', '')
+        passwd = data.get('pass', '')
     lines = []
     for ln in open(HOSTAPD_CONF).read().splitlines():
         if ln.startswith('ssid='):
