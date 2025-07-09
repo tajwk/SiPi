@@ -15,7 +15,7 @@ from flask import (
 )
 
 # Initial SiPi version (bump patch for simple fixes)
-__version__ = "0.7"
+__version__ = "0.8"
 
 # Base directory for Git operations
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -551,21 +551,17 @@ def update_wifi():
         data = request.get_json(force=True)
         ssid = data.get('ssid', '')
         passwd = data.get('pass', '')
-    lines = []
-    for ln in open(HOSTAPD_CONF).read().splitlines():
-        if ln.startswith('ssid='):
-            lines.append(f"ssid={ssid}")
-        elif ln.startswith('wpa_passphrase='):
-            lines.append(f"wpa_passphrase={passwd}")
-        else:
-            lines.append(ln)
-    with open(HOSTAPD_CONF,'w') as f:
-        f.write("\n".join(lines) + "\n")
     try:
-        subprocess.run(['systemctl','restart','hostapd'], check=False)
-    except:
-        pass
-    return jsonify(success=True)
+        result = subprocess.run(
+            ['sudo', '/usr/local/bin/update_hostapd_conf.sh', ssid, passwd],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.returncode == 0:
+            return jsonify(success=True)
+        else:
+            return jsonify(success=False, error=result.stderr), 500
+    except Exception as e:
+        return jsonify(success=False, error=str(e)), 500
 
 @app.route('/toggle_vibration', methods=['POST'])
 def toggle_vibration():

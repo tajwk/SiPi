@@ -501,11 +501,23 @@ $(function(){
   });
 
   // Wi-Fi Save
-  $('#saveWifiBtn').click(() => {
-    $.post('/update_wifi',{
-      ssid: $('#wifiSsidInput').val(),
-      pass: $('#wifiPassphraseInput').val()
-    });
+  $('#saveWifiBtn').click(function(e) {
+    e.preventDefault();
+    const ssid = $('#wifiSsidInput').val();
+    const pass = $('#wifiPassphraseInput').val();
+    $.post('/update_wifi', { ssid, pass })
+      .done(function(data) {
+        if (data && data.success) {
+          alert('Wi-Fi settings saved!');
+          // Optionally reload to reflect new settings
+          // location.reload();
+        } else {
+          alert('Failed to save Wi-Fi settings.');
+        }
+      })
+      .fail(function(xhr) {
+        alert('Error saving Wi-Fi settings: ' + (xhr.responseText || xhr.statusText));
+      });
   });
 
   // Handpad toggles
