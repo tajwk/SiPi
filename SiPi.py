@@ -23,12 +23,68 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'  # Replace with a strong secret key
 
+
 # Paths
 SI_TECH_HOST    = 'localhost'
 SI_TECH_PORT    = 8078
 CONFIG_FILE     = "/usr/share/SiTech/SiTechExe/SiTech.cfg"
+CONFIG_BACKUP   = "/opt/SiTech/SiPi/SiTech.cfg.bak"
 HOSTAPD_CONF    = "/etc/hostapd/hostapd.conf"
 WEB_CONFIG_FILE = os.path.join(os.path.dirname(__file__), "web_config.json")
+# --- Config backup/restore endpoints ---
+@app.route('/backup_config', methods=['POST'])
+import getpass
+import stat
+def backup_config():
+    try:
+        os.makedirs(os.path.dirname(CONFIG_BACKUP), exist_ok=True)
+        with open(CONFIG_FILE, 'r') as src, open(CONFIG_BACKUP, 'w') as dst:
+            dst.write(src.read())
+        # Diagnostics: user, permissions
+        user = getpass.getuser()
+        cfg_stat = os.stat(CONFIG_FILE)
+        bak_stat = os.stat(CONFIG_BACKUP)
+        dir_stat = os.stat(os.path.dirname(CONFIG_BACKUP))
+        perms = {
+            'config_file': oct(cfg_stat.st_mode & 0o777),
+            'backup_file': oct(bak_stat.st_mode & 0o777),
+            'backup_dir': oct(dir_stat.st_mode & 0o777),
+        }
+        return jsonify(success=True, message="Backup successful.", user=user, perms=perms)
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        user = getpass.getuser()
+        return jsonify(success=False, error=str(e), traceback=tb, user=user), 500
+
+@app.route('/restore_config', methods=['POST'])
+def restore_config():
+    try:
+        if not os.path.exists(CONFIG_BACKUP):
+            return jsonify(success=False, error="No backup file found."), 404
+        with open(CONFIG_BACKUP, 'r') as src, open(CONFIG_FILE, 'w') as dst:
+            dst.write(src.read())
+        # Diagnostics: user, permissions
+        user = getpass.getuser()
+        cfg_stat = os.stat(CONFIG_FILE)
+        bak_stat = os.stat(CONFIG_BACKUP)
+        dir_stat = os.stat(os.path.dirname(CONFIG_BACKUP))
+        perms = {
+            'config_file': oct(cfg_stat.st_mode & 0o777),
+            'backup_file': oct(bak_stat.st_mode & 0o777),
+            'backup_dir': oct(dir_stat.st_mode & 0o777),
+        }
+        # Optionally reload config in SiTechExe
+        try:
+            send_command('ReloadConfigFile\n')
+        except Exception:
+            pass
+        return jsonify(success=True, message="Restore successful.", user=user, perms=perms)
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        user = getpass.getuser()
+        return jsonify(success=False, error=str(e), traceback=tb, user=user), 500
 
 # Mount model file on Pi
 MODEL_DIR       = "/usr/share/SiTech/SiTechExe"
