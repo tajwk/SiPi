@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+
 import socket
 import threading
 import time
@@ -9,6 +10,8 @@ import datetime
 import math
 import json
 import uuid
+import getpass
+import stat
 from flask import (
     Flask, render_template, jsonify, request,
     flash, redirect, url_for, send_from_directory
@@ -33,8 +36,6 @@ HOSTAPD_CONF    = "/etc/hostapd/hostapd.conf"
 WEB_CONFIG_FILE = os.path.join(os.path.dirname(__file__), "web_config.json")
 # --- Config backup/restore endpoints ---
 @app.route('/backup_config', methods=['POST'])
-import getpass
-import stat
 def backup_config():
     try:
         os.makedirs(os.path.dirname(CONFIG_BACKUP), exist_ok=True)

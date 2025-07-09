@@ -398,16 +398,24 @@ function showConfirm(msg, cb) {
 <script>
 $(function(){
   // --- Backup/Restore Config ---
+  // Remove debug info from backup/restore popups
+  function formatDiag(resp) { return ''; }
   $('#backupConfigBtn').on('click', function() {
     showModal('Backup current SiTech.cfg to backup location?', function() {
       $.post('/backup_config', function(resp) {
         if (resp.success) {
-          showModal('Backup successful!');
+          showModal('Backup successful!' + formatDiag(resp));
         } else {
-          showModal('Backup failed: ' + (resp.error || 'Unknown error'));
+          showModal('Backup failed: ' + (resp.error || 'Unknown error') + formatDiag(resp));
         }
       }).fail(function(xhr) {
-        showModal('Backup failed: ' + (xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : 'Unknown error'));
+        let msg = 'Backup failed: ';
+        if (xhr.responseJSON) {
+          msg += (xhr.responseJSON.error || 'Unknown error') + formatDiag(xhr.responseJSON);
+        } else {
+          msg += xhr.statusText || 'Unknown error';
+        }
+        showModal(msg);
       });
     });
   });
@@ -416,12 +424,18 @@ $(function(){
       if (!yes) return;
       $.post('/restore_config', function(resp) {
         if (resp.success) {
-          showModal('Restore successful! Reloading...', function() { location.reload(); });
+          showModal('Restore successful! Reloading...' + formatDiag(resp), function() { location.reload(); });
         } else {
-          showModal('Restore failed: ' + (resp.error || 'Unknown error'));
+          showModal('Restore failed: ' + (resp.error || 'Unknown error') + formatDiag(resp));
         }
       }).fail(function(xhr) {
-        showModal('Restore failed: ' + (xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : 'Unknown error'));
+        let msg = 'Restore failed: ';
+        if (xhr.responseJSON) {
+          msg += (xhr.responseJSON.error || 'Unknown error') + formatDiag(xhr.responseJSON);
+        } else {
+          msg += xhr.statusText || 'Unknown error';
+        }
+        showModal(msg);
       });
     });
   });
