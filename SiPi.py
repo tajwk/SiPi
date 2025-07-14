@@ -18,7 +18,7 @@ from flask import (
 )
 
 # Initial SiPi version (bump patch for simple fixes)
-__version__ = "0.8"
+__version__ = "0.9"
 
 # Base directory for Git operations
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -764,13 +764,39 @@ def apply_updates():
             ['git', 'pull', 'origin', current_branch],
             cwd=BASE_DIR, capture_output=True, text=True, env=env)
         print(f"[DEBUG] git pull: {pull.stdout}\n{pull.stderr}", flush=True)
-        # Restart service
+        # --- SiTechExe.exe update logic ---
+        sitex_src = "/opt/SiTech/SiPi/SiTechExe.exe"
+        sitex_dst = "/opt/SiTech/SiTechExe/SiTechExe.exe"
+        update_msgs = []
+        # Stop sitech.service
+        try:
+            stop_sitech = subprocess.run(['sudo', 'systemctl', 'stop', 'sitech'], capture_output=True, text=True, env=env)
+            update_msgs.append("[sitech.service stopped]")
+        except Exception as e:
+            update_msgs.append(f"[Failed to stop sitech.service: {e}]")
+        # Copy new SiTechExe.exe
+        try:
+            if os.path.exists(sitex_src):
+                import shutil
+                shutil.copy2(sitex_src, sitex_dst)
+                update_msgs.append("[SiTechExe.exe updated]")
+            else:
+                update_msgs.append(f"[SiTechExe.exe not found at {sitex_src}]")
+        except Exception as e:
+            update_msgs.append(f"[Failed to update SiTechExe.exe: {e}]")
+        # Restart sitech.service
+        try:
+            subprocess.run(['sudo', 'systemctl', 'start', 'sitech'], check=False, env=env)
+            update_msgs.append("[sitech.service restarted]")
+        except Exception as e:
+            update_msgs.append(f"[Failed to restart sitech.service: {e}]")
+        # Restart sipi.service
         try:
             subprocess.run(['sudo', 'systemctl', 'restart', 'sipi'], check=False, env=env)
-            restart_msg = "\n[sipi.service restarted]"
+            update_msgs.append("[sipi.service restarted]")
         except Exception as e:
-            restart_msg = f"\n[Failed to restart sipi.service: {e}]"
-        return jsonify(success=True, message="Force-updated to latest remote." + restart_msg)
+            update_msgs.append(f"[Failed to restart sipi.service: {e}]")
+        return jsonify(success=True, message="Force-updated to latest remote.\n" + "\n".join(update_msgs))
     except Exception as e:
         print(f"[DEBUG] apply_updates: Exception: {e}", flush=True)
         return jsonify(success=False, message=str(e))
