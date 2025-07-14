@@ -101,8 +101,90 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Current mount pointing
   let mountPos     = { alt: null, az: null };
 
+  // --- Mount position polling ---
+  async function fetchMount() {
+    try {
+      const resp = await fetch('/status');
+      if (!resp.ok) throw new Error('Failed to fetch mount position');
+      const data = await resp.json();
+      // /status returns alt and az as strings or numbers; parse as float and check for NaN
+      const alt = parseFloat(data.alt);
+      const az = parseFloat(data.az);
+      if (!isNaN(alt) && !isNaN(az)) {
+        mountPos.alt = alt;
+        mountPos.az = az;
+        console.log('[SkyView] Mount position updated:', mountPos);
+      } else {
+        mountPos.alt = null;
+        mountPos.az = null;
+        console.warn('[SkyView] Invalid mount position data:', data);
+      }
+    } catch (e) {
+      mountPos.alt = null;
+      mountPos.az = null;
+      console.error('[SkyView] Error fetching mount position:', e);
+    }
+    draw();
+  }
+
+  // Fetch mount position on load and every 2 seconds
+  fetchMount();
+  setInterval(fetchMount, 2000);
+
   // Track the currently selected object (star, galaxy, or open cluster)
   let selectedObject = null;
+
+  // --- Restore default/previous view toggles on load ---
+  // Default: Stars ON, Constellations ON, Constellation Labels OFF, others OFF
+  // Try to restore from localStorage, else set default
+  function setDefaultOrRestoreToggles() {
+    const toggles = [
+      { id: 'toggleStars', def: true },
+      { id: 'toggleConst', def: true },
+      { id: 'toggleConstLabels', def: false },
+      { id: 'toggleGal', def: false },
+      { id: 'toggleOpen', def: false },
+      { id: 'toggleGlobular', def: false },
+      { id: 'toggleNebula', def: false },
+      { id: 'togglePlanetary', def: false },
+      { id: 'toggleCalPoints', def: false }
+    ];
+    let anyRestored = false;
+    toggles.forEach(t => {
+      const el = document.getElementById(t.id);
+      if (!el) return;
+      let val = localStorage.getItem('skyview_' + t.id);
+      if (val !== null) {
+        el.checked = val === 'true';
+        anyRestored = true;
+      } else {
+        el.checked = t.def;
+      }
+    });
+    // If nothing was restored, force default view (stars + const, no labels)
+    if (!anyRestored) {
+      const stars = document.getElementById('toggleStars');
+      const consts = document.getElementById('toggleConst');
+      const labels = document.getElementById('toggleConstLabels');
+      if (stars) stars.checked = true;
+      if (consts) consts.checked = true;
+      if (labels) labels.checked = false;
+    }
+  }
+  setDefaultOrRestoreToggles();
+
+  // --- Save toggle state on change ---
+  [
+    'toggleStars','toggleConst','toggleConstLabels','toggleGal','toggleOpen','toggleGlobular','toggleNebula','togglePlanetary','toggleCalPoints'
+  ].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('change', () => {
+        localStorage.setItem('skyview_' + id, el.checked);
+        draw();
+      });
+    }
+  });
 
   // Fullscreen toggle removed: fullscreenBtn no longer exists
 
@@ -165,22 +247,164 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   setInitialCanvasTransform();
 
+
   // Pan & pinch-zoom state
   let pointers={}, initialDist=0, panStartX, panStartY, panOrigX, panOrigY;
 
-  canvas.addEventListener('pointerdown', e=>{
-    // Always redraw to ensure hit-test arrays are up-to-date
-    draw();
-    const {mx,my}=transformEvent(e);
-    canvas.setPointerCapture(e.pointerId);
-    pointers[e.pointerId] = e;
-    const ids = Object.keys(pointers);
-    if(ids.length===2){
-      const [p1,p2] = ids.map(i=>pointers[i]);
-      initialDist = Math.hypot(p1.clientX-p2.clientX, p1.clientY-p2.clientY);
-    } else {
-      panStartX = e.clientX; panStartY = e.clientY;
-      panOrigX  = translateX; panOrigY  = translateY;
+  // --- Utility: Convert pointer event to canvas pixel coordinates (untransformed) ---
+  function transformEvent(e) {
+    // Returns {mx, my} in canvas pixel coordinates (before pan/zoom)
+    const rect = canvas.getBoundingClientRect();
+    // Scale mouse/touch position to canvas pixel space
+    const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const my = (e.clientY - rect.top) * (canvas.height / rect.height);
+    return {mx, my};
+  }
+
+  canvas.addEventListener('pointerdown', e => {
+    console.log('[SkyView] pointerdown event', e);
+    // Defensive: ensure canvas is visible and not covered
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) {
+      console.warn('SkyView canvas is not visible or has zero size!');
+      return;
+    }
+    // --- Calibration point click detection (priority) ---
+    if (typeof transformEvent !== 'function') {
+      window.alert('transformEvent() is not defined!');
+      return;
+    }
+    const {mx, my} = transformEvent(e);
+    let hitCalPt = false;
+    if (toggleCalPoints && toggleCalPoints.checked && calPointHits.length) {
+      for (let pt of calPointHits) {
+        if (Math.hypot(mx - pt.x, my - pt.y) < pt.r + HIT_PADDING) {
+          // Set Alt/Az textboxes to this calibration point
+          if (altInput && azInput) {
+            altInput.value = degToDMS(pt.dec); // Alt is pt.dec
+            azInput.value = degToDMS(pt.ra);  // Az is pt.ra
+          }
+          let html = `<div><strong>Cal Point #${pt.index}</strong></div>` +
+            `<div>Az: ${pt.ra.toFixed(5)}°</div>` +
+            `<div>Alt: ${pt.dec.toFixed(5)}°</div>` +
+            `<div>RMS: ${pt.error.toFixed(5)}</div>` +
+            `<div>Status: <span style='color:${pt.enabled ? 'yellow' : 'red'}'>${pt.enabled ? 'Enabled' : 'Disabled'}</span></div>` +
+            `<button id='toggleCalPointBtn' style="min-width: 100px; padding: 6px 18px; font-size: 1em; margin-top: 6px; border-radius: 6px; border: 2px solid #888; background: #222; color: #fff; cursor: pointer;">${pt.enabled ? 'Disable' : 'Enable'}</button>`;
+          popup.innerHTML = html;
+          popup.style.left = (e.pageX + 8) + 'px';
+          popup.style.top = (e.pageY + 8) + 'px';
+          popup.style.display = 'block';
+          // Attach click handler after popup is visible
+          setTimeout(() => {
+            const btn = document.getElementById('toggleCalPointBtn');
+            if (btn) {
+              btn.onclick = async (ev) => {
+                ev.stopPropagation();
+                btn.disabled = true;
+                btn.textContent = pt.enabled ? 'Disabling...' : 'Enabling...';
+                try {
+                  const resp = await fetch(pt.enabled ? '/disable_cal_point' : '/enable_cal_point', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({index: pt.index})
+                  });
+                  if (!resp.ok) throw new Error('Request failed');
+                  // Wait for cal points to refresh, then hide popup and redraw
+                  await fetchCalPoints();
+                  // Wait a short delay to ensure UI is updated
+                  setTimeout(() => {
+                    popup.style.display = 'none';
+                  }, 200);
+                } catch (err) {
+                  btn.textContent = 'Error';
+                  btn.style.background = '#a00';
+                  setTimeout(() => { popup.style.display = 'none'; }, 1200);
+                }
+              };
+            }
+          }, 0);
+          hitCalPt = true;
+          break;
+        }
+      }
+    }
+
+    // --- Object selection (stars, galaxies, clusters, etc) ---
+    if (!hitCalPt) {
+      let hitObj = null;
+      for (let s of starHits) {
+        if (Math.hypot(mx - s.screenX, my - s.screenY) < s.r + HIT_PADDING) {
+          hitObj = s;
+          break;
+        }
+      }
+      if (!hitObj) {
+        for (let g of galaxyHits) {
+          if (Math.hypot(mx - g.screenX, my - g.screenY) < g.r + HIT_PADDING) {
+            hitObj = g;
+            break;
+          }
+        }
+      }
+      if (!hitObj) {
+        for (let o of openHits) {
+          if (Math.hypot(mx - o.screenX, my - o.screenY) < o.r + HIT_PADDING) {
+            hitObj = o;
+            break;
+          }
+        }
+      }
+      if (!hitObj) {
+        for (let g of globularHits) {
+          if (Math.hypot(mx - g.screenX, my - g.screenY) < g.r + HIT_PADDING) {
+            hitObj = g;
+            break;
+          }
+        }
+      }
+      if (!hitObj) {
+        for (let n of nebulaHits) {
+          if (Math.hypot(mx - n.screenX, my - n.screenY) < n.r + HIT_PADDING) {
+            hitObj = n;
+            break;
+          }
+        }
+      }
+      if (!hitObj) {
+        for (let pn of planetaryHits) {
+          if (Math.hypot(mx - pn.screenX, my - pn.screenY) < pn.r + HIT_PADDING) {
+            hitObj = pn;
+            break;
+          }
+        }
+      }
+      if (hitObj) {
+        selectedObject = hitObj;
+        showSelectedAttributes(selectedObject);
+        // Update Alt/Az textboxes with object's current Alt/Az in DDD:MM:SS
+        if (altInput && azInput && typeof hitObj.altDeg === 'number' && typeof hitObj.azDeg === 'number') {
+          altInput.value = degToDMS(hitObj.altDeg);
+          azInput.value = degToDMS(hitObj.azDeg);
+        }
+        draw();
+        console.log('[SkyView] Selected object:', hitObj);
+        return;
+      }
+    }
+
+    // --- Normal pan/zoom logic ---
+    if (!hitCalPt) {
+      canvas.setPointerCapture(e.pointerId);
+      pointers[e.pointerId] = e;
+      const ids = Object.keys(pointers);
+      if(ids.length===2){
+        const [p1,p2] = ids.map(i=>pointers[i]);
+        initialDist = Math.hypot(p1.clientX-p2.clientX, p1.clientY-p2.clientY);
+      } else {
+        panStartX = e.clientX; panStartY = e.clientY;
+        panOrigX  = translateX; panOrigY  = translateY;
+      }
+      console.log('[SkyView] Pan/zoom start', {panStartX, panStartY, panOrigX, panOrigY});
     }
   });
 
@@ -309,6 +533,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function draw(){
+    // Debug: log mountPos before drawing reticle
+    console.log('[SkyView] draw() called, mountPos:', mountPos);
     console.log('[SkyView] draw() called');
     console.log('[SkyView] Canvas size:', canvas.width, 'x', canvas.height, 'CSS:', canvas.style.width, 'x', canvas.style.height, 'dpr:', dpr, 'canvasScale:', canvasScale, 'translateX:', translateX, 'translateY:', translateY, 'currentVpScale:', currentVpScale);
     // clear
@@ -636,16 +862,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --- reticle ---
-    if(mountPos.alt!=null&&mountPos.alt>0){
-      const p = altAzToXY(mountPos.alt, (mountPos.az + 180) % 360, effR);
+    if (mountPos.alt !== null && mountPos.az !== null) {
+      const azForDraw = (mountPos.az + 180) % 360;
+      const p = altAzToXY(mountPos.alt, azForDraw, effR);
       // Reticle radius fixed in screen space (like orange crosshair)
       const reticleRadius = 18; // px, visually matches orange crosshair
       const screenX = p.x * dpr * currentVpScale * canvasScale + translateX;
       const screenY = p.y * dpr * currentVpScale * canvasScale + translateY;
+      console.log('[SkyView] Reticle debug:', {
+        mountPos,
+        azForDraw,
+        effR,
+        p,
+        screenX,
+        screenY,
+        canvas: { width: canvas.width, height: canvas.height },
+        css: { width: canvas.style.width, height: canvas.style.height },
+        dpr,
+        canvasScale,
+        translateX,
+        translateY,
+        currentVpScale
+      });
       ctx.save();
       ctx.setTransform(1,0,0,1,0,0);
       ctx.strokeStyle='red'; ctx.lineWidth=2;
-      ctx.beginPath(); ctx.arc(screenX, screenY, reticleRadius, 0, 2*Math.PI); ctx.stroke();
+      // Crosshairs only
       ctx.beginPath();
       ctx.moveTo(screenX - reticleRadius * 1.3, screenY);
       ctx.lineTo(screenX + reticleRadius * 1.3, screenY);
@@ -653,6 +895,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       ctx.lineTo(screenX, screenY + reticleRadius * 1.3);
       ctx.stroke();
       ctx.restore();
+      console.log('[SkyView] Reticle drawn at:', screenX, screenY, 'for mountPos:', mountPos);
+    } else {
+      console.log('[SkyView] Reticle not drawn, mountPos.alt or az is null:', mountPos);
     }
 
     // --- highlight selected object (dark orange circle only) ---
@@ -754,245 +999,85 @@ document.addEventListener('DOMContentLoaded', async () => {
   planetaryNebulae = planetaryData;
   console.log('[SkyView] Loaded globular:', globularClusters.length, 'nebulae:', nebulae.length, 'planetary:', planetaryNebulae.length);
 
-  // === Mount polling ===
-  async function fetchMount(){
+
+  // --- Calibration Points ---
+  let calPoints = [];
+  let calPointHits = [];
+  const toggleCalPoints = document.getElementById('toggleCalPoints');
+
+  async function fetchCalPoints() {
     try {
-      const s = await (await fetch('/status')).json();
-      const a = parseFloat(s.alt), z = parseFloat(s.az);
-      if(!isNaN(a)&&!isNaN(z)){
-        mountPos = {alt:a,az:z};
-        draw();
-      }
-    } catch {}
+      const resp = await fetch('/cal_points');
+      const data = await resp.json();
+      calPoints = data.points || [];
+      draw();
+    } catch (e) {
+      console.error('Failed to load calibration points', e);
+      calPoints = [];
+    }
   }
-  fetchMount();
-  setInterval(fetchMount,500);
 
-  // === UI handlers ===
-  if (toggleStars) toggleStars.addEventListener('change',()=>{ console.log('[SkyView] toggleStars:', toggleStars.checked); draw(); });
-  if (toggleConst) toggleConst.addEventListener('change',()=>{ console.log('[SkyView] toggleConst:', toggleConst.checked); draw(); });
-  if (toggleGal) toggleGal.addEventListener('change',()=>{ console.log('[SkyView] toggleGal:', toggleGal.checked); draw(); });
-  if (toggleOpen) toggleOpen.addEventListener('change',()=>{ console.log('[SkyView] toggleOpen:', toggleOpen.checked); draw(); });
-  if (toggleGlobular) toggleGlobular.addEventListener('change',()=>{ console.log('[SkyView] toggleGlobular:', toggleGlobular.checked); draw(); });
-  if (toggleNebula) toggleNebula.addEventListener('change',()=>{ console.log('[SkyView] toggleNebula:', toggleNebula.checked); draw(); });
-  if (togglePlanetary) togglePlanetary.addEventListener('change',()=>{ console.log('[SkyView] togglePlanetary:', togglePlanetary.checked); draw(); });
-  if (toggleConstLabels) toggleConstLabels.addEventListener('change',()=>{ console.log('[SkyView] toggleConstLabels:', toggleConstLabels.checked); draw(); });
+  if (toggleCalPoints) {
+    toggleCalPoints.addEventListener('change', draw);
+  }
 
-  // --- Object toggle persistence ---
-  const toggleDefaults = {
-    toggleStars: true,
-    toggleConst: true,
-    toggleConstLabels: false,
-    toggleGal: false,
-    toggleOpen: false,
-    toggleGlobular: false,
-    toggleNebula: false,
-    togglePlanetary: false
+  // Fetch cal points on load and every 10s
+  fetchCalPoints();
+  setInterval(fetchCalPoints, 10000);
+
+  // --- Mount Position: fetch and update reticle ---
+  // (Removed duplicate/incorrect fetchMount definition)
+
+  // --- Patch draw() to plot cal points ---
+  const origDraw = draw;
+  draw = function() {
+    origDraw();
+    if (!toggleCalPoints || !toggleCalPoints.checked) return;
+    if (!calPoints.length) return;
+    calPointHits = [];
+    const effR = baseRadius;
+    calPoints.forEach(pt => {
+      // Az/Alt are now stored as pt.ra (az) and pt.dec (alt)
+      const az = pt.ra;
+      const alt = pt.dec;
+      // Project using alt/az directly
+      const p = altAzToXY(alt, az, effR);
+      if (!p) return;
+      ctx.save();
+      ctx.setTransform(1,0,0,1,0,0);
+      const x = p.x * dpr * currentVpScale * canvasScale + translateX;
+      const y = p.y * dpr * currentVpScale * canvasScale + translateY;
+      const r = 13;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, 2 * Math.PI);
+      ctx.strokeStyle = pt.enabled ? 'yellow' : 'red';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      // Crosshair
+      ctx.beginPath();
+      ctx.moveTo(x - r, y);
+      ctx.lineTo(x + r, y);
+      ctx.moveTo(x, y - r);
+      ctx.lineTo(x, y + r);
+      ctx.strokeStyle = pt.enabled ? 'yellow' : 'red';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.restore();
+      calPointHits.push({
+        ...pt,
+        x, y, r: r + 6, // hit area
+        screenX: x, screenY: y
+      });
+    });
   };
-  function saveToggles() {
-    const state = {};
-    Object.keys(toggleDefaults).forEach(id => {
-      const el = window[id];
-      if (el) state[id] = el.checked;
-    });
-    localStorage.setItem('skyviewToggles', JSON.stringify(state));
-  }
-  function restoreToggles() {
-    let state = {};
-    try {
-      state = JSON.parse(localStorage.getItem('skyviewToggles')) || {};
-    } catch {}
-    Object.keys(toggleDefaults).forEach(id => {
-      const el = window[id];
-      if (el) {
-        // Use saved value if present, else default
-        el.checked = (id in state) ? state[id] : toggleDefaults[id];
-      }
-    });
-  }
-  // Restore on load
-  restoreToggles();
-  // Save on change
-  Object.keys(toggleDefaults).forEach(id => {
-    const el = window[id];
-    if (el) el.addEventListener('change', saveToggles);
-  });
 
-  // transformEvent → world coords (robust, correct order, screen space)
-  function transformEvent(e) {
-    const rect = canvas.getBoundingClientRect();
-    // Step 1: event position relative to canvas CSS pixels
-    let x = (e.clientX - rect.left) * (canvas.width / rect.width);
-    let y = (e.clientY - rect.top) * (canvas.height / rect.height);
-    return { mx: x, my: y };
-  }
 
-  // click to populate info
-  canvas.addEventListener('pointerdown', e=>{
-    draw(); // ensure hit-test arrays are up-to-date
-    const {mx,my}=transformEvent(e);
-    if (toggleStars.checked) {
-      for(let s of starHits){
-        if(Math.hypot(mx-s.screenX,my-s.screenY)<s.r+HIT_PADDING){
-          selectedObject = s;
-          draw();
-          azInput.value   = degToDMS(s.azDeg);
-          altInput.value  = degToDMS(s.altDeg);
-          magInfo.textContent   = `Magnitude: ${s.Mag}`;
-          hipInfo.textContent   = `HIP: ${s.HIPNum}`;
-          hdInfo.textContent    = `HD: ${s.HDNum}`;
-          hrInfo.textContent    = `HR: ${s.HRNum}`;
-          specInfo.textContent  = `Spectral Type: ${s.SpectType}`;
-          colorInfo.textContent = `Color Index: ${s.ColorIDX}`;
-          distInfo.textContent  = `Distance: ${s.Distance}`;
-          nameInfo.textContent  = `Name: ${s.Name}`;
-          showSelectedAttributes(s);
-          return;
-        }
-      }
-    }
-    if (toggleGal.checked) {
-      for(let g of galaxyHits){
-        if(Math.hypot(mx-g.screenX,my-g.screenY)<g.r+HIT_PADDING){
-          selectedObject = g;
-          draw();
-          azInput.value   = degToDMS(g.azDeg);
-          altInput.value  = degToDMS(g.altDeg);
-          magInfo.textContent   = `Magnitude: ${g.mag}`;
-          distInfo.textContent  = `Size: ${g.Size}`;
-          nameInfo.textContent  = `Name: ${g.Name}`;
-          showSelectedAttributes(g);
-          return;
-        }
-      }
-    }
-    if (toggleOpen.checked) {
-      for(let o of openHits){
-        if(Math.hypot(mx-o.screenX,my-o.screenY)<o.r+HIT_PADDING){
-          selectedObject = o;
-          draw();
-          azInput.value   = degToDMS(o.azDeg);
-          altInput.value  = degToDMS(o.altDeg);
-          magInfo.textContent   = `Magnitude: ${o.Mag}`;
-          distInfo.textContent  = `Size: ${o.Size}`;
-          nameInfo.textContent  = `Name: ${o.Name}`;
-          showSelectedAttributes(o);
-          return;
-        }
-      }
-    }
-    if (toggleGlobular.checked) {
-      for(let g of globularHits){
-        if(Math.hypot(mx-g.screenX,my-g.screenY)<g.r+HIT_PADDING){
-          selectedObject = g;
-          draw();
-          azInput.value   = degToDMS(g.azDeg);
-          altInput.value  = degToDMS(g.altDeg);
-          magInfo.textContent   = `Magnitude: ${g.Mag}`;
-          distInfo.textContent  = `Size: ${g.Size}`;
-          nameInfo.textContent  = `Name: ${g.Name}`;
-          showSelectedAttributes(g);
-          return;
-        }
-      }
-    }
-    if (toggleNebula.checked) {
-      for(let n of nebulaHits){
-        if(Math.hypot(mx-n.screenX,my-n.screenY)<n.r+HIT_PADDING){
-          selectedObject = n;
-          draw();
-          azInput.value   = degToDMS(n.azDeg);
-          altInput.value  = degToDMS(n.altDeg);
-          magInfo.textContent   = `Magnitude: ${n.Mag}`;
-          distInfo.textContent  = `Size: ${n.Size}`;
-          nameInfo.textContent  = `Name: ${n.Name}`;
-          showSelectedAttributes(n);
-          return;
-        }
-      }
-    }
-    if (togglePlanetary.checked) {
-      for(let pn of planetaryHits){
-        if(Math.hypot(mx-pn.screenX,my-pn.screenY)<pn.r+HIT_PADDING){
-          selectedObject = pn;
-          draw();
-          azInput.value   = degToDMS(pn.azDeg);
-          altInput.value  = degToDMS(pn.altDeg);
-          magInfo.textContent   = `Magnitude: ${pn.Mag}`;
-          distInfo.textContent  = `Size: ${pn.Size}`;
-          nameInfo.textContent  = `Name: ${pn.Name}`;
-          showSelectedAttributes(pn);
-          return;
-        }
-      }
-    }
-  });
 
-  // right-click / long-press popup
-  canvas.addEventListener('contextmenu', e=>{
-    e.preventDefault(); // Always suppress browser menu
-    const {mx,my}=transformEvent(e);
-    let nearest={dist:Infinity,obj:null,type:null};
-
-    if(toggleStars.checked) starHits.forEach(s=>{
-      const d=Math.hypot(mx-s.x,my-s.y);
-      if(d<s.r+HIT_PADDING && d<nearest.dist) nearest={dist:d,obj:s,type:'star'};
-    });
-    if(toggleGal.checked) galaxyHits.forEach(g=>{
-      const d=Math.hypot(mx-g.x,my-g.y);
-      if(d<g.r+HIT_PADDING && d<nearest.dist) nearest={dist:d,obj:g,type:'gal'};
-    });
-    if(toggleOpen.checked) openHits.forEach(o=>{
-      const d=Math.hypot(mx-o.x,my-o.y);
-      if(d<o.r+HIT_PADDING && d<nearest.dist) nearest={dist:d,obj:o,type:'open'};
-    });
-    if(toggleGlobular.checked) globularHits.forEach(g=>{
-      const d=Math.hypot(mx-g.x,my-g.y);
-      if(d<g.r+HIT_PADDING && d<nearest.dist) nearest={dist:d,obj:g,type:'globular'};
-    });
-    if(toggleNebula.checked) nebulaHits.forEach(n=>{
-      const d=Math.hypot(mx-n.x,my-n.y);
-      if(d<n.r+HIT_PADDING && d<nearest.dist) nearest={dist:d,obj:n,type:'nebula'};
-    });
-    if(togglePlanetary.checked) planetaryHits.forEach(pn=>{
-      const d=Math.hypot(mx-pn.x,my-pn.y);
-      if(d<pn.r+HIT_PADDING && d<nearest.dist) nearest={dist:d,obj:pn,type:'planetary'};
-    });
-
-    if(nearest.obj){
-      const o=nearest.obj;
-      const scale=window.visualViewport?window.visualViewport.scale:1;
-      popup.style.transformOrigin='0 0';
-      popup.style.transform=`scale(${1/scale})`;
-
-      let html=`<div><strong>${o.Name}</strong></div>
-                <div>Az:  ${degToDMS(o.azDeg)}</div>
-                <div>Alt: ${degToDMS(o.altDeg)}</div>`;
-      if(nearest.type==='gal'){
-        html+=`<div>Mag: ${o.mag}</div><div>Size: ${o.Size}</div>`;
-      } else if(nearest.type==='open'){
-        html+=`<div>Mag: ${o.Mag}</div><div>Size: ${o.Size}</div>`;
-      }
-      html+=`<button id="popupGoTo">GoTo</button>`;
-      popup.innerHTML=html;
-      popup.style.left=(e.pageX+8)+'px';
-      popup.style.top =(e.pageY+8)+'px';
-      popup.style.display='block';
-
-      document.getElementById('popupGoTo').onclick=()=>{
-        const alt = o.altDeg, az = o.azDeg;
-        fetch('/goto-altaz',{method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({alt,az})
-        }).then(fetchMount);
-        popup.style.display='none';
-      };
-    }
-  });
-
-  // hide popup
+  // hide popup only if click is outside both popup and canvas
   document.addEventListener('pointerdown', e=>{
-    if(!popup.contains(e.target)) popup.style.display='none';
+    if (!popup.contains(e.target) && e.target !== canvas) {
+      popup.style.display = 'none';
+    }
   });
 
   // top-bar GoTo
@@ -1044,7 +1129,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       background: #111 !important;
       color: #fff !important;
       -webkit-box-shadow: none !important;
-      -moz-box-shadow: none !important;
+      -moz.box-shadow: none !important;
       caret-color: red !important;
       transition: none !important;
     }
@@ -1072,6 +1157,70 @@ document.addEventListener('DOMContentLoaded', async () => {
   `;
   document.head.appendChild(style);
 
+  // --- View toggle initialization ---
+  // IDs of all toggles
+  const toggleIds = [
+    'toggleStars',
+    'toggleConst',
+    'toggleConstLabels',
+    'toggleGal',
+    'toggleOpen',
+    'toggleGlobular',
+    'toggleNebula',
+    'togglePlanetary',
+    'toggleCalPoints'
+  ];
+  // Default state
+  const defaultToggles = {
+    toggleStars: true,
+    toggleConst: true,
+    toggleConstLabels: false,
+    toggleGal: false,
+    toggleOpen: false,
+    toggleGlobular: false,
+    toggleNebula: false,
+    togglePlanetary: false,
+    toggleCalPoints: false
+  };
+  // Restore from localStorage or set defaults
+  function initToggles() {
+    let restored = false;
+    let saved = null;
+    try {
+      saved = JSON.parse(localStorage.getItem('skyviewToggles'));
+    } catch (e) { saved = null; }
+    toggleIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (saved && typeof saved[id] === 'boolean') {
+        el.checked = saved[id];
+        restored = true;
+      } else {
+        el.checked = defaultToggles[id];
+      }
+      // Save on change
+      el.addEventListener('change', () => {
+        saveToggles();
+        draw();
+      });
+    });
+    if (restored) {
+      console.log('[SkyView] Restored toggle state from localStorage:', saved);
+    } else {
+      console.log('[SkyView] Set toggles to default:', defaultToggles);
+    }
+    draw();
+  }
+  function saveToggles() {
+    const state = {};
+    toggleIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) state[id] = el.checked;
+    });
+    localStorage.setItem('skyviewToggles', JSON.stringify(state));
+  }
+  initToggles();
+
   console.log('✅ SkyView renderer ready');
 });
 
@@ -1080,18 +1229,80 @@ function showSelectedAttributes(selected) {
   const attrs = [
     'nameInfo','magInfo','hipInfo','hdInfo','hrInfo','specInfo','colorInfo','distInfo'
   ];
+  // Hide all info fields and clear their text
   attrs.forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     el.classList.remove('active');
+    el.textContent = '';
   });
   if (!selected) return;
-  if (selected.Name) document.getElementById('nameInfo').classList.add('active');
-  if (selected.Mag || selected.mag) document.getElementById('magInfo').classList.add('active');
-  if (selected.HIPNum || selected.HIP) document.getElementById('hipInfo').classList.add('active');
-  if (selected.HDNum || selected.HD) document.getElementById('hdInfo').classList.add('active');
-  if (selected.HRNum || selected.HR) document.getElementById('hrInfo').classList.add('active');
-  if (selected.SpectType) document.getElementById('specInfo').classList.add('active');
-  if (selected.ColorIDX) document.getElementById('colorInfo').classList.add('active');
-  if (selected.Distance || selected.Size) document.getElementById('distInfo').classList.add('active');
+  // Name
+  if (selected.Name) {
+    const el = document.getElementById('nameInfo');
+    if (el) {
+      el.classList.add('active');
+      el.textContent = `Name: ${selected.Name}`;
+    }
+  }
+  // Magnitude
+  if (selected.Mag || selected.mag) {
+    const el = document.getElementById('magInfo');
+    if (el) {
+      el.classList.add('active');
+      el.textContent = `Mag: ${selected.Mag !== undefined ? selected.Mag : selected.mag}`;
+    }
+  }
+  // HIP
+  if (selected.HIPNum || selected.HIP) {
+    const el = document.getElementById('hipInfo');
+    if (el) {
+      el.classList.add('active');
+      el.textContent = `HIP: ${selected.HIPNum !== undefined ? selected.HIPNum : selected.HIP}`;
+    }
+  }
+  // HD
+  if (selected.HDNum || selected.HD) {
+    const el = document.getElementById('hdInfo');
+    if (el) {
+      el.classList.add('active');
+      el.textContent = `HD: ${selected.HDNum !== undefined ? selected.HDNum : selected.HD}`;
+    }
+  }
+  // HR
+  if (selected.HRNum || selected.HR) {
+    const el = document.getElementById('hrInfo');
+    if (el) {
+      el.classList.add('active');
+      el.textContent = `HR: ${selected.HRNum !== undefined ? selected.HRNum : selected.HR}`;
+    }
+  }
+  // Spectral Type
+  if (selected.SpectType) {
+    const el = document.getElementById('specInfo');
+    if (el) {
+      el.classList.add('active');
+      el.textContent = `Spectral Type: ${selected.SpectType}`;
+    }
+  }
+  // Color Index
+  if (selected.ColorIDX) {
+    const el = document.getElementById('colorInfo');
+    if (el) {
+      el.classList.add('active');
+      el.textContent = `Color Index: ${selected.ColorIDX}`;
+    }
+  }
+  // Distance or Size
+  if (selected.Distance || selected.Size) {
+    const el = document.getElementById('distInfo');
+    if (el) {
+      el.classList.add('active');
+      if (selected.Distance) {
+        el.textContent = `Distance: ${selected.Distance}`;
+      } else {
+        el.textContent = `Size: ${selected.Size}`;
+      }
+    }
+  }
 }

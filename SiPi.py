@@ -497,7 +497,51 @@ def goto_altaz():
     cmd = f"GoToAltAz {az:.6f} {alt:.6f}\n"
     result = send_command(cmd)
     return jsonify(response=result)
+# --- Calibration Points API ---
+import re
 
+POINTERR_PATH = "/usr/share/SiTech/SiTechExe/PointErr.txt"
+
+@app.route('/cal_points')
+def cal_points():
+    points = []
+    try:
+        with open(POINTERR_PATH, 'r') as f:
+            for line in f:
+                parts = line.strip().split(';')
+                if len(parts) < 5:
+                    continue
+                idx = int(parts[0])
+                ra = float(parts[1])
+                dec = float(parts[2])
+                error = float(parts[3])
+                enabled = parts[4].strip().lower() == 'true'
+                points.append({
+                    'index': idx,
+                    'ra': ra,
+                    'dec': dec,
+                    'error': error,
+                    'enabled': enabled
+                })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    return jsonify(points=points)
+
+@app.route('/enable_cal_point', methods=['POST'])
+def enable_cal_point():
+    idx = request.json.get('index')
+    if idx is None:
+        return jsonify({'error': 'Missing index'}), 400
+    resp = send_command(f"EnablePoint {idx}\n", timeout=5, terminator="\n")
+    return jsonify(response=resp)
+
+@app.route('/disable_cal_point', methods=['POST'])
+def disable_cal_point():
+    idx = request.json.get('index')
+    if idx is None:
+        return jsonify({'error': 'Missing index'}), 400
+    resp = send_command(f"DisablePoint {idx}\n", timeout=5, terminator="\n")
+    return jsonify(response=resp)
 @app.route('/calpt', methods=['POST'])
 def calpt():
     ra = request.form.get('ra','')
@@ -816,6 +860,11 @@ def wait_for_ip(interface='wlan0'):
 @app.route('/quickstart')
 def quickstart():
     return render_template('quickstart.html')
+
+@app.route('/RemoveLastCalPoint', methods=['POST'])
+def remove_last_cal_point():
+    resp = send_command("RemoveLastCalPoint\n", timeout=5, terminator="\n")
+    return jsonify(response=resp)
 
 if __name__ == '__main__':
     get_site_location()

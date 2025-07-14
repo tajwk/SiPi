@@ -308,7 +308,7 @@
     /* Day/Night mode styles */
     body.night-mode {
       background: #111 !important;
-      color: #f33 !important;
+      color: #ff0000 !important;
     }
     .status-panel {
       background: #f5f5f5;
@@ -316,16 +316,16 @@
     }
     body.night-mode .status-panel {
       background: #222;
-      color: #f33;
+      color: #ff0000;
     }
     /* SkyView night mode overrides */
     #skyviewContainer {
       background: #000 !important;
-      color: #f33 !important;
+      color: #ff0000 !important;
     }
     body.night-mode #skyviewContainer {
       background: #000 !important;
-      color: #f33 !important;
+      color: #ff0000 !important;
     }
     #skyviewContainer label,
     #skyviewContainer span,
@@ -336,9 +336,9 @@
     }
     #skyviewContainer button {
       background: #222 !important;
-      color: #f33 !important;
+      color: #ff0000 !important;
       border-radius: 8px !important;
-      border: 1.5px solid #f33 !important;
+      border: 1.5px solid #ff0000 !important;
       min-width: 38px;
       min-height: 38px;
       width: 38px;
@@ -361,8 +361,8 @@
     }
     #skyviewContainer input[type="text"] {
       background: #222 !important;
-      color: #f33 !important;
-      border: 1.5px solid #f33 !important;
+      color: #ff0000 !important;
+      border: 1.5px solid #ff0000 !important;
       border-radius: 6px;
       padding: 2px 4px;
     }
@@ -370,7 +370,7 @@
     #skyviewContainer input[type="checkbox"] {
       width: 18px;
       height: 18px;
-      border: 2px solid #f33 !important;
+      border: 2px solid #ff0000 !important;
       background: #000 !important;
       border-radius: 4px;
       appearance: none;
@@ -382,8 +382,8 @@
       transition: background 0.15s, border 0.15s;
     }
     #skyviewContainer input[type="checkbox"]:checked {
-      background: #f33 !important;
-      border: 2px solid #f33 !important;
+      background: #ff0000 !important;
+      border: 2px solid #ff0000 !important;
     }
     #skyviewContainer input[type="checkbox"]:checked::after {
       content: '';
@@ -408,18 +408,18 @@
       border: none;
     }
     #skyviewContainer label {
-      color: #f33 !important;
+      color: #ff0000 !important;
     }
     #skyviewTopBar {
       background: rgba(0,0,0,0.85) !important;
     }
     #starAttributes {
       background: rgba(0,0,0,0.7) !important;
-      color: #f33 !important;
+      color: #ff0000 !important;
     }
     #popup {
       background: rgba(0,0,0,0.8) !important;
-      color: #f33 !important;
+      color: #ff0000 !important;
     }
     /* Ensure all buttons are square and rounded */
     #refreshBtn {
@@ -438,7 +438,7 @@
     /* Search results styling */
     .search-results__info {
       background: #222;
-      color: #f33;
+      color: #ff0000;
       padding: 12px 18px;
       border-radius: 8px 8px 0 0;
       text-align: center;
@@ -463,14 +463,9 @@
       padding: 14px 0 18px 0;
     }
     .search-results__actions .btn {
-      min-width: 70px;
-      min-height: 38px;
-      height: 38px;
-      font-size: 1.08em;
-      border-radius: 6px;
       background: var(--surface, #222);
-      color: var(--fg, #f33);
-      border: 1.5px solid var(--accent, #f33);
+      color: #ff0000;
+      border: 1.5px solid #ff0000;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -483,7 +478,7 @@
     }
     .search-results__none {
       background: #222;
-      color: #f33;
+      color: #ff0000;
       padding: 14px 18px;
       border-radius: 8px;
       text-align: center;
@@ -592,6 +587,7 @@
           </div>
           <div class="model-panel__actions">
             <button id="calptButton" class="btn">+ Cal Pt</button>
+            <button id="delCalptButton" class="btn">- Cal Pt</button>
             <button id="clearButton" class="btn">Clear</button>
             <button id="saveButton"  class="btn">Save</button>
           </div>
@@ -612,6 +608,7 @@
         <button class="tray-btn" id="editConfigBtn" title="Settings">⚙</button>
         <button class="tray-btn" id="toggleFullScreen" title="Fullscreen">⛶</button>
         <button class="tray-btn" id="toggleMode" title="Day/Night">🌙</button>
+        <a class="tray-btn" id="helpBtn" title="Help" href="{{ url_for('quickstart') }}" target="_blank" rel="noopener">Help</a>
       </div>
 
       <!-- START and STOP BUTTONS below Handpad -->
@@ -748,6 +745,7 @@
       <label><input type="checkbox" id="toggleGlobular"> Globular Clusters</label>
       <label><input type="checkbox" id="toggleNebula"> Nebulae</label>
       <label><input type="checkbox" id="togglePlanetary"> Planetary Nebulae</label>
+      <label><input type="checkbox" id="toggleCalPoints" checked> Calibration Points</label>
     </div>
     <canvas id="skyviewCanvas"
             data-latitude="{{ site_latitude }}"
@@ -871,6 +869,16 @@
       if(!q) return customAlert("Enter an object name.");
       $.post('/search',{query:q}, function(data){
         window.searchResults = data.results;
+        // Only show the selection popup if not just synced
+        if (window.justSynced) {
+          window.justSynced = false;
+          if(data.results.length===1){
+            selectSearchResult(0);
+          } else if(data.results.length===0){
+            $('#results').html('<div class="search-results__none">No results found.</div>');
+          }
+          return;
+        }
         if(data.results.length>1){
           var html = '<div class="modal__body"><h3>Select result</h3>';
           data.results.forEach((it,i) => {
@@ -905,8 +913,10 @@
         '</div>'
       );
       $('#syncButton').off('click').on('click',function(){
-        if(window.currentRA && window.currentDEC)
+        if(window.currentRA && window.currentDEC) {
+          window.justSynced = true;
           $.post('/sync',{ra:window.currentRA,dec:window.currentDEC});
+        }
       });
       $('#goToBtn').off('click').on('click',function(){
         $.post('/goto',{ra:it.raw_ra,dec:window.currentDEC});
@@ -915,6 +925,8 @@
         $('#results').empty();
       });
       hideModal();
+      // Clear searchResults after a selection to prevent popup reappearing
+      setTimeout(function(){ window.searchResults = []; }, 0);
     };
 
     // SkyView toggle logic
@@ -962,6 +974,11 @@
     setInterval(()=>{ if(!$('#modelPanel').hasClass('hidden')) updateModelInfo(); },5000);
 
     $('#calptButton').click(()=>{ if(window.currentRA&&window.currentDEC) $.post('/calpt',{ra:window.currentRA,dec:window.currentDEC}); });
+    $('#delCalptButton').off('click').on('click', function(){
+      $.post('/RemoveLastCalPoint', function(resp){
+        if (typeof updateModelInfo === 'function') updateModelInfo();
+      });
+    });
     // --- Clear Model button with confirmation ---
     $('#clearButton').click(function(){
       showModal(
@@ -1014,8 +1031,8 @@
     // Render SVG handpad with 4 wide, spaced arcs at up/down/left/right (not corners)
     // Each arc is a quarter of a ring, centered on 0, 90, 180, 270 deg, with square gaps
     // --- Handpad geometry tweaks for more space and square gaps ---
-    const arcOuterR = 150;
-    const arcInnerR = 85; // increased inner radius for more space from center
+    const arcOuterR = 182.5; // 50% wider arcs (was 150)
+    const arcInnerR = 85; // restore original inner radius
     const arcGapDeg = 22; // larger gap for more square separation
     const arcSweep = 90 - arcGapDeg;
     const center = 200;
@@ -1053,13 +1070,13 @@
       <svg class="handpad" viewBox="0 0 400 400" width="340" height="340">
         ${arcPaths}
         <circle id="speedButton" class="handpad-center" cx="200" cy="200" r="${speedBtnR}"/>
-        <text x="200" y="200" text-anchor="middle" dominant-baseline="middle" class="speed-label">${window.currentSpeed}</text>
+        <text x="200" y="200" text-anchor="middle" dominant-baseline="central" class="speed-label">${window.currentSpeed}</text>
       </svg>
       <div class="handpad__row handpad__row--actions">
         <!-- Removed STOP button from here -->
       </div>
     `);
-    // Style for arcs and center (day/night mode aware)
+    // Update handpad SVG style injection for night mode red
     $("<style id='handpadArcStyle'>\n"
       // Day mode: blue border, gray background, black text
       + ".handpad-arc, .handpad-center {\n"
@@ -1070,16 +1087,13 @@
       + "  cursor: pointer;\n"
       + "  transition: opacity 0.15s, fill 0.15s, stroke 0.15s;\n"
       + "}\n"
-      // Remove hover effect for handpad arcs and center: only activate on press
-      // + ".handpad-arc:hover, .handpad-center:hover { fill: #e0eaff !important; }\n"
       + ".speed-label { font-size: 2.1em; font-weight: bold; fill: #111 !important; pointer-events: none; }\n"
-      // Night mode: dark bg, red border/text
+      // Night mode: dark bg, #ff0000 border/text
       + "body.night-mode .handpad-arc, body.night-mode .handpad-center {\n"
-      + "  stroke: #f33 !important;\n"
+      + "  stroke: #ff0000 !important;\n"
       + "  fill: #222 !important;\n"
       + "}\n"
-      // + "body.night-mode .handpad-arc:hover, body.night-mode .handpad-center:hover { fill: #f33 !important; }\n"
-      + "body.night-mode .speed-label { fill: #f33 !important; }\n"
+      + "body.night-mode .speed-label { fill: #ff0000 !important; }\n"
       + "</style>").appendTo('head');
     // Remove any old handpadGridStyle
     $('style#handpadGridStyle').remove();
@@ -1238,14 +1252,14 @@
     }
     body.night-mode #controlTrayBtn {
       background: #222;
-      color: #f33;
-      box-shadow: -2px 2px 8px rgba(255,51,51,0.18);
-      border: 1.5px solid #f33;
+      color: #ff0000;
+      box-shadow: -2px 2px 8px rgba(255,0,0,0.18);
+      border: 1.5px solid #ff0000;
     }
     body.night-mode #controlTrayBtn:active, body.night-mode #controlTrayBtn:focus {
-      background: #f33;
+      background: #ff0000;
       color: #111;
-      border: 1.5px solid #f33;
+      border-color: #ff0000;
     }
     #controlTray {
       position: fixed;
@@ -1274,8 +1288,8 @@
     }
     body.night-mode #controlTray {
       background: rgba(34,34,34,0.98);
-      box-shadow: -2px 2px 16px rgba(255,51,51,0.22);
-      border: 1.5px solid #f33;
+      box-shadow: -2px 2px 16px rgba(255,0,0,0.22);
+      border: 1.5px solid #ff0000;
     }
     .tray-btn {
       font-size: 1.08em;
@@ -1325,14 +1339,14 @@
       border-color: #1a5a8a !important;
     }
     body.night-mode .tray-collapse-btn {
-      color: #f33 !important;
+      color: #ff0000 !important;
       background: transparent !important;
-      border: 1.5px solid #f33 !important;
+      border: 1.5px solid #ff0000 !important;
     }
     body.night-mode .tray-collapse-btn:active, body.night-mode .tray-collapse-btn:focus {
       color: #fff !important;
-      background: #f33 !important;
-      border: 1.5px solid #f33 !important;
+      background: #ff0000 !important;
+      border: 1.5px solid #ff0000 !important;
     }
     .tray-btn:active, .tray-btn:focus {
       background: #1a5a8a;
@@ -1340,12 +1354,12 @@
     }
     body.night-mode .tray-btn {
       background: #222;
-      color: #f33;
-      box-shadow: 0 2px 8px rgba(255,51,51,0.18);
-      border: 1.5px solid #f33;
+      color: #ff0000;
+      box-shadow: 0 2px 8px rgba(255,0,0,0.18);
+      border: 1.5px solid #ff0000;
     }
     body.night-mode .tray-btn:active, body.night-mode .tray-btn:focus {
-      background: #f33;
+      background: #ff0000;
       color: #111;
     }
     @media (max-width: 700px) {
@@ -1416,6 +1430,7 @@
     padding: 0;
   }
   .start-action-btn {
+    font-weight: bold;
     background: #fff;
     color: #111;
     border: 2.5px solid #28a;
@@ -1427,13 +1442,13 @@
   }
   body.night-mode .start-action-btn {
     background: #222;
-    color: #f33;
-    border: 2.5px solid #f33;
+    color: #ff0000;
+    border: 2.5px solid #ff0000;
   }
   body.night-mode .start-action-btn:active, body.night-mode .start-action-btn:focus {
-    background: #f33;
+    background: #ff0000;
     color: #fff;
-    border-color: #f33;
+    border-color: #ff0000;
   }
   .action-btn:active, .action-btn:focus {
     background: #e0eaff;
@@ -1506,19 +1521,19 @@
   }
   body.night-mode .stop-octagon-btn {
     background: #222;
-    border: 2.5px solid #f33;
-    box-shadow: 0 2px 8px rgba(255,51,51,0.18);
+    border: 2.5px solid #ff0000;
+    box-shadow: 0 2px 8px rgba(255,0,0,0.18);
   }
   body.night-mode .stop-octagon-btn:active, body.night-mode .stop-octagon-btn:focus {
-    background: #f33;
-    border-color: #f33;
+    background: #ff0000;
+    border-color: #ff0000;
   }
   body.night-mode .stop-octagon-shape {
     fill: #222;
-    stroke: #f33;
+    stroke: #ff0000;
   }
   body.night-mode .stop-octagon-text {
-    fill: #f33;
+    fill: #ff0000;
   }
   /* Responsive tweaks for STOP button */
   @media (max-width: 700px) {
