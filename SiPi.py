@@ -35,6 +35,11 @@ CONFIG_BACKUP   = "/opt/SiTech/SiPi/SiTech.cfg.bak"
 HOSTAPD_CONF    = "/etc/hostapd/hostapd.conf"
 WEB_CONFIG_FILE = os.path.join(os.path.dirname(__file__), "web_config.json")
 # --- Config backup/restore endpoints ---
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(os.path.join(app.root_path, 'static'),
+                               'favicon.ico', mimetype='image/vnd.microsoft.icon')
+
 @app.route('/backup_config', methods=['POST'])
 def backup_config():
     try:
@@ -902,3 +907,4 @@ if __name__ == '__main__':
     wait_for_ip()
     threading.Thread(target=status_update_loop, daemon=True).start()
     app.run(host='0.0.0.0', port=5000, debug=False)
+
