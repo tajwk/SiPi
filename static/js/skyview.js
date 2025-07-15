@@ -4,7 +4,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
   // how many extra pixels to expand every hit area by (for easier touch)
-  const HIT_PADDING = 4;
+  // Increase hit area for easier touch selection
+  const HIT_PADDING = 18;
   // zoom limits
   const MIN_SCALE   = 0.5;
   const MAX_SCALE   = 50;
@@ -253,65 +254,124 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // --- Utility: Convert pointer event to canvas pixel coordinates (untransformed) ---
   function transformEvent(e) {
-    // Returns {mx, my} in canvas pixel coordinates (before pan/zoom)
+    // Returns {mx, my} in canvas pixel coordinates (before pan/zoom/flip)
     const rect = canvas.getBoundingClientRect();
+    
     // Scale mouse/touch position to canvas pixel space
-    const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
+    let mx = (e.clientX - rect.left) * (canvas.width / rect.width);
     const my = (e.clientY - rect.top) * (canvas.height / rect.height);
+    
+    // Mirror mx if Flip SkyView is enabled
+    // With our new transform sequence, we need to mirror coordinates for hit testing
+    const flip = localStorage.getItem('flipSkyView') === 'true';
+    if (flip) {
+      mx = canvas.width - mx;
+    }
+    
     return {mx, my};
   }
 
+
+  // --- Tap-and-hold (short press) object selection logic ---
+  let tapHoldTimer = null;
+  let tapHoldTarget = null;
+  let tapHoldStart = null;
+  let tapHoldLastEvent = null;
+  const TAP_HOLD_DELAY = 320; // ms for touch
+  const CLICK_SELECT_MAX_MS = 200; // ms for mouse click selection
+  const CLICK_SELECT_MOVE_THRESH = 10; // px for mouse click selection
+
+  let pointerDownInfo = null;
   canvas.addEventListener('pointerdown', e => {
-    console.log('[SkyView] pointerdown event', e);
     // Defensive: ensure canvas is visible and not covered
     const rect = canvas.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) {
-      console.warn('SkyView canvas is not visible or has zero size!');
       return;
     }
-    // --- Calibration point click detection (priority) ---
-    if (typeof transformEvent !== 'function') {
-      window.alert('transformEvent() is not defined!');
-      return;
+    let {mx, my} = transformEvent(e);
+    pointerDownInfo = {
+      pointerType: e.pointerType,
+      time: Date.now(),
+      mx, my,
+      event: e
+    };
+
+    // --- Unified object selection: gather all candidates (including cal points) ---
+    let candidates = [];
+    function addHits(arr) {
+      for (let obj of arr) {
+        if (Math.hypot(mx - obj.screenX, my - obj.screenY) < obj.r + HIT_PADDING) {
+          candidates.push(obj);
+        }
+      }
     }
-    const {mx, my} = transformEvent(e);
-    let hitCalPt = false;
+    addHits(starHits);
+    addHits(galaxyHits);
+    addHits(openHits);
+    addHits(globularHits);
+    addHits(nebulaHits);
+    addHits(planetaryHits);
     if (toggleCalPoints && toggleCalPoints.checked && calPointHits.length) {
       for (let pt of calPointHits) {
         if (Math.hypot(mx - pt.x, my - pt.y) < pt.r + HIT_PADDING) {
-          // Set Alt/Az textboxes to this calibration point
+          // For cal points, add a special object with cal point info and screenX/screenY
+          candidates.push({
+            ...pt,
+            isCalPoint: true,
+            altDeg: pt.dec,
+            az: (((pt.ra - 180) % 360) + 360) % 360,
+            r: pt.r || 19,
+            screenX: pt.x,
+            screenY: pt.y
+          });
+        }
+      }
+    }
+    // If any candidates, select the closest
+    if (candidates.length > 0) {
+      let hitObj = null;
+      let minDist = Infinity;
+      for (let obj of candidates) {
+        let dist = Math.hypot(mx - obj.screenX, my - obj.screenY);
+        if (dist < minDist) {
+          minDist = dist;
+          hitObj = obj;
+        }
+      }
+      if (hitObj) {
+        selectedObject = hitObj;
+        showSelectedAttributes(selectedObject);
+        // Show popup for cal point, else normal attributes
+        if (hitObj.isCalPoint) {
           if (altInput && azInput) {
-            altInput.value = degToDMS(pt.dec); // Alt is pt.dec
-            azInput.value = degToDMS(pt.ra);  // Az is pt.ra
+            altInput.value = degToDMS(hitObj.dec); // Alt is pt.dec
+            azInput.value = degToDMS(hitObj.ra);  // Az is pt.ra
           }
-          let html = `<div><strong>Cal Point #${pt.index}</strong></div>` +
-            `<div>Az: ${pt.ra.toFixed(5)}°</div>` +
-            `<div>Alt: ${pt.dec.toFixed(5)}°</div>` +
-            `<div>RMS: ${pt.error.toFixed(5)}</div>` +
-            `<div>Status: <span style='color:${pt.enabled ? 'yellow' : 'red'}'>${pt.enabled ? 'Enabled' : 'Disabled'}</span></div>` +
-            `<button id='toggleCalPointBtn' style="min-width: 100px; padding: 6px 18px; font-size: 1em; margin-top: 6px; border-radius: 6px; border: 2px solid #888; background: #222; color: #fff; cursor: pointer;">${pt.enabled ? 'Disable' : 'Enable'}</button>`;
+          let html = `<div><strong>Cal Point #${hitObj.index}</strong></div>` +
+            `<div>Az: ${hitObj.ra.toFixed(5)}°</div>` +
+            `<div>Alt: ${hitObj.dec.toFixed(5)}°</div>` +
+            `<div>RMS: ${hitObj.error.toFixed(5)}</div>` +
+            `<div>Status: <span style='color:${hitObj.enabled ? 'yellow' : 'red'}'>${hitObj.enabled ? 'Enabled' : 'Disabled'}</span></div>` +
+            `<button id='toggleCalPointBtn' style="min-width: 100px; padding: 6px 18px; font-size: 1em; margin-top: 6px; border-radius: 6px; border: 2px solid #888; background: #222; color: #fff; cursor: pointer;">${hitObj.enabled ? 'Disable' : 'Enable'}</button>`;
           popup.innerHTML = html;
           popup.style.left = (e.pageX + 8) + 'px';
           popup.style.top = (e.pageY + 8) + 'px';
           popup.style.display = 'block';
-          // Attach click handler after popup is visible
           setTimeout(() => {
             const btn = document.getElementById('toggleCalPointBtn');
             if (btn) {
               btn.onclick = async (ev) => {
                 ev.stopPropagation();
                 btn.disabled = true;
-                btn.textContent = pt.enabled ? 'Disabling...' : 'Enabling...';
+                btn.textContent = hitObj.enabled ? 'Disabling...' : 'Enabling...';
                 try {
-                  const resp = await fetch(pt.enabled ? '/disable_cal_point' : '/enable_cal_point', {
+                  const resp = await fetch(hitObj.enabled ? '/disable_cal_point' : '/enable_cal_point', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({index: pt.index})
+                    body: JSON.stringify({index: hitObj.index})
                   });
                   if (!resp.ok) throw new Error('Request failed');
-                  // Wait for cal points to refresh, then hide popup and redraw
                   await fetchCalPoints();
-                  // Wait a short delay to ensure UI is updated
                   setTimeout(() => {
                     popup.style.display = 'none';
                   }, 200);
@@ -323,89 +383,275 @@ document.addEventListener('DOMContentLoaded', async () => {
               };
             }
           }, 0);
-          hitCalPt = true;
-          break;
+        } else {
+          if (altInput && azInput && typeof hitObj.altDeg === 'number' && typeof hitObj.azDeg === 'number') {
+            altInput.value = degToDMS(hitObj.altDeg);
+            azInput.value = degToDMS(hitObj.azDeg);
+          }
         }
+        draw();
       }
     }
 
-    // --- Object selection (stars, galaxies, clusters, etc) ---
-    if (!hitCalPt) {
-      let hitObj = null;
-      for (let s of starHits) {
-        if (Math.hypot(mx - s.screenX, my - s.screenY) < s.r + HIT_PADDING) {
-          hitObj = s;
-          break;
-        }
-      }
-      if (!hitObj) {
-        for (let g of galaxyHits) {
-          if (Math.hypot(mx - g.screenX, my - g.screenY) < g.r + HIT_PADDING) {
-            hitObj = g;
-            break;
+    // --- Tap-and-hold for object selection (touch only, if nothing was selected above) ---
+    if (e.pointerType === 'touch' && candidates.length === 0) {
+      tapHoldStart = {mx, my, time: Date.now()};
+      tapHoldTarget = e;
+      tapHoldLastEvent = e;
+      tapHoldTimer = setTimeout(() => {
+        // Use the latest pointer position for hit test
+        let event = tapHoldLastEvent || tapHoldTarget;
+        let {mx, my} = transformEvent(event);
+        // Gather all hits at this point (including cal points)
+        let candidates2 = [];
+        function addHits2(arr) {
+          for (let obj of arr) {
+            if (Math.hypot(mx - obj.screenX, my - obj.screenY) < obj.r + HIT_PADDING) {
+              candidates2.push(obj);
+            }
           }
         }
-      }
-      if (!hitObj) {
-        for (let o of openHits) {
-          if (Math.hypot(mx - o.screenX, my - o.screenY) < o.r + HIT_PADDING) {
-            hitObj = o;
-            break;
+        addHits2(starHits);
+        addHits2(galaxyHits);
+        addHits2(openHits);
+        addHits2(globularHits);
+        addHits2(nebulaHits);
+        addHits2(planetaryHits);
+        if (toggleCalPoints && toggleCalPoints.checked && calPointHits.length) {
+          for (let pt of calPointHits) {
+            if (Math.hypot(mx - pt.x, my - pt.y) < pt.r + HIT_PADDING) {
+              candidates2.push({
+                ...pt,
+                isCalPoint: true,
+                altDeg: pt.dec,
+                az: (((pt.ra - 180) % 360) + 360) % 360,
+                r: pt.r || 19,
+                screenX: pt.x,
+                screenY: pt.y
+              });
+            }
           }
         }
-      }
-      if (!hitObj) {
-        for (let g of globularHits) {
-          if (Math.hypot(mx - g.screenX, my - g.screenY) < g.r + HIT_PADDING) {
-            hitObj = g;
-            break;
+        // If multiple, pick the closest
+        let hitObj2 = null;
+        let minDist2 = Infinity;
+        for (let obj of candidates2) {
+          let dist = Math.hypot(mx - obj.screenX, my - obj.screenY);
+          if (dist < minDist2) {
+            minDist2 = dist;
+            hitObj2 = obj;
           }
         }
-      }
-      if (!hitObj) {
-        for (let n of nebulaHits) {
-          if (Math.hypot(mx - n.screenX, my - n.screenY) < n.r + HIT_PADDING) {
-            hitObj = n;
-            break;
+        if (hitObj2) {
+          selectedObject = hitObj2;
+          showSelectedAttributes(selectedObject);
+          if (hitObj2.isCalPoint) {
+            if (altInput && azInput) {
+              altInput.value = degToDMS(hitObj2.dec);
+              azInput.value = degToDMS(hitObj2.ra);
+            }
+            let html = `<div><strong>Cal Point #${hitObj2.index}</strong></div>` +
+              `<div>Az: ${hitObj2.ra.toFixed(5)}°</div>` +
+              `<div>Alt: ${hitObj2.dec.toFixed(5)}°</div>` +
+              `<div>RMS: ${hitObj2.error.toFixed(5)}</div>` +
+              `<div>Status: <span style='color:${hitObj2.enabled ? 'yellow' : 'red'}'>${hitObj2.enabled ? 'Enabled' : 'Disabled'}</span></div>` +
+              `<button id='toggleCalPointBtn' style="min-width: 100px; padding: 6px 18px; font-size: 1em; margin-top: 6px; border-radius: 6px; border: 2px solid #888; background: #222; color: #fff; cursor: pointer;">${hitObj2.enabled ? 'Disable' : 'Enable'}</button>`;
+            popup.innerHTML = html;
+            popup.style.left = (event.pageX + 8) + 'px';
+            popup.style.top = (event.pageY + 8) + 'px';
+            popup.style.display = 'block';
+            setTimeout(() => {
+              const btn = document.getElementById('toggleCalPointBtn');
+              if (btn) {
+                btn.onclick = async (ev) => {
+                  ev.stopPropagation();
+                  btn.disabled = true;
+                  btn.textContent = hitObj2.enabled ? 'Disabling...' : 'Enabling...';
+                  try {
+                    const resp = await fetch(hitObj2.enabled ? '/disable_cal_point' : '/enable_cal_point', {
+                      method: 'POST',
+                      headers: {'Content-Type': 'application/json'},
+                      body: JSON.stringify({index: hitObj2.index})
+                    });
+                    if (!resp.ok) throw new Error('Request failed');
+                    await fetchCalPoints();
+                    setTimeout(() => {
+                      popup.style.display = 'none';
+                    }, 200);
+                  } catch (err) {
+                    btn.textContent = 'Error';
+                    btn.style.background = '#a00';
+                    setTimeout(() => { popup.style.display = 'none'; }, 1200);
+                  }
+                };
+              }
+            }, 0);
+          } else {
+            if (altInput && azInput && typeof hitObj2.altDeg === 'number' && typeof hitObj2.azDeg === 'number') {
+              altInput.value = degToDMS(hitObj2.altDeg);
+              azInput.value = degToDMS(hitObj2.azDeg);
+            }
           }
+          draw();
         }
-      }
-      if (!hitObj) {
-        for (let pn of planetaryHits) {
-          if (Math.hypot(mx - pn.screenX, my - pn.screenY) < pn.r + HIT_PADDING) {
-            hitObj = pn;
-            break;
-          }
-        }
-      }
-      if (hitObj) {
-        selectedObject = hitObj;
-        showSelectedAttributes(selectedObject);
-        // Update Alt/Az textboxes with object's current Alt/Az in DDD:MM:SS
-        if (altInput && azInput && typeof hitObj.altDeg === 'number' && typeof hitObj.azDeg === 'number') {
-          altInput.value = degToDMS(hitObj.altDeg);
-          azInput.value = degToDMS(hitObj.azDeg);
-        }
-        draw();
-        console.log('[SkyView] Selected object:', hitObj);
-        return;
-      }
+        tapHoldTimer = null;
+        tapHoldTarget = null;
+        tapHoldStart = null;
+        tapHoldLastEvent = null;
+      }, TAP_HOLD_DELAY);
     }
 
     // --- Normal pan/zoom logic ---
-    if (!hitCalPt) {
-      canvas.setPointerCapture(e.pointerId);
-      pointers[e.pointerId] = e;
-      const ids = Object.keys(pointers);
-      if(ids.length===2){
-        const [p1,p2] = ids.map(i=>pointers[i]);
-        initialDist = Math.hypot(p1.clientX-p2.clientX, p1.clientY-p2.clientY);
-      } else {
-        panStartX = e.clientX; panStartY = e.clientY;
-        panOrigX  = translateX; panOrigY  = translateY;
-      }
-      console.log('[SkyView] Pan/zoom start', {panStartX, panStartY, panOrigX, panOrigY});
+    canvas.setPointerCapture(e.pointerId);
+    pointers[e.pointerId] = e;
+    const ids = Object.keys(pointers);
+    if(ids.length===2){
+      const [p1,p2] = ids.map(i=>pointers[i]);
+      initialDist = Math.hypot(p1.clientX-p2.clientX, p1.clientY-p2.clientY);
+    } else {
+      panStartX = e.clientX; panStartY = e.clientY;
+      panOrigX  = translateX; panOrigY  = translateY;
     }
+  });
+
+  // Cancel tap-hold if pointer moves too far or is released, and track last pointer event
+  // (removed duplicate declaration of tapHoldLastEvent)
+  canvas.addEventListener('pointermove', e => {
+    if (tapHoldStart && tapHoldTimer) {
+      tapHoldLastEvent = e;
+      const {mx, my} = transformEvent(e);
+      const dx = mx - tapHoldStart.mx;
+      const dy = my - tapHoldStart.my;
+      if (Math.abs(dx) > 12 || Math.abs(dy) > 12) {
+        clearTimeout(tapHoldTimer);
+        tapHoldTimer = null;
+        tapHoldTarget = null;
+        tapHoldStart = null;
+        tapHoldLastEvent = null;
+      }
+    }
+  });
+  canvas.addEventListener('pointerup', e => {
+    // Mouse: fast click selection
+    if (pointerDownInfo && pointerDownInfo.pointerType === 'mouse') {
+      const dt = Date.now() - pointerDownInfo.time;
+      const {mx: downX, my: downY} = pointerDownInfo;
+      const {mx: upX, my: upY} = transformEvent(e);
+      const moveDist = Math.hypot(upX - downX, upY - downY);
+      if (dt < CLICK_SELECT_MAX_MS && moveDist < CLICK_SELECT_MOVE_THRESH) {
+        // Gather all hits at pointerup position, including cal points
+        let candidates = [];
+        function addHits(arr) {
+          for (let obj of arr) {
+            if (Math.hypot(upX - obj.screenX, upY - obj.screenY) < obj.r + HIT_PADDING) {
+              candidates.push(obj);
+            }
+          }
+        }
+        addHits(starHits);
+        addHits(galaxyHits);
+        addHits(openHits);
+        addHits(globularHits);
+        addHits(nebulaHits);
+        addHits(planetaryHits);
+        if (toggleCalPoints && toggleCalPoints.checked && calPointHits.length) {
+          for (let pt of calPointHits) {
+            if (Math.hypot(upX - pt.x, upY - pt.y) < pt.r + HIT_PADDING) {
+              candidates.push({
+                ...pt,
+                isCalPoint: true,
+                altDeg: pt.dec,
+                az: (((pt.ra - 180) % 360) + 360) % 360,
+                r: pt.r || 19,
+                screenX: pt.x,
+                screenY: pt.y
+              });
+            }
+          }
+        }
+        // If multiple, pick the closest
+        let hitObj = null;
+        let minDist = Infinity;
+        for (let obj of candidates) {
+          let dist = Math.hypot(upX - obj.screenX, upY - obj.screenY);
+          if (dist < minDist) {
+            minDist = dist;
+            hitObj = obj;
+          }
+        }
+        if (hitObj) {
+          selectedObject = hitObj;
+          showSelectedAttributes(selectedObject);
+          if (hitObj.isCalPoint) {
+            if (altInput && azInput) {
+              altInput.value = degToDMS(hitObj.dec);
+              azInput.value = degToDMS(hitObj.ra);
+            }
+            let html = `<div><strong>Cal Point #${hitObj.index}</strong></div>` +
+              `<div>Az: ${hitObj.ra.toFixed(5)}°</div>` +
+              `<div>Alt: ${hitObj.dec.toFixed(5)}°</div>` +
+              `<div>RMS: ${hitObj.error.toFixed(5)}</div>` +
+              `<div>Status: <span style='color:${hitObj.enabled ? 'yellow' : 'red'}'>${hitObj.enabled ? 'Enabled' : 'Disabled'}</span></div>` +
+              `<button id='toggleCalPointBtn' style="min-width: 100px; padding: 6px 18px; font-size: 1em; margin-top: 6px; border-radius: 6px; border: 2px solid #888; background: #222; color: #fff; cursor: pointer;">${hitObj.enabled ? 'Disable' : 'Enable'}</button>`;
+            popup.innerHTML = html;
+            popup.style.left = (e.pageX + 8) + 'px';
+            popup.style.top = (e.pageY + 8) + 'px';
+            popup.style.display = 'block';
+            setTimeout(() => {
+              const btn = document.getElementById('toggleCalPointBtn');
+              if (btn) {
+                btn.onclick = async (ev) => {
+                  ev.stopPropagation();
+                  btn.disabled = true;
+                  btn.textContent = hitObj.enabled ? 'Disabling...' : 'Enabling...';
+                  try {
+                    const resp = await fetch(hitObj.enabled ? '/disable_cal_point' : '/enable_cal_point', {
+                      method: 'POST',
+                      headers: {'Content-Type': 'application/json'},
+                      body: JSON.stringify({index: hitObj.index})
+                    });
+                    if (!resp.ok) throw new Error('Request failed');
+                    await fetchCalPoints();
+                    setTimeout(() => {
+                      popup.style.display = 'none';
+                    }, 200);
+                  } catch (err) {
+                    btn.textContent = 'Error';
+                    btn.style.background = '#a00';
+                    setTimeout(() => { popup.style.display = 'none'; }, 1200);
+                  }
+                };
+              }
+            }, 0);
+          } else {
+            if (altInput && azInput && typeof hitObj.altDeg === 'number' && typeof hitObj.azDeg === 'number') {
+              altInput.value = degToDMS(hitObj.altDeg);
+              azInput.value = degToDMS(hitObj.azDeg);
+            }
+          }
+          draw();
+        }
+      }
+    }
+    pointerDownInfo = null;
+    // Touch: cancel tap-hold timer if released early
+    if (tapHoldTimer) {
+      clearTimeout(tapHoldTimer);
+      tapHoldTimer = null;
+      tapHoldTarget = null;
+      tapHoldStart = null;
+      tapHoldLastEvent = null;
+    }
+    delete pointers[e.pointerId];
+    const ids = Object.keys(pointers);
+    if(ids.length === 1) {
+      const remaining = pointers[ids[0]];
+      panStartX = remaining.clientX;
+      panStartY = remaining.clientY;
+      panOrigX = translateX;
+      panOrigY = translateY;
+    }
+    if(ids.length < 2) initialDist = 0;
   });
 
   canvas.addEventListener('pointermove', e=>{
@@ -444,9 +690,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       draw();
     } else {
-      // pan
-      const dx = e.clientX - panStartX;
+      // Calculate the delta for panning
+      let dx = e.clientX - panStartX;
       const dy = e.clientY - panStartY;
+      
       translateX = panOrigX + dx;
       translateY = panOrigY + dy;
       draw();
@@ -491,24 +738,44 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Drawing helpers
   // If you need to re-render the handpad/buttons after certain actions, call renderHandpadAndActions() again.
-  function drawGrid(r){
-    ctx.strokeStyle = '#888'; ctx.lineWidth = 2 / canvasScale; // gray border
-    ctx.beginPath(); ctx.arc(cx,cy,r,0,2*Math.PI); ctx.stroke();
+  function drawGrid(r, drawLabels = true){
+    ctx.save(); // Save transform state before drawing grid
+    
+    // Border is now drawn separately in the main draw function
+    
     ctx.setLineDash([4,4]);
+    // Draw altitude circles at 30° and 60°
     [30,60].forEach(a=>{
       const rr=(90-a)/90*r;
       ctx.lineWidth = 0.7 / canvasScale; // dashed grid lines narrower
       ctx.strokeStyle = '#888'; // gray dashed
       ctx.beginPath(); ctx.arc(cx,cy,rr,0,2*Math.PI); ctx.stroke();
     });
+    
+    // Draw azimuth lines at 30° intervals
+    ctx.beginPath();
+    for(let az=0; az<360; az+=30) {
+      const rad = az * Math.PI / 180;
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + r * Math.sin(rad), cy - r * Math.cos(rad));
+    }
+    ctx.stroke();
+    
     ctx.setLineDash([]);
-    ctx.fillStyle = 'white';
-    ctx.font = `${Math.max(12,r*0.04)}px sans-serif`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('N',cx,cy-r-14);
-    ctx.fillText('S',cx,cy+r+14);
-    ctx.fillText('W',cx-r-14,cy);
-    ctx.fillText('E',cx+r+14,cy);
+    
+    // Only draw labels if requested
+    if (drawLabels) {
+      ctx.fillStyle = 'white';
+      ctx.font = `${Math.max(12,r*0.04)}px sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      // Use drawFlippableText for cardinal points
+      drawFlippableText('N', cx, cy-r-14);
+      drawFlippableText('S', cx, cy+r+14);
+      drawFlippableText('W', cx-r-14, cy);
+      drawFlippableText('E', cx+r+14, cy);
+    }
+    
+    ctx.restore(); // Restore transform state after drawing grid
   }
 
   function project(raH,decDeg,r){
@@ -532,28 +799,99 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
   }
 
+  // Helper function to set transform for drawing in screen space
+  function prepareScreenSpaceDrawing() {
+    // Save current transform state
+    ctx.save();
+    // Reset to identity matrix
+    ctx.resetTransform();
+    
+    // If flipped, we need to mirror the screen space drawing
+    const flip = localStorage.getItem('flipSkyView') === 'true';
+    if (flip) {
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+    }
+    
+    // Return whether we're in flipped mode so functions can make further adjustments if needed
+    return flip;
+  }
+  
+  // Helper function to draw text that remains readable when flipped
+  function drawFlippableText(text, x, y, options = {}) {
+    const flip = localStorage.getItem('flipSkyView') === 'true';
+    ctx.save();
+    if (options.font) ctx.font = options.font;
+    if (options.fillStyle) ctx.fillStyle = options.fillStyle;
+    if (options.textAlign) ctx.textAlign = options.textAlign;
+    if (options.textBaseline) ctx.textBaseline = options.textBaseline;
+    
+    if (flip) {
+      // Save original transform, apply reversed scale just for text
+      ctx.scale(-1, 1);
+      ctx.fillText(text, -x, y);
+    } else {
+      ctx.fillText(text, x, y);
+    }
+    ctx.restore();
+  }
+
   function draw(){
     // Debug: log mountPos before drawing reticle
     console.log('[SkyView] draw() called, mountPos:', mountPos);
-    console.log('[SkyView] draw() called');
     console.log('[SkyView] Canvas size:', canvas.width, 'x', canvas.height, 'CSS:', canvas.style.width, 'x', canvas.style.height, 'dpr:', dpr, 'canvasScale:', canvasScale, 'translateX:', translateX, 'translateY:', translateY, 'currentVpScale:', currentVpScale);
-    // clear
-    ctx.save();
-    ctx.setTransform(1,0,0,1,0,0);
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    ctx.restore();
-
-    // apply pan & zoom
+    
+    // Clear the entire canvas and reset transform stack
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.resetTransform();
-    ctx.translate(translateX, translateY);
-    ctx.scale(dpr * currentVpScale * canvasScale, dpr * currentVpScale * canvasScale);
-
-    const effR = baseRadius;
+    
+    // Get flip state for use in drawing functions
+    const flip = localStorage.getItem('flipSkyView') === 'true';
+    
+    // Apply transforms in a cleaner sequence:
+    const zoomFactor = dpr * currentVpScale * canvasScale;
+    
+    // First apply zoom
+    ctx.scale(zoomFactor, zoomFactor);
+    
+    // Then pan (with appropriate scaling)
+    ctx.translate(translateX / zoomFactor, translateY / zoomFactor);
+    
+    // Then flip if needed (after pan)
+    if (flip) {
+      ctx.translate(cx, 0);
+      ctx.scale(-1, 1);
+      ctx.translate(-cx, 0);
+    }
+    
+    // Flip is now applied before panning in our new transform sequence above
+    
+    // Continue with drawing...
+    const r = baseRadius, effR = r;
+    
+    // Draw circular horizon (background)
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+    ctx.fillStyle = '#000';
+    ctx.fill();
+    
+    // Draw the border
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+    ctx.strokeStyle = '#888';
+    ctx.lineWidth = 2 / (dpr * currentVpScale * canvasScale);
+    ctx.stroke();
+    
+    // Save context before clipping
     ctx.save();
-    ctx.beginPath(); ctx.arc(cx,cy,effR,0,2*Math.PI); ctx.clip();
-
-    drawGrid(effR);
-
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+    ctx.clip();  // Clip to the circular horizon
+    
+    // Draw Alt/Az grid (but not the NSEW labels yet, they'll be drawn outside clip area)
+    drawGrid(r, false);
+    
+    // Draw sky objects - DO NOT CALL ctx.setTransform() in any of these functions!
     // --- constellations ---
     if(toggleConst.checked){
       console.log('[SkyView] Drawing constellations:', constLines.length);
@@ -593,7 +931,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(!ppts.length) return;
         const avgX=ppts.reduce((s,p)=>s+p.x,0)/ppts.length;
         const avgY=ppts.reduce((s,p)=>s+p.y,0)/ppts.length;
-        ctx.fillText(f.id,avgX,avgY);
+        // Use drawFlippableText for constellation labels
+        drawFlippableText(f.id, avgX, avgY);
       });
       ctx.restore();
     }
@@ -646,7 +985,16 @@ document.addEventListener('DOMContentLoaded', async () => {
           }
         }
         ctx.save();
-        ctx.setTransform(1,0,0,1,0,0); // reset transform to draw icon in screen space
+        // Save current transform state
+        ctx.save();
+        // Apply the necessary transforms to draw in screen space while preserving flip
+        const flip = localStorage.getItem('flipSkyView') === 'true';
+        ctx.resetTransform();
+        // If flipped, we need to mirror the screen space drawing
+        if (flip) {
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+        }
         ctx.beginPath(); ctx.arc(p.x * dpr * currentVpScale * canvasScale + translateX, p.y * dpr * currentVpScale * canvasScale + translateY, sz, 0, 2*Math.PI); ctx.fillStyle = color; ctx.fill();
         ctx.restore();
         // For hit-test, use a larger radius: icon size or a minimum (e.g. 12px), whichever is greater
@@ -693,8 +1041,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const area = Math.PI * galMinRadius * galMinRadius * Math.pow(galAreaStep, 7 - bin);
         const maj = Math.sqrt(area / Math.PI);
         const min = maj / 2;
-        ctx.save();
-        ctx.setTransform(1,0,0,1,0,0);
+        const isFlipped = prepareScreenSpaceDrawing();
         ctx.strokeStyle = 'rgb(255,64,64)'; // fully opaque red
         ctx.lineWidth = 1.2 + Math.min((canvasScale - 1) * 0.7, 2.2); // gentler scaling
         ctx.beginPath(); ctx.ellipse(p.x * dpr * currentVpScale * canvasScale + translateX, p.y * dpr * currentVpScale * canvasScale + translateY, maj, min, 0, 0, 2*Math.PI); ctx.stroke();
@@ -726,8 +1073,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const cl=Math.max(1,Math.min(25,o.Size));
         const frac=(cl-1)/(25-1);
         const pix=4+frac*(12-4);
-        ctx.save();
-        ctx.setTransform(1,0,0,1,0,0);
+        const isFlipped = prepareScreenSpaceDrawing();
         ctx.lineWidth = 1.2 + Math.min((canvasScale - 1) * 0.7, 2.2); // gentler scaling
         ctx.beginPath(); ctx.arc(p.x * dpr * currentVpScale * canvasScale + translateX, p.y * dpr * currentVpScale * canvasScale + translateY, pix, 0, 2*Math.PI); ctx.stroke();
         ctx.restore();
@@ -760,8 +1106,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         mag = Math.max(3.5, Math.min(20, mag));
         const minR = 4, maxR = 12; // smaller than before
         const r = maxR - ((mag-3.5)/(20-3.5))*(maxR-minR);
-        ctx.save();
-        ctx.setTransform(1,0,0,1,0,0);
+        const isFlipped = prepareScreenSpaceDrawing();
         ctx.lineWidth = 1.1 + Math.min((canvasScale - 1) * 0.6, 1.8); // slightly thinner
         ctx.beginPath(); ctx.arc(p.x * dpr * currentVpScale * canvasScale + translateX, p.y * dpr * currentVpScale * canvasScale + translateY, r, 0, 2*Math.PI); ctx.stroke();
         ctx.beginPath();
@@ -800,8 +1145,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         mag = Math.max(3.5, Math.min(20, mag));
         const minSz = 6, maxSz = 16; // smaller than before
         const sz = maxSz - ((mag-3.5)/(20-3.5))*(maxSz-minSz);
-        ctx.save();
-        ctx.setTransform(1,0,0,1,0,0);
+        const isFlipped = prepareScreenSpaceDrawing();
         ctx.lineWidth = 1.1 + Math.min((canvasScale - 1) * 0.6, 1.8);
         const x = p.x * dpr * currentVpScale * canvasScale + translateX;
         const y = p.y * dpr * currentVpScale * canvasScale + translateY;
@@ -836,8 +1180,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         mag = Math.max(7.3, Math.min(20, mag));
         const minSz = 8, maxSz = 14; // smaller than before
         const sz = maxSz - ((mag-7.3)/(20-7.3))*(maxSz-minSz);
-        ctx.save();
-        ctx.setTransform(1,0,0,1,0,0);
+        const isFlipped = prepareScreenSpaceDrawing();
         ctx.lineWidth = 1.1 + Math.min((canvasScale - 1) * 0.6, 1.8);
         const x = p.x * dpr * currentVpScale * canvasScale + translateX;
         const y = p.y * dpr * currentVpScale * canvasScale + translateY;
@@ -884,8 +1227,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         translateY,
         currentVpScale
       });
-      ctx.save();
-      ctx.setTransform(1,0,0,1,0,0);
+      const isFlipped = prepareScreenSpaceDrawing();
       ctx.strokeStyle='red'; ctx.lineWidth=2;
       // Crosshairs only
       ctx.beginPath();
@@ -907,8 +1249,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const screenX = p.x * dpr * currentVpScale * canvasScale + translateX;
       const screenY = p.y * dpr * currentVpScale * canvasScale + translateY;
       const r = selectedObject.r || 12;
-      ctx.save();
-      ctx.setTransform(1,0,0,1,0,0);
+      const isFlipped = prepareScreenSpaceDrawing();
       // Orange circle only (no crosshair)
       ctx.beginPath();
       ctx.arc(screenX, screenY, r + 6, 0, 2 * Math.PI);
@@ -920,6 +1261,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     ctx.restore(); // restore sky circle clip before overlay
 
+    // Draw NSEW labels outside clipping area
+    drawGrid(r, true);
+    
     // --- STOP button overlay (drawn on canvas, after main sky objects) ---
     // Only draw if SkyView overlay is active
     const skyViewContainer = document.getElementById('skyviewContainer');
@@ -1037,14 +1381,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     calPointHits = [];
     const effR = baseRadius;
     calPoints.forEach(pt => {
-      // Az/Alt are now stored as pt.ra (az) and pt.dec (alt)
-      const az = pt.ra;
-      const alt = pt.dec;
-      // Project using alt/az directly
+      // Use pt.dec as Alt, pt.ra as Az, but ensure Az is measured from North (0=N, 90=E, 180=S, 270=W)
+      // If pt.ra is not in [0,360), wrap it
+      // --- Fix: Subtract 180° from azimuth to correct projection ---
+      let az = (((pt.ra - 180) % 360) + 360) % 360;
+      let alt = pt.dec;
+      // Project using altAzToXY (Alt, Az, r)
       const p = altAzToXY(alt, az, effR);
       if (!p) return;
-      ctx.save();
-      ctx.setTransform(1,0,0,1,0,0);
+      const isFlipped = prepareScreenSpaceDrawing();
       const x = p.x * dpr * currentVpScale * canvasScale + translateX;
       const y = p.y * dpr * currentVpScale * canvasScale + translateY;
       const r = 13;

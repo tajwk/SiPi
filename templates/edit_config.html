@@ -385,6 +385,14 @@ function showConfirm(msg, cb) {
       </div>
     </div>
     <div class="grid-item">
+      <h2>SkyView Settings</h2>
+      <div style="text-align:center;">
+        <label>
+          <input type="checkbox" id="flipSkyViewCheckbox"> Flip SkyView
+        </label>
+      </div>
+    </div>
+    <div class="grid-item">
       <h2>Versions</h2>
       <div>SiTech Version: {{ site_version }}</div>
       <div>SiPi Version: {{ sipi_version }}</div>
@@ -397,6 +405,19 @@ function showConfirm(msg, cb) {
 
 <script>
 $(function(){
+  // --- Flip SkyView Checkbox Persistence ---
+  // On page load, set checkbox state from localStorage
+  var flipSkyView = localStorage.getItem('flipSkyView');
+  if (flipSkyView === 'true') {
+    $('#flipSkyViewCheckbox').prop('checked', true);
+  } else {
+    $('#flipSkyViewCheckbox').prop('checked', false);
+  }
+
+  // On checkbox change, update localStorage
+  $('#flipSkyViewCheckbox').on('change', function() {
+    localStorage.setItem('flipSkyView', this.checked ? 'true' : 'false');
+  });
   // --- Backup/Restore Config ---
   // Remove debug info from backup/restore popups
   function formatDiag(resp) { return ''; }

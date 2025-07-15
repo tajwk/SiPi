@@ -97,9 +97,12 @@ def load_web_config():
         with open(WEB_CONFIG_FILE, 'r') as f:
             return json.load(f)
     except:
-        return {"vibration_enabled": False, "tilt_enabled": False}
+        return {"vibration_enabled": False, "tilt_enabled": False, "flip_skyview": False}
 
 def save_web_config(cfg):
+    # Ensure flip_skyview is always present
+    if 'flip_skyview' not in cfg:
+        cfg['flip_skyview'] = False
     with open(WEB_CONFIG_FILE, 'w') as f:
         json.dump(cfg, f)
 
