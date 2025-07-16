@@ -306,6 +306,11 @@ button {
   color: black;
 }
 
+/* Ensure night mode modals use red text */
+.night-mode .modal__content {
+  color: #ff0000;
+}
+
 .modal__body {
   margin-bottom: var(--gap);
 }

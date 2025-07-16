@@ -147,8 +147,11 @@
     }
     #popup {
       position:absolute; background:rgba(0,0,0,0.8);
-      color:white; padding:8px; border-radius:4px;
+      color:black; padding:8px; border-radius:4px;
       font-family:sans-serif; display:none; z-index:40;
+    }
+    body.night-mode #popup {
+      color: #ff0000 !important;
     }
     #popup button {
       margin-top:6px; padding:4px 8px;
