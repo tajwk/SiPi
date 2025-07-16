@@ -303,6 +303,7 @@ button {
   box-shadow: 0 4px 8px var(--shadow);
   max-width: 90%;
   width: 300px;
+  color: black;
 }
 
 .modal__body {
