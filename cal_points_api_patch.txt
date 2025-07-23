@@ -1,0 +1,18 @@
+# PATCH PLAN: Calibration Points API and SkyView Overlay
+
+--- BACKEND (SiPi.py) ---
+1. Add route /cal_points to return calibration points from PointErr.txt as JSON.
+2. Add routes /enable_cal_point and /disable_cal_point to enable/disable a point (send EnablePoint N or DisablePoint N).
+
+--- FRONTEND (skyview.js + index.html) ---
+1. Add JS to fetch /cal_points and plot on SkyView overlay.
+2. Add checkbox in Objects menu to toggle cal point visibility.
+3. Make cal points clickable: show popup with RMS and enable/disable button.
+
+--- DATA FORMAT ---
+Each cal point: { index, ra, dec, error, enabled }
+
+--- FILES TO EDIT ---
+- SiPi.py (Flask API)
+- static/js/skyview.js (plotting, interaction)
+- templates/index.html (Objects menu checkbox)

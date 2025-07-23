@@ -618,7 +618,19 @@ $(function(){
     $('#configTextarea').val(setOption2Bits(lines, o2).join('\n'));
   });
   // Set Park
-  $('#setParkButton').click(() => $.post('/setpark'));
+  $('#setParkButton').click(() => {
+    $.post('/setpark')
+      .done(function(resp) {
+        if (resp && resp.response) {
+          showModal('Park position set! Response: ' + resp.response);
+        } else {
+          showModal('Park position set successfully!');
+        }
+      })
+      .fail(function(xhr) {
+        showModal('Failed to set park position: ' + (xhr.responseJSON?.error || xhr.statusText || 'Unknown error'));
+      });
+  });
 
   // Device Time handlers (use unified /set_time endpoint)
   $('#setTimeBtn').click(() => {

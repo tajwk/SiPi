@@ -1,0 +1,503 @@
+
+Starting with version 0.92e of SiTechExe, there is a TCP/IP interface to SiTechExe.
+
+To get started, we have a C# project you can try:
+http://siderealtechnology.com/TestSiTechTCP02.zip
+
+First you set up the port number in the SiTechExe/Config/ChangeConfig/Misc.  
+It's labeled "Indi Port Number"
+Note, if something like INDI is connected when you change this, there will likely be an exception in the external app.
+Best to disconnect all TCP processes before changing this SiTechExe config item.
+
+You need to be running SiTechExe before connecting with your software.
+Basically, you send an ASCII string as a command, SiTechExe possibly does something, and returns a string.
+Nothing blocks in SiTechExe, the string is returned right away, even if the command will take a while to complete.
+ 
+Unless otherwise stated, every command returns the standard return string. The command "ReadScopeStatus" returns "_" as the message.
+Other commands return a message after the "_";
+
+Parameters are separated by a ';' semi-colon.
+As of version 0.92e, here is the standard return string description. 
+The type (int, double, or string) is a literal string, your software must convert these strings to an int or double if necessary.
+int boolParms (Slewing, Tracking, Initialized, etc.)
+double RightAsc (Hours, JNow)	
+double Declination (Degs, JNow)  
+double ScopeAlititude (Degs)	
+double ScopeAzimuth (Degs)	   
+double Secondary Axis Angle (Degs) (if a RotatorComms command, this will be the ParallacticAngle) (if this is a ReadScopeDestination command, it is the destination RA)
+double Primary Axis Angle (Degs) (if a RotatorComms command, this will be the ParallacticRate) (if this is a ReadScopeDestination command, it is the destination Dec)
+double ScopeSidereal Time (Hours) (if a RotatorComms command, this will be the CameraSolvedAngle) (if this is a ReadScopeDestination command, it is the destination ScopeAltitude)
+double Scope Julian Day  (if a RotatorComms command, this will be the Commanded Rotator GoTo position) (if this is a ReadScopeDestination command, it is the destination ScopeAzimuth)
+double Scope Time( Hours) 
+double AirMass
+String "_" followed by message.
+
+The boolParms have bits in it that mean certain things as follows:
+Bit 00 (AND with    1) Scope Is Initialized
+Bit 01 (AND with    2) Scope Is Tracking (remains true when slewing)
+Bit 02 (AND with    4) Scope is Slewing
+Bit 03 (AND with    8) Scope is Parking
+Bit 04 (AND with   16) Scope is Parked
+Bit 05 (AND with   32) Scope is "Looking East" (GEM mount);
+Bit 06 (AND with   64) ServoController is in "Blinky" (Manual) mode, one or both axis's
+Bit 07 (AND with  128) There is a communication fault between SiTechExe and the ServoController
+Bit 08 (AND with  256) Limit Swith is activated (Primary Plus) (ServoII and Brushless)
+Bit 09 (AND with  512) Limit Swith is activated (Primary Minus) (ServoII and Brushless)
+Bit 10 (AND with 1024) Limit Swith is activated (Secondary Plus) (ServoII and Brushless)
+Bit 11 (AND with 2048) Limit Swith is activated (Secondary Minus) (ServoII and Brushless)
+Bit 12 (AND with 4096) Homing Switch Primary Axis is activated
+Bit 13 (AND with 8192) Homing Switch Secondary Axis is activated
+Bit 14 (AND with 16384) GoTo Commanded Rotator Position (if this is a rotator response)
+Bit 15 (AND with 32768) Tracking at Offset Rate of some kind (non-sidereal)
+Bit 16 (AND with 65536) We are tracking a satellite now
+Bit 17 (AND with 131072) The tracking hasn't settled after a slew
+
+COMMANDS:
+"	
+Returns the above string, no other action taken
+
+"ReadScopeDestination\n"
+Returns the above string, but the axis angles secondary, primary, sidereal time, 
+julian day are RA, Dec, Alt, Az, are the final destination
+of the telescope. No other action taken. This is for the dome control program.
+Secondary Axis Angle (Degs) (if a ReadScopeDestination command, this will be the RA)
+Primary Axis Angle (Degs) (if a ReadScopeDestination command, this will be the Dec)
+ScopeSidereal Time (Hours) (if a ReadScopeDestination command, this will be the Altitude)
+Scope Julian Day  (if a ReadScopeDestination command, this will be the Azimuth)
+
+"ReadScopeStatusMIT\n"
+	Returns the custom MIT string.
+
+"RotatorComms IsMoving RotatorAngle\n"
+IsMoving is 0 or 1.  RotatorAngle is the current rotator angle in degs.
+Following is the difference from the standard response.
+Returns the above string in RotatorComms mode, The string on the end is "RotatorComms"
+Secondary Axis Angle (Degs) (if a RotatorComms command, this will be the ParallacticAngle)
+Primary Axis Angle (Degs) (if a RotatorComms command, this will be the ParallacticRate)
+ScopeSidereal Time (Hours) (if a RotatorComms command, this will be the CameraSolvedAngle)
+Scope Julian Day  (if a RotatorComms command, this will be the Commanded Rotator GoTo position)
+
+
+"SiteLocations\n"
+returns a string separated by ';' 
+siteLatitude (deg's);
+siteLongitude (deg's);
+siteElevation (meters); 
+_SiteLocations
+
+"ScopeInfo\n"
+returns a string separated by ';' 
+ApertureDiameter; 
+ApertureArea;
+FocalLength;
+NameOfScope;
+_ScopeInfo
+
+siteLongitude (deg's);
+siteElevation (meters); 
+_SiteLocations
+	
+"GoToAltAz Az Alt\n"
+Az and Alt are a double number, converted to a string.  Example: 
+"GoToAltAz 180.0 80.0\n"
+This will move the scope azimuth to the south, and the altitude to 80 deg's.  0 azimuth is north, and 90 azimuth is east.
+If scope is parked, if in blinky mode, if alt/az is out of parameters, or if below horizon limit, an error will be returned after the "_".
+
+"GoToAltAzStop Az Alt\n"
+Same as above, except scope stops after the slew.
+
+"GoTo RA Dec <J2K>\n"
+RA and Dec is a double number, converted to a string. Example:
+"GoTo 12.0 45.0\n"
+This will move the scope to 12 hours of right ascension and +45 deg's in declination, JNow.
+
+Example:
+"GoTo 12.0 45.0 J2K\n"
+This will move the scope to 12 hours of right ascension and +45 deg's in declination, J2000.
+If the coordinates are in J2000, then put an optional " J2K" before the \n.  SiTech will then perform precession, Nutation, and Aberration corrections.
+If scope is parked, if in blinky mode, if RA/Dec is out of parameters, or if below horizon limit, an error will be returned after the "_".
+
+"GoToStop 12.0 45.0\n"
+Same as above, except it stops after slew is completed.
+
+"CookCoordinates 12.0 45.0"
+The RA and Dec should be in J2000 epoch.
+This will return the standard return string, and after the "_" will return the JNow coordinates, with Precession, Nutation, and Aberration applied.
+
+"UnCookCoordinates 12.0 45.0"
+The RA and Dec should be in JNow coordinates, with Precession, Nutation, and Aberration applied.
+This will return the standard return string, and after the "_" will return the J2000 coordinates.
+
+"SyncToAltAz Az Alt\n"
+Az and Alt are a double number, converted to a string.  Example: 
+"SyncToAltAz 180.0 80.0\n"
+This will tell sitechExe that the scope is pointed in azimuth to the south, and the altitude to 80 deg's.  0 azimuth is north, and 90 azimuth is east.
+If scope is parked, if in blinky mode, if alt/az is out of parameters, or if below horizon limit, an error will be returned after the "_".
+If successful, SiTechExe will believe that the scope is pointed to 180 az and 80 elevation.
+
+"Sync 12.0 45.0 <n> <J2K>\n"
+RA and Dec is a double number, converted to a string. 
+The <n> is optional, and is the type of sync.
+0 = use SiTechExe standard Init Window.
+1 = perform an instant Offset init (no init window comes up)
+2 = perform an instant "load calibration" init (no init window comes up).
+Example:
+"Sync 12.0 45.0\n"
+If successfu, this will tell sitechExe that the scope is pointed in RA to 12 hours, and the declination to plus 45 deg's, JNow.
+SiTechExe will also use the default SiTechExe Init window.
+
+"Sync 12.0 45.0 J2K\n"
+This will tell sitechExe that the scope is pointed in RA to 12 hours, and the declination to plus 45 deg's, J2000.
+SiTechExe will also use the default SiTechExe Init window.
+
+"Sync 12.0 45.0 2 J2K\n"
+This will tell sitechExe that the scope is pointed in RA to 12 hours, and the declination to plus 45 deg's, J2000.
+SiTechExe will perform an add calibration point.
+
+If scope is parked, if in blinky mode, if alt/az is out of parameters, or if below horizon limit, an error will be returned after the "_".
+
+"Park\n"
+If all is well (no blinky, and a park position has been specified), the mount will move to the park position, and then will officially be in the "parked" status.
+
+"GoToPark 1\n"
+If all is well (no blinky, and a park position has been specified for the park number (by right clicking on SetPark), the mount will move to the park position, 
+	but will not be in the "parked" status.
+You can specify park location: 1, 2, or 3.
+
+"UnPark\n"
+If the mount is officially parked, this will "unpark" the mount.  It will then be ready for goto's.
+
+"Abort\n"
+This will abort any slews, and stop the scope from tracking as well.
+
+"SetTrackMode 1 1 0.0 0.0\n"
+This will start tracking at the sidereal rate, or any other rate, or stop tracking altogether.
+There are 4 parameters. 
+1. bool 1 equals track.  Any other value will  stop tracking.
+2. 1 = use the following rates.  0 means track at the sidereal rate.
+3. Right Ascension Rate (arc seconds per second).  A 0.0 will  track at the sidereal rate.
+4. Declination rate (arc seconds per second) A 0.0 will track the declination according to the telescope model and refraction.
+Example: 
+"SetTrackMode 1 0 0.0 0.0\n" will start the mount tracking at the sidereal rate.
+"SetTrackMode 0 0 0.0 0.0\n" will stop the mount from tracking.
+
+
+"PulseGuide Direction, Milliseconds\n"
+This will nudge the mount in the direction specified, for the number of Milliseconds specified, at the Guide Rate stored in the servo controller configuration.
+Direction:
+ 0=North, 1=South, 2=East, 3 = West
+So the way that SiTechExe performs this, is it does some math on the current guide rate (stored in the controller configuration) 
+and figures how far the mount will move if guided at that rate for the time specified.
+It then changes the RA and Dec setpoint by that amount.  
+
+Example:
+"PulseGuide 0 1000\n" 
+This will nudge the mount north by 5 arc seconds if the guide rate is set for 5 arc seconds per second.
+
+"MotorsToBlinky\n"
+This will force the motors to blinky mode (Manual Mode), in effect removing all power from the motors.  They will coast to a stop.
+
+"MotorsToAuto\n"
+This will put the motors back into Auto Mode.
+
+"CookCoordinates 12 45\n"
+This command will return the JNow coordinates after the "_" in the return string.  
+They will be adjusted for Precession, Nutation, and Aberration.
+
+"UnCookCoordinates 12 45\n"
+This command will return the J2000 coordinates after the "_" in the return string.  
+They will be adjusted for Precession, Nutation, and Aberration, from JNow to J2000.
+
+"JogArcSeconds N 5.0\n"
+Self explanatory, N, S, E, or W, 
+
+"MoveAxisPri dps\n"
+Moves the Primary axis at the speed of dps.  
+If dps is negative, it moves the axis the other way.
+If dps is 0, it stops the move.
+If there is not another MoveAxisPri command in a short time, this software will stop the move.
+It returns something I think.
+
+"MoveAxisSec dps\n"
+same as MoveAxisPri, but the secondary axis
+
+"SearchDatabaseGoto SearchString\n"
+Skyview will search for the string, and perform a goto if it finds it.
+It will goto the first object that passes the test that's above the horizon limit
+I believe it returns data about the object
+
+"SearchDatabase SearchString\n"
+Same as above, but it doesn't perform the goto, but returns coordinates
+
+"GoToSun\n"
+Will go to the Sun and track at sidereal rate. Make sure it's safe!
+"GoToSunTrack\n"
+Will go to the Sun, and track the Sun.  Make sure it's safe!
+
+"GoToMoon\n"
+Will go to the Moon and track at sidereal rate.
+"GoToMoonTrack\n"
+Will go to the Moon, and track the Moon.
+
+
+"CloseMe\n"
+Makes the server close the socket.  There is no response.
+
+"PotsAndParkData\n"
+Returns standard return string plus an ascii int.
+if bit 0 is set, primary axis is at park;
+if bit 1 is set, secondary axis is at park;
+if bit 2 is set, primary axis pot agrees with the axis angle;
+if bit 3 is set, secondary axis pot agrees with the axis angle;
+
+"CloseSiTech\n"
+This shuts down SiTechExe
+
+*****************Satellite Stuff*********************
+
+"SatelliteOpenWindow\n"
+The SitechExe Satellite Tracking window needs to be up for any of the satellite commands or queries to work.
+You can open it using this command.
+Example Response:
+	48133;0;7.279178;27.44993;56.759877;6.13705;2120.706;0;0;_SatelliteOpenWindow
+
+"GetSatelliteInfo\n"
+Returns the standard return string plus the following separated by ";"'s:
+    Norad Number
+	Tracking Info integer
+		bit 0: 1 = Telescope tracking satellite, 0 = telescope not tracking satellite
+		bit 1: 1 = Satellite InSun, 0 = Satellite in earths shadow
+    Sat Rt Asc (hours)
+	Sat Dec (degrees)
+    Sat Azm (degrees)
+	Sat Alt (degrees)
+    Sat EarthDistance (Km)
+	Sat Rt Asc Tracking Error (degrees)
+	Sat Dec Tracking Error (degrees)
+#if_MIT_
+	Sat NudgedFwdBack (total in arc minutes)
+	Sat NudgedLeftRight (total in arc minutes)
+#endif
+
+Example Response:
+	45161;1;3.722091;82.29454;10.500718;47.62323;1567.658;0.4307;-0.1317;_GetSatelliteInfo
+	This response is returned by most Satellite Commands or Queries.
+
+
+"SatelliteGetCurrentTLE\n"
+	Returns the 3 line element, separated by ";".
+	An example response, norad45154
+	0 ONEWEB-0049;1 45154U 20008Z   21349.93880990  .00000125  00000-0  32146-3 0  9991;2 45154  87.8859   3.1542 0002023 103.8737 256.2616 13.10374340 92697;_SatelliteGetCurrentTLE
+
+"SatelliteLoadTLE\n"
+	Example string to send
+	"SatelliteLoadTLE;0 ONEWEB-0049;1 45154U 20008Z   21349.93880990  .00000125  00000-0  32146-3 0  9991;2 45154  87.8859   3.1542 0002023 103.8737 256.2616 13.10374340 92697"
+	Example Return Value 
+	45154;0;11.456804;25.72;4.258954;-19.16264;6755.398;0;0;1;_SatelliteLoadTLE
+
+"SatelliteStartTrack\n"
+	If the proper tle is loaded, and it's not below the horizon too far, this will make the telescope track the satellite.
+	if the satellite is below the horizon limit, the telescope will move to the location that the satellite will rise over the horizon limit and wait until it does.
+Example return response:
+	48133;1;1.233285;58.26954;36.424589;71.60334;580.381;0;0;1;_SatelliteStartTrack
+
+"SatelliteStopTrack\n"
+Example return response""
+	48133;0;5.137849;52.00579;51.815993;39.71549;821.31;0;0;1;_SatelliteStopTrack
+
+"SatelliteGetData\n", or "SatelliteGetData 2459635.49789296\n"
+This returns information as follows:
+   Return data separated by ";"'s
+	Julian Day (either the day you sent, or the current jd)
+	Satellite Name (the TLE line 1)
+	Norad Number
+	Epoch from the TLE in standard date time format 
+	Eccentricity
+	Inclination
+	Perigee Height (Km)
+	Apogee Height (Km)
+	RightAscension of Ascending Node
+	Argument of Perigee
+	Revolutions Per Day
+	Mean anomaly at epoch
+	Orbit Number at Epoch
+	IsDeep (0 = false, 1 = true)
+	SGP Method (0=SGP 1=SGP4, 2=SGP8)
+	Rt Asc of satellite at JulDay Specified
+	Dec of satellite at JulDay Specified
+	Distance of Satellite at JulDay Specified
+	Altitude of Satellite at JulDay Specified
+	Azimuth of Satellite at JulDay Specified
+	Tracking Info integer
+		bit 0: 1 = Telescope tracking satellite, 0 = telescope not tracking satellite
+		bit 1: 1 = Satellite InSun, 0 = Satellite in earths shadow
+
+Example return response:
+	2459635.49789296;2/24/2022 11:56 PM;0 COSMOS 2272;23003;12/15/2021 7:58:53 PM;0.0011048;1.4412;1396.5;1413.7;4.6331;5.2274;
+			12.6433742;1.0557;28462;0;SGP4;15.8325;63.4055;0;20.1227;348.6376;0;_SatelliteGetData
+
+
+"SatelliteSetTrackingGain 75\n"
+	The gain setting is pretty important for accurate tracking.  Gains up to 100 can be used, but there's sometimes issues with oscillation.
+	The default is pretty moderate, so you can experiment with higher gains.
+	
+Example return response:
+	23003;0;0.174627;-27.37081;251.15447;-20.32016;7185.213;0;0;75;_SatelliteSetTrackingGain
+
+
+"SatelliteNudgeFwdBack 0.45\n" or "SatelliteNudgeFwdBack -0.45\n"
+	This routine calculates the trajectory, then provides an offset to the satellite TLE RA and Dec calculation, to cause it to "lead" the satellite (or "lag" the satellite if negative).
+Example return response if _MIT_:
+	39077;1;9.489801;68.0433;29.386857;57.47641;1625.207;0.18726;-0.02932;0.45;-0.45;1;_NudgeFwdBack
+Example return response if not _MIT_:
+	39077;1;9.489801;68.0433;29.386857;57.47641;1625.207;0.18726;-0.02932;1;_NudgeFwdBack
+
+		The units are arc minutes, and the maximum is +-120 arc minutes (+= 2 degrees);
+		In the above example, if you keep sending the command, the result will be accumulative, for instance, if you send "SatelliteNudgeFwdBack -0.45", it will have a value of -0.90 arc minutes.
+		Sending a value of "0" will set to zero the FwdBack offset
+
+"SatelliteNudgeRightLeft 5.5\n" or "SatelliteNudgeRightLeft -6.6\n"
+	This routine calculates the trajectory, then provides an offset to the satellite TLE RA and Dec calculation, to cause it to move the satellite right of trajectory  or move the satellite left of trajectory if negative.
+Example return response if _MIT_:
+	48463;1;9.162213;4.22525;129.552665;37.53066;852.301;0.0472;-0.05549;5.5;-6.6;0;_NudgeLeftRight
+Example return response if not _MIT_:
+	48463;1;9.162213;4.22525;129.552665;37.53066;852.301;0.0472;-0.05549;0;_NudgeLeftRight
+
+		The units are arc minutes, and the maximum is +-120 arc minutes (+= 2 degrees);
+		In the above example, if you keep sending the command, the result will be accumulative, for instance, if you send "SatelliteNudgeFwdBack -0.45", it will have a value of -0.90 arc minutes.
+		Sending a value of "0" will set to zero the rightLeft offset
+
+"SatelliteTimeOffset 5.5\n"
+	This routine adds seconds to the time calulation for the satellite being tracked
+Example return response:
+	48463;1;9.162213;4.22525;129.552665;37.53066;852.301;0.0472;-0.05549;0;_SatelliteTimeOffset
+		The units are seconds of time
+		This is not accumulative, and the offset will be what you send.
+		Sending a value of "0" will set 0 to the Time Offset amount
+
+
+"OffsetDestinationBy 0.1 0.2\n"
+	Used for Satellite tracking to center a satellite.
+	Create a destination offset of hours right ascension and Degrees Destination.
+	This returns the standard response described at the beginning of this document.
+Example Response:
+	65539;8.3569115;23.314803;60.857314;130.101376;23.32228;156.07546;6.76158;2459635.68721919;20.49323417;1.14;_OffsetDestinationBy Accepted
+
+
+
+******************************End Satellite TCP interface
+
+
+The following are custom commands for the ATLAS project
+"DoAPhotoInit"
+
+"AtlasGetAllData"
+
+"AtlasGetRedisData"
+
+"AtlasGetFlipwillBe rtAsc"
+
+******************************
+The following are custom commands for the MIT_LL project
+DONE
+"ReadScopeStatusMIT\n"
+int Booleans are the same
+double RightAsc (Hours, JNow)	
+double Declination (Degs, JNow)  
+double HourAngle (Hours)
+double ScopeAlititude (Degs)	
+double ScopeAzimuth (Degs)	   
+double Secondary Axis Angle (Degs) 
+double Primary Axis Angle (Degs) 
+double ScopeSidereal Time (Hours) 
+double Scope Julian Day  
+double Scope Time( Hours) 
+double AirMass
+double DestinationAltitude (deg's)
+double DestinationAzimuth (deg's)
+double DestinationRtAsc (hours)
+double DestinationDec (deg's)
+double DestinationHourAngle (hours)
+int ScopeEncoderRawPri
+int ScopeEncoderRawSec
+double VelocityPri (dps)
+double VelocitySec (dps)
+double PositionErrorPri (degs)
+double PositionErrorSec (degs)
+
+DONE
+"GoToStop 12.0 45.0\n"
+Same "GoTo" above, except scope stops after slew is completed.
+Returns the standard MIT return string
+
+DONE
+GoToAltAzStop
+Same as GoToAltAzStop above,except scope stops after slew is completed.
+Returns the standard MIT return string
+
+DONE
+"GetSunMoon\n"
+returns sunRA;sunDec;sunHA;sunAlt;sunAz;moonRA;moonDec;moonHA;moonAlt;moonAz;_GotSunMoon
+
+DONE
+JogArcSecondsTotal N (S, E, W, or C) 
+You need the letter (NSEorW) and an arc second double.  In the case of "C", you don't need the double.
+C means clear.  The offsets are cleared on a goto or stop tracking.
+Returns standardMIT string ; PriTotal ; SecTotal ;__JogArcSeconds Accepted
+
+
+DONE
+"SetAccelerations dpspsPri dpspsSec\n"
+
+DONE
+"GetAccelerations\n"
+returns PrimaryAcceleration SecondaryAcceleration
+
+DONE
+"MoveBothAxes Vel_DPS_Pri Vel_DPS_Sec DestPri DestSec \n"
+In SiTechExe/Config/ChangeConfig/Ascom and Logging, there's a checkbox labeled "ASCOM Rates to RA and Dec"
+in fact, if "ASCOM Rates to RA and Dec" is checked, the destination parameters are ignored.
+If this is checked, the mount model is taken into accound, and even if you have an alt/az or alt/alt scopes, the motions will be in RA and Dec.
+If this is unchecked, the primary axis DPS will move the primary at specified rate, in other words, if you have an alt/az, it will move the azimuth.
+if both of the velocities are zero, the axis motion will be stopped
+if both destinations are zero, the routine figures out the destination by the polarity of the velocity, 
+	in other words, if the Vel_DPS_Pri is negative, 
+	this will move the primary axis to the counterclockwise (birds eye view) if it's an alt/az,
+	or if the ascom rates checkbox is checked it will move to the eest.
+If the destinations are specified, add this angle (in degrees) to the current axis angle, and any negative polarity in the Vel_DPS_ will be considered positive.
+If the AscomRates checkbox is checked or if Destinations are 0, it will only move for about 7 seconds. In this case, you have to keep sending "MoveBothAxes" to keep it moving
+
+Examples with "ASCOM Rates to RA and Dec" checked:
+
+"MoveBothAxes 1 1\n"
+	This will move the right ascension (regardles of type of mount) in right ascension to the west, and declination to the north at 1 degree per second.
+"MoveBothAxes 1 -1\n"
+	This will move the right ascension (regardles of type of mount) in right ascension to the west, and declination to the south at 1 degree per second.
+"MoveBothAxes -1 -1\n"
+	This will move the right ascension (regardles of type of mount) in right ascension to the east, and declination to the south at 1 degree per second.
+in the above 3 cases, the motion will stop after roughly 7 seconds unless you keep sending
+
+Examples with "ASCOM Rates to RA and Dec" UN-checked:
+"MoveBothAxes 1 1\n"
+	This will move the primary axis in a positive direction, and declination in a positive direction at 1 degree per second.
+"MoveBothAxes 1 -1\n"
+	This will move the primary axis in a positive direction, and declination in a negative direction at 1 degree per second.
+"MoveBothAxes -1 -1\n"
+	This will move the primary axis in a negative direction, and declination in a negative direction at 1 degree per second.
+in the above 3 cases, the motion will stop after roughly 7 seconds unless you keep sending
+
+"MoveBothAxes 1 1 5 5\n"
+	This will move the primary axis in a positive direction for 5 degrees, and declination in a negative direction for 5 degrees.
+"MoveBothAxes 1 1 -5 -5\n"
+	This will move the primary axis in a positive direction for 5 degrees, and declination in a negative direction for 5 degrees.
+
+"MoveBothAxes -1 -1 5 5\n"
+	This will move the primary axis in a positive direction for 5 degrees, and declination in a positive direction for 5 degrees, even though you specified -1 dps.
+
+Returns the standard MIT return string
+
+
+
+
+
+

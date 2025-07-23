@@ -17,6 +17,9 @@ from flask import (
     flash, redirect, url_for, send_from_directory
 )
 
+# Import astrometric corrections
+from astrometric_corrections import preprocess_catalogs_for_current_epoch
+
 # Initial SiPi version (bump patch for simple fixes)
 __version__ = "0.9"
 
@@ -25,6 +28,18 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'  # Replace with a strong secret key
+
+# Global variables for corrected catalog paths
+corrected_catalogs = {
+    'stars': None,
+    'messier': None,
+    'constellations': None,
+    'galaxies': None,
+    'globular_clusters': None,
+    'nebula': None,
+    'open_clusters': None,
+    'planetary_nebula': None
+}
 
 
 # Paths
@@ -404,21 +419,22 @@ def status():
     else:
         ra = dec = sid = alt = az = "N/A"
     bp = int(fields[0]) if fields[0].isdigit() else 0
-    if bp & 0x40000:
-        track = "Below Horizon Limit"
-    elif bp & 128:
+    # Priority-based status determination (highest to lowest priority)
+    if bp & 128:  # Bit 07
         track = "Communication Fault"
-    elif bp & 8:
-        track = "Parking"
-    elif bp & 16:
-        track = "Parked"
-    elif bp & 4:
-        track = "Slewing"
-    elif bp & 64:
-        track = "Blinky"
-    elif bp & 2:
+    elif bp & 64:  # Bit 06
+        track = "Blinky/Manual"
+    elif not (bp & 1):  # Bit 00 false
+        track = "Scope Not Initialized"
+    elif bp & 2:  # Bit 01
         track = "Tracking"
-    else:
+    elif bp & 8:  # Bit 03
+        track = "Parking"
+    elif bp & 16:  # Bit 04
+        track = "Parked"
+    elif bp & 4:  # Bit 02
+        track = "Slewing"
+    else:  # Bit 02 false
         track = "Stopped"
     return jsonify(
         time=time.strftime("%H:%M:%S"),
@@ -900,11 +916,206 @@ def remove_last_cal_point():
     resp = send_command("RemoveLastCalPoint\n", timeout=5, terminator="\n")
     return jsonify(response=resp)
 
+# --- Astrometric Corrections ---
+def initialize_astrometric_corrections():
+    """Initialize astrometric corrections at startup."""
+    global corrected_catalogs
+    
+    print("Initializing astrometric corrections...")
+    try:
+        corrected_catalogs = preprocess_catalogs_for_current_epoch(BASE_DIR)
+        print("Astrometric corrections initialized successfully.")
+        print(f"Stars catalog: {corrected_catalogs['stars']}")
+        print(f"Messier catalog: {corrected_catalogs['messier']}")
+        print(f"Constellations catalog: {corrected_catalogs['constellations']}")
+        print(f"Galaxies catalog: {corrected_catalogs['galaxies']}")
+        print(f"Globular clusters catalog: {corrected_catalogs['globular_clusters']}")
+        print(f"Nebula catalog: {corrected_catalogs['nebula']}")
+        print(f"Open clusters catalog: {corrected_catalogs['open_clusters']}")
+        print(f"Planetary nebula catalog: {corrected_catalogs['planetary_nebula']}")
+    except Exception as e:
+        print(f"Warning: Astrometric corrections failed: {e}")
+        print("Falling back to original catalogs.")
+        corrected_catalogs = {
+            'stars': os.path.join(BASE_DIR, 'static', 'stars.json'),
+            'messier': os.path.join(BASE_DIR, 'static', 'messier.json'),
+            'constellations': os.path.join(BASE_DIR, 'static', 'constellations.json'),
+            'galaxies': os.path.join(BASE_DIR, 'static', 'galaxies.json'),
+            'globular_clusters': os.path.join(BASE_DIR, 'static', 'globular_clusters.json'),
+            'nebula': os.path.join(BASE_DIR, 'static', 'nebula.json'),
+            'open_clusters': os.path.join(BASE_DIR, 'static', 'open_clusters.json'),
+            'planetary_nebula': os.path.join(BASE_DIR, 'static', 'planetary_nebula.json')
+        }
+
+@app.route('/corrected_stars.json')
+def corrected_stars():
+    """Serve the astrometrically corrected star catalog."""
+    try:
+        with open(corrected_catalogs['stars'], 'r') as f:
+            data = json.load(f)
+        return jsonify(data)
+    except Exception as e:
+        print(f"Error serving corrected stars: {e}")
+        # Fallback to original catalog
+        return send_from_directory(os.path.join(BASE_DIR, 'static'), 'stars.json')
+
+@app.route('/corrected_messier.json')
+def corrected_messier():
+    """Serve the astrometrically corrected Messier catalog."""
+    try:
+        with open(corrected_catalogs['messier'], 'r') as f:
+            data = json.load(f)
+        return jsonify(data)
+    except Exception as e:
+        print(f"Error serving corrected Messier catalog: {e}")
+        # Fallback to original catalog
+        return send_from_directory(os.path.join(BASE_DIR, 'static'), 'messier.json')
+
+@app.route('/corrected_constellations.json')
+def corrected_constellations():
+    """Serve the astrometrically corrected constellation catalog."""
+    try:
+        with open(corrected_catalogs['constellations'], 'r') as f:
+            data = json.load(f)
+        return jsonify(data)
+    except Exception as e:
+        print(f"Error serving corrected constellation catalog: {e}")
+        # Fallback to original catalog
+        return send_from_directory(os.path.join(BASE_DIR, 'static'), 'constellations.json')
+
+@app.route('/corrected_galaxies.json')
+def corrected_galaxies():
+    """Serve the astrometrically corrected galaxy catalog."""
+    try:
+        with open(corrected_catalogs['galaxies'], 'r') as f:
+            data = json.load(f)
+        return jsonify(data)
+    except Exception as e:
+        print(f"Error serving corrected galaxy catalog: {e}")
+        # Fallback to original catalog
+        return send_from_directory(os.path.join(BASE_DIR, 'static'), 'galaxies.json')
+
+@app.route('/corrected_globular_clusters.json')
+def corrected_globular_clusters():
+    """Serve the astrometrically corrected globular cluster catalog."""
+    try:
+        with open(corrected_catalogs['globular_clusters'], 'r') as f:
+            data = json.load(f)
+        return jsonify(data)
+    except Exception as e:
+        print(f"Error serving corrected globular cluster catalog: {e}")
+        # Fallback to original catalog
+        return send_from_directory(os.path.join(BASE_DIR, 'static'), 'globular_clusters.json')
+
+@app.route('/corrected_nebula.json')
+def corrected_nebula():
+    """Serve the astrometrically corrected nebula catalog."""
+    try:
+        with open(corrected_catalogs['nebula'], 'r') as f:
+            data = json.load(f)
+        return jsonify(data)
+    except Exception as e:
+        print(f"Error serving corrected nebula catalog: {e}")
+        # Fallback to original catalog
+        return send_from_directory(os.path.join(BASE_DIR, 'static'), 'nebula.json')
+
+@app.route('/corrected_open_clusters.json')
+def corrected_open_clusters():
+    """Serve the astrometrically corrected open cluster catalog."""
+    try:
+        with open(corrected_catalogs['open_clusters'], 'r') as f:
+            data = json.load(f)
+        return jsonify(data)
+    except Exception as e:
+        print(f"Error serving corrected open cluster catalog: {e}")
+        # Fallback to original catalog
+        return send_from_directory(os.path.join(BASE_DIR, 'static'), 'open_clusters.json')
+
+@app.route('/corrected_planetary_nebula.json')
+def corrected_planetary_nebula():
+    """Serve the astrometrically corrected planetary nebula catalog."""
+    try:
+        with open(corrected_catalogs['planetary_nebula'], 'r') as f:
+            data = json.load(f)
+        return jsonify(data)
+    except Exception as e:
+        print(f"Error serving corrected planetary nebula catalog: {e}")
+        # Fallback to original catalog
+        return send_from_directory(os.path.join(BASE_DIR, 'static'), 'planetary_nebula.json')
+
+@app.route('/reprocess_catalogs', methods=['POST'])
+def reprocess_catalogs():
+    """Manually trigger catalog reprocessing."""
+    try:
+        global corrected_catalogs
+        corrected_catalogs = preprocess_catalogs_for_current_epoch(BASE_DIR)
+        return jsonify({
+            'status': 'success',
+            'message': 'Catalogs reprocessed successfully',
+            'catalogs': corrected_catalogs
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Reprocessing failed: {str(e)}'
+        }), 500
+
+@app.route('/catalog_status')
+def catalog_status():
+    """Get status of current catalogs."""
+    status = {}
+    for name, path in corrected_catalogs.items():
+        if path and os.path.exists(path):
+            try:
+                with open(path, 'r') as f:
+                    data = json.load(f)
+                
+                # Handle different catalog formats
+                if name == 'constellations':
+                    # Constellation catalog has metadata at root level
+                    is_corrected = '_correction_metadata' in data
+                    correction_jd = data.get('_correction_metadata', {}).get('correction_jd') if is_corrected else None
+                    sample_size = len(data.get('features', []))
+                else:
+                    # Star and Messier catalogs have metadata in objects
+                    sample = data[:3] if isinstance(data, list) else []
+                    is_corrected = '_correction_jd' in sample[0] if sample else False
+                    correction_jd = sample[0].get('_correction_jd') if is_corrected and sample else None
+                    sample_size = len(data) if isinstance(data, list) else 0
+                
+                status[name] = {
+                    'path': path,
+                    'exists': True,
+                    'corrected': is_corrected,
+                    'correction_jd': correction_jd,
+                    'file_size': os.path.getsize(path),
+                    'modified': os.path.getmtime(path),
+                    'object_count': sample_size
+                }
+            except Exception as e:
+                status[name] = {
+                    'path': path,
+                    'exists': True,
+                    'error': str(e)
+                }
+        else:
+            status[name] = {
+                'path': path,
+                'exists': False
+            }
+    
+    return jsonify(status)
+
+@app.route('/astrometric')
+def astrometric_admin():
+    """Admin interface for astrometric corrections."""
+    return render_template('astrometric.html')
+
 if __name__ == '__main__':
     get_site_location()
     connect_command_socket()
     connect_persistent_socket()
+    initialize_astrometric_corrections()  # Initialize corrected catalogs
     wait_for_ip()
     threading.Thread(target=status_update_loop, daemon=True).start()
     app.run(host='0.0.0.0', port=5000, debug=False)
-

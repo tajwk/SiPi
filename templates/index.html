@@ -654,6 +654,7 @@
         </button>
         <button id="backBtn" title="Back" aria-label="Back" class="skyview-btn skyview-btn--icon"><span style="width:40px;height:40px;line-height:40px;display:inline-block;text-align:center;font-size:1.2em;">&#8592;</span></button>
         <button id="redrawBtn" title="Redraw" aria-label="Redraw" class="skyview-btn skyview-btn--icon"><span style="width:40px;height:40px;line-height:40px;display:inline-block;text-align:center;font-size:1.2em;">&#8635;</span></button>
+        <button id="flipBtn" title="Flip E/W (Temporary)" aria-label="Flip E/W" class="skyview-btn skyview-btn--icon"><span style="width:40px;height:40px;line-height:40px;display:inline-block;text-align:center;font-size:1.2em;">&#8596;</span></button>
       </div>
     </div>
   <style>
@@ -741,8 +742,10 @@
     <button id="toggleMenuBtn">Objects &#x25BC;</button>
     <div id="toggleBar" class="hide">
       <label><input type="checkbox" id="toggleStars" checked> Stars</label>
+      <label style="margin-left:0.5em;"><input type="checkbox" id="toggleStarNames" checked> Names</label>
       <label><input type="checkbox" id="toggleConst"> Constellations</label>
       <label style="margin-left:0.5em;"><input type="checkbox" id="toggleConstLabels" checked> Names</label>
+      <label><input type="checkbox" id="toggleMessierNames" checked> Messier Names</label>
       <label><input type="checkbox" id="toggleGal"> Galaxies</label>
       <label><input type="checkbox" id="toggleOpen"> Open Clusters</label>
       <label><input type="checkbox" id="toggleGlobular"> Globular Clusters</label>
@@ -1157,7 +1160,8 @@
             style="${isNight ? 'color:#f33; background:#222; border-radius:8px; padding:10px 0;' : 'color:#111; background:#f5f5f5; border-radius:8px; padding:10px 0;'}">
             <strong>Set System Time?</strong>
             <div style="margin-top:10px;">Would you like to set the Pi's system time to your device's current time?</div>
-            <div style="margin-top:10px; font-size:1.1em;">Device time: <span style="font-weight:bold;">${timeStr}</span></div>
+            <div style="margin-top:10px; font-size:1.1em;">Current device time: <span id="currentTimeDisplay" style="font-weight:bold;">${timeStr}</span></div>
+            <div style="margin-top:5px; font-style:italic; font-size:0.9em;">(The exact time will be captured when you click "Set Time")</div>
           </div>
           <div class="modal__footer"
             style="${isNight ? 'background:#222; color:#f33; border-radius:0 0 8px 8px; padding:10px 0; text-align:center;' : 'background:#f5f5f5; color:#111; border-radius:0 0 8px 8px; padding:10px 0; text-align:center;'}">
@@ -1166,10 +1170,28 @@
           </div>
         `;
         showModal(modalHtml);
+        
+        // Update the time display every second
+        const updateTimeInterval = setInterval(function() {
+          const now = new Date();
+          $('#currentTimeDisplay').text(now.toLocaleString());
+        }, 1000);
+        
+        // Make sure to clear the interval when the modal is closed
+        const originalHideModal = window.hideModal;
+        window.hideModal = function() {
+          clearInterval(updateTimeInterval);
+          originalHideModal();
+          window.hideModal = originalHideModal;
+        };
+        
         $('#setSystemTimeBtn').off('click').on('click', function() {
-          // Send device time as local dt_str (YYYY-MM-DD HH:MM:SS)
+          // Get the current time at the moment the button is clicked
+          const currentTime = new Date();
+          // Format the current time as local dt_str (YYYY-MM-DD HH:MM:SS)
           function pad(n) { return n.toString().padStart(2, '0'); }
-          const dt_str = deviceTime.getFullYear() + '-' + pad(deviceTime.getMonth()+1) + '-' + pad(deviceTime.getDate()) + ' ' + pad(deviceTime.getHours()) + ':' + pad(deviceTime.getMinutes()) + ':' + pad(deviceTime.getSeconds());
+          const dt_str = currentTime.getFullYear() + '-' + pad(currentTime.getMonth()+1) + '-' + pad(currentTime.getDate()) + ' ' + 
+                         pad(currentTime.getHours()) + ':' + pad(currentTime.getMinutes()) + ':' + pad(currentTime.getSeconds());
           $.ajax({
             url: '/set_time',
             method: 'POST',

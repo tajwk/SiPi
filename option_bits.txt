@@ -1,0 +1,113 @@
+Dan Gray <grayarea56@gmail.com>
+	
+Tue, Apr 22, 8:29 AM
+	
+to Taj
+OptionBits
+bit 0 1 Ignore Scope Encoders
+Bit 1 2 Encoder Precise Mode
+Bit 2 4 Encoder Polite Mode
+Bit 3 8 ENcoder Drag Mode
+Bit 4 16 Use Sitech Rotator
+Bit 5 32 Use Sitech Focuser
+Bit 6 64 Move Through Pole (not used)
+Bit 7 128 Auto Meridian Flip
+Bit 8 256 a '1' turns off refraction calculation
+Bit 9 512 Freeze Declination
+Bit 10 1024 Auto track on start of Equatorial
+Bit 11 2048 Auto GEM FLip on Track End
+Bit 12 4096 All Red
+Bit 13 8192 TroubleShooting Mode
+Bit 14 16384 Use Two Focusers.
+Bit 15 32768 Mute Sounds
+Bit 16 65536 AxisRates apply to R/A and Dec
+Bit 17 131072 Altitude/Dec Ignore (Scope Encoder)
+Bit 18 262144 Altitude/Dec Precise mode (Scope Encoder)
+Bit 19 524288 Altitude/Dec Polite mode (Scope Encoder)
+Bit 20 1048576 Apply Nutation corrections to ascom coordinates
+Bit 21 2097152 Apply Aberration corrections to ascom coordinates
+Bit 22 4194304 Azimuth/RA Tick Management Mode (Scope Encoder)
+Bit 23 8388608 Altitude/Dec Tick Management Mode (Scope Encoder)
+Bit 24 16777216 Az/RA NoWrap
+Bit 25 33554432 Use Azimuth Pot
+Bit 26 67108864 Use Altitude Pot
+Bit 27 134217728 Invert Azimuth Pot
+Bit 28 268435456 Invert Altitude Pot
+Bit 29 536870912 Spare
+Bit 30 1073741824 JoystickEnable
+
+
+ * OPTION BITS 2!
+Option2Bits
+Bit 0 1 Use High Priority
+Bit 1 2 Use Above Normal Priority
+Bit 2 4 Log ASCOM commands
+Bit 3 8 Log Serial Communications
+Bit 4 16 Use No Cam
+Bit 5 32 Use Maxim Cam
+Bit 6 64 Use AstroArt Cam
+Bit 7 128 Use Nebulosity Cam
+Bit 8 256 Use CCDSoft Cam
+Bit 9 512 Gurley 320 Tick Interpolation (RA)
+Bit 10 1024 Gurley 500 Tick Interpolation (RA)
+Bit 11 2048 Gurley 320 Tick Interpolation (Dec)
+Bit 12 4096 Gurley 500 Tick Interpolation (Dec)
+Bit 13 8192 Don't reverse Guide mode when looking east
+Bit 14 16384 Log Gurley Interpolation
+Bit 15 32768 invert Gurley Interpolation
+Bit 16 65536 InstantTotal pulse guide method
+Bit 17 131072 IsPulseGuiding always returns NO
+Bit 18 262144 PrimAxisCWOnTrue
+Bit 19 524288 SecAxisCWOnTrue
+Bit 20 1048576 EnableAscomHoming
+Bit 21 2097152 Don't Reverse Guide in RA while looking east
+Bit 22 4194304 EncoderModeCascadeAl
+Bit 23 8388608 EncoderModeCascadeAz
+Bit 24 16777216 LogAscomGets
+Bit 25 33554432 Use 2nd Nasmyth Focuser
+Bit 26 67108864 Use 2nd Nasmyth Rotator
+Bit 27 134217728 Brushless Motor
+Bit 28 268435456 Slew From Same Direction on Declination
+Bit 29 536870912 UseSiTechHRZ
+Bit 30 1073741824 UseActiveXPXP;
+Bit 31 2147483648 Use Nebulosity3 Cam
+
+* OPTION BITS 3!
+Option3Bits
+Bit 0 1 Use Nebulosity3Camera
+Bit 1 2 Motors To Manual on Park
+Bit 2 4 UseAutoPECSensorAz
+Bit 3 8 UseAutoPECSensorAl
+Bit 4 16 CallScriptOnSlewEnd
+Bit 5 32 AutoLoadPXPFile  Automaticall Load "AutoLoad.pxp" on start
+Bit 6 64 UsingAbsoluteEncoders Using RA AND Dec absolute encoders
+Bit 7 128 UsePlateSolve3
+Bit 8 256 UseAscomFocuser
+Bit 9 512 UseAscomRotator
+Bit 10 1024 SlewAboveHorizon
+Bit 10 2048 LogControllerStuff
+Bit 11 4096 DeActivateDecCosines for pan/guide
+Bit 12 8192 AutoOpenSkyView option
+Bit 13 16384 SmartSlewSettle
+Bit 14 32768 RunScriptOnError
+Bit 15 65536 DisableFakingServos
+Bit 17 131072 LogActions
+Bit 18 262144 IgnoreSetPark
+Bit 19 524288 UseIPCamera
+Bit 20 1048576 TrackOnlySidereal
+Bit 21 2097152 LogTrackingInfo
+Bit 22 4194304 APECWormAngleToPempro  CommandString PECIDX#
+Bit 23 8388608 UseDSSCamera
+Bit 24 16777216 UseAtlasCamera
+Bit 25 33554432 UseAstrometry
+Bit 26 67108864 DrawGuideCamera180IfFlipped
+Bit 27 134217728 GoToJ2000
+Bit 28 268435456 UseAscomDome
+Bit 29 536870912 DontReverseCrossing Don't reverse slew polarity crossing north (or south) pole
+Bit 30 1073741824 Open loop tracking during slew end if TrackingAfterSlewTimePri > current time
+//last bit in Option3Bits
+
+* OPTION BITS 4!
+Option4Bits
+Bit 0 (1) Open loop tracking during slew end if TrackingAfterSlewTimeSec > current time
+
