@@ -1,16 +1,250 @@
 // static/js/skyview.js
-document.addEventListener('DOMContentLoaded', async () => {
-  console.log('📡 SkyView init');
 
+// Device Performance Profiling and Adaptive Optimizations
+class DeviceProfiler {
+  constructor() {
+    this.profile = null;
+    this.initialized = false;
+  }
+  
+  async detectPerformance() {
+    console.log("[PERF] Starting device performance detection...");
+    
+    // Create test canvas for performance measurement
+    const testCanvas = document.createElement('canvas');
+    testCanvas.width = 200;
+    testCanvas.height = 200;
+    const ctx = testCanvas.getContext('2d');
+    
+    // Performance test - draw 1000 circles
+    const start = performance.now();
+    for (let i = 0; i < 1000; i++) {
+      ctx.beginPath();
+      ctx.arc(Math.random() * 200, Math.random() * 200, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    const renderTime = performance.now() - start;
+    
+    // Gather device info
+    const deviceInfo = {
+      render_time: renderTime,
+      screen_width: screen.width,
+      screen_height: screen.height,
+      pixel_ratio: window.devicePixelRatio || 1,
+      memory: navigator.deviceMemory || 4,
+      user_agent: navigator.userAgent
+    };
+    
+    console.log("[PERF] Performance test results:", {
+      renderTime: renderTime.toFixed(2) + 'ms',
+      screenSize: `${deviceInfo.screen_width}x${deviceInfo.screen_height}`,
+      pixelRatio: deviceInfo.pixel_ratio,
+      memory: deviceInfo.memory + 'GB'
+    });
+    
+    // Get optimized profile from backend
+    try {
+      const response = await fetch('/device_profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(deviceInfo)
+      });
+      
+      this.profile = await response.json();
+      console.log("[PERF] Device tier:", this.profile.tier);
+      console.log("[PERF] Applied optimizations:", this.profile);
+      
+      return this.profile;
+    } catch (error) {
+      console.warn("[PERF] Failed to get device profile, using defaults:", error);
+      // Fallback profile
+      this.profile = {
+        tier: 'medium',
+        max_pixel_ratio: 2,
+        throttle_ms: 33,
+        max_stars: 3000,
+        max_messier: 100,
+        max_galaxies: 500,
+        max_clusters: 200,
+        anti_aliasing: true,
+        batch_drawing: true,
+        viewport_culling: true,
+        lod_enabled: false,
+        animation_quality: 'medium',
+        constellation_detail: 'high',
+        label_density: 'medium'
+      };
+      return this.profile;
+    }
+  }
+  
+  async initialize() {
+    if (this.initialized) return this.profile;
+    
+    await this.detectPerformance();
+    this.applyOptimizations();
+    this.initialized = true;
+    
+    return this.profile;
+  }
+  
+  applyOptimizations() {
+    if (!this.profile) return;
+    
+    console.log(`[PERF] Applying ${this.profile.tier}-tier optimizations...`);
+    
+    // Apply canvas optimizations
+    this.optimizeCanvas();
+    
+    // Apply event throttling
+    this.setupEventThrottling();
+    
+    // Show performance info to user (optional)
+    this.showPerformanceInfo();
+  }
+  
+  optimizeCanvas() {
+    const canvas = document.getElementById('skyviewCanvas');
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    
+    // Apply anti-aliasing setting
+    ctx.imageSmoothingEnabled = this.profile.anti_aliasing;
+    
+    // Force hardware acceleration for all devices
+    canvas.style.transform = 'translateZ(0)';
+    
+    console.log(`[PERF] Canvas optimized: anti-aliasing=${this.profile.anti_aliasing}`);
+  }
+  
+  setupEventThrottling() {
+    // Store original event handlers for throttling
+    const throttleMs = this.profile.throttle_ms;
+    
+    // Create throttled versions of event handlers
+    const throttle = (func, limit) => {
+      let inThrottle;
+      return function(...args) {
+        if (!inThrottle) {
+          func.apply(this, args);
+          inThrottle = true;
+          setTimeout(() => inThrottle = false, limit);
+        }
+      };
+    };
+    
+    // Apply throttling to zoom/pan handlers if they exist
+    if (window.handleZoom) {
+      window.handleZoomThrottled = throttle(window.handleZoom, throttleMs);
+    }
+    
+    if (window.handlePan) {
+      window.handlePanThrottled = throttle(window.handlePan, throttleMs);
+    }
+    
+    console.log(`[PERF] Event throttling set to ${throttleMs}ms`);
+  }
+  
+  // Adaptive magnitude limits based on device tier and zoom
+  getMagnitudeLimit(objectType, zoom) {
+    const tier = this.profile.tier;
+    
+    switch (objectType) {
+      case 'stars':
+        if (tier === 'low') {
+          return zoom < 2 ? 4 : (zoom < 4 ? 5 : 6);
+        } else if (tier === 'medium') {
+          return zoom < 2 ? 5 : (zoom < 4 ? 6 : 7);
+        } else {
+          return zoom < 2 ? 5 : (zoom < 4 ? 6 : (zoom < 6 ? 7 : 8));
+        }
+      
+      case 'galaxies':
+        if (tier === 'low') {
+          return zoom < 4 ? 12 : (zoom < 6 ? 14 : 16);
+        } else if (tier === 'medium') {
+          return zoom < 4 ? 14 : (zoom < 6 ? 16 : 18);
+        } else {
+          return zoom < 4 ? 10 : (zoom < 6 ? 14.5 : (zoom < 8 ? 19 : 20.1));
+        }
+      
+      case 'clusters':
+        if (tier === 'low') {
+          return zoom < 2 ? 10 : (zoom < 4 ? 12 : 14);
+        } else if (tier === 'medium') {
+          return zoom < 2 ? 12 : (zoom < 4 ? 14 : 16);
+        } else {
+          return zoom < 2 ? 8 : (zoom < 4 ? 12 : (zoom < 6 ? 16 : 18));
+        }
+      
+      default:
+        return 20; // Conservative default
+    }
+  }
+  
+  // Check if object should be drawn based on performance profile
+  shouldDrawObject(ra, dec, magnitude, objectType, zoom) {
+    // Viewport culling - only skip objects clearly outside view
+    if (this.profile.viewport_culling) {
+      const p = project(ra, dec, baseRadius);
+      if (p.alt <= 0) return false; // Below horizon
+      
+      // Screen bounds check with generous padding to avoid clipping near edges
+      const padding = 100; // Generous padding to ensure no visible objects are culled
+      if (p.x < -padding || p.x > canvas.width + padding || 
+          p.y < -padding || p.y > canvas.height + padding) {
+        return false;
+      }
+    }
+    
+    // Magnitude-based culling using existing zoom-dependent limits
+    // This preserves the original magnitude progression logic
+    const magLimit = this.getMagnitudeLimit(objectType, zoom);
+    if (magnitude > magLimit) return false;
+    
+    return true;
+  }
+  
+  showPerformanceInfo() {
+    // Optional: Show performance tier to user
+    const tierColors = {
+      'high': '#4CAF50',
+      'medium': '#FF9800', 
+      'low': '#F44336'
+    };
+    
+    const tierNames = {
+      'high': 'High Performance',
+      'medium': 'Optimized',
+      'low': 'Battery Saver'
+    };
+    
+    console.log(`[PERF] Running in ${tierNames[this.profile.tier]} mode`);
+  }
+}
+
+// Global profiler instance
+const deviceProfiler = new DeviceProfiler();
+
+document.addEventListener('DOMContentLoaded', async () => {
+  console.log('📡 SkyView init - Initializing adaptive performance optimizations...');
+  
+  // Initialize device profiler first
+  await deviceProfiler.initialize();
+  console.log('[PERF] Performance optimizations applied successfully!');
 
   // how many extra pixels to expand every hit area by (for easier touch)
   // Increase hit area for easier touch selection
   const HIT_PADDING = 18;
-  // zoom limits
-  const MIN_SCALE   = 0.5;
+  // zoom limits - default zoom (1.0) is now the minimum
+  const MIN_SCALE   = 1.0;
   const MAX_SCALE   = 50;
 
-  // Convert degrees → “DDD:MM:SS”
+  // Flip state for East/West mirroring
+  let isFlipped = localStorage.getItem('flipSkyView') === 'true';
+
+  // Convert degrees → "DDD:MM:SS"
   function degToDMS(deg) {
     const d = Math.floor(deg);
     const m = Math.floor(Math.abs(deg - d) * 60);
@@ -73,6 +307,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       draw();
     };
   }
+  
+  // Flip button handler (temporary for testing)
+  const flipBtn = document.getElementById('flipBtn');
+  if (flipBtn) {
+    flipBtn.onclick = function() {
+      toggleFlip();
+    };
+  }
 
   // Make GoTo button wider for text
   if (gotoBtn) {
@@ -80,6 +322,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     gotoBtn.style.width = 'auto';
     gotoBtn.style.padding = '4px 18px';
     gotoBtn.style.fontSize = '1.1em';
+  }
+
+  // Toggle flip function
+  function toggleFlip() {
+    isFlipped = !isFlipped;
+    localStorage.setItem('flipSkyView', isFlipped ? 'true' : 'false');
+    draw(); // Redraw with new flip state
   }
 
   // Data arrays
@@ -90,6 +339,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let globularClusters = [];
   let nebulae = [];
   let planetaryNebulae = [];
+  let messierObjects = [];
 
   // Hit-test buffers
   let starHits     = [];
@@ -141,8 +391,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   function setDefaultOrRestoreToggles() {
     const toggles = [
       { id: 'toggleStars', def: true },
+      { id: 'toggleStarNames', def: true },
       { id: 'toggleConst', def: true },
       { id: 'toggleConstLabels', def: false },
+      { id: 'toggleMessierNames', def: true },
       { id: 'toggleGal', def: false },
       { id: 'toggleOpen', def: false },
       { id: 'toggleGlobular', def: false },
@@ -176,7 +428,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // --- Save toggle state on change ---
   [
-    'toggleStars','toggleConst','toggleConstLabels','toggleGal','toggleOpen','toggleGlobular','toggleNebula','togglePlanetary','toggleCalPoints'
+    'toggleStars','toggleStarNames','toggleConst','toggleConstLabels','toggleMessierNames','toggleGal','toggleOpen','toggleGlobular','toggleNebula','togglePlanetary','toggleCalPoints'
   ].forEach(id => {
     const el = document.getElementById(id);
     if (el) {
@@ -252,13 +504,80 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Pan & pinch-zoom state
   let pointers={}, initialDist=0, panStartX, panStartY, panOrigX, panOrigY;
 
+  // --- Utility: Determine label positioning based on object type ---
+  function getLabelPosition(objectX, objectY, text, objectType, canvasScale) {
+    const ctx = canvas.getContext('2d');
+    const textMetrics = ctx.measureText(text);
+    const textWidth = textMetrics.width;
+    
+    // Even shorter fixed offsets for closer labels and shorter pointer lines
+    const offsetX = 2;
+    const offsetY = 1.5;
+    
+    let textX, textY, pointerStartX, pointerStartY;
+    
+    if (objectType === 'messier') {
+      // Messier Objects: always right and below, pointer from first character
+      textX = objectX + offsetX;
+      textY = objectY + offsetY;
+      pointerStartX = textX; // First character position
+      pointerStartY = textY;
+    } else {
+      // Stars: always left and below, pointer from last character
+      textX = objectX - offsetX;
+      textY = objectY + offsetY;
+      // For right-aligned text, the last character is at textX (since text extends leftward)
+      pointerStartX = textX; // Last character position for right-aligned text
+      pointerStartY = textY;
+    }
+    
+    return {
+      textX: textX,
+      textY: textY,
+      pointerStartX: pointerStartX,
+      pointerStartY: pointerStartY,
+      pointerEndX: objectX,
+      pointerEndY: objectY
+    };
+  }
+
+  // --- Utility: Draw label with appropriate positioning and pointer line ---
+  function drawLabelWithPointer(text, objectX, objectY, objectType, color, canvasScale) {
+    const pos = getLabelPosition(objectX, objectY, text, objectType, canvasScale);
+    
+    // Set text alignment based on object type
+    ctx.save();
+    if (objectType === 'messier') {
+      // Right side positioning: left-align text
+      ctx.textAlign = 'left';
+    } else {
+      // Left side positioning: right-align text  
+      ctx.textAlign = 'right';
+    }
+    ctx.textBaseline = 'top';
+    
+    // Draw pointer line with consistent thickness
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(0.3, 1.0 / canvasScale);
+    
+    ctx.beginPath();
+    ctx.moveTo(pos.pointerStartX, pos.pointerStartY);
+    ctx.lineTo(pos.pointerEndX, pos.pointerEndY);
+    ctx.stroke();
+    
+    // Draw text
+    drawFlippableText(text, pos.textX, pos.textY);
+    ctx.restore();
+  }
+
   // --- Utility: Convert pointer event to canvas pixel coordinates (untransformed) ---
   function transformEvent(e) {
-    // Returns {mx, my} in canvas pixel coordinates (before pan/zoom)
+    // Returns {mx, my} in canvas pixel coordinates (screen space)
     const rect = canvas.getBoundingClientRect();
     // Scale mouse/touch position to canvas pixel space
     const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
     const my = (e.clientY - rect.top) * (canvas.height / rect.height);
+    
     return {mx, my};
   }
 
@@ -646,7 +965,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if(ids.length < 2) initialDist = 0;
   });
 
-  canvas.addEventListener('pointermove', e=>{
+  // Pan and pinch handling with adaptive throttling
+  const handlePointerMove = (e) => {
     if(!pointers[e.pointerId]) return;
     pointers[e.pointerId] = e;
     const ids = Object.keys(pointers);
@@ -689,7 +1009,25 @@ document.addEventListener('DOMContentLoaded', async () => {
       translateY = panOrigY + dy;
       draw();
     }
-  });
+  };
+
+  // Apply adaptive throttling for touch/pan events
+  let panTimeout;
+  const throttledPointerMove = (e) => {
+    if (panTimeout) {
+      // Update pointer data but don't redraw yet
+      if(pointers[e.pointerId]) {
+        pointers[e.pointerId] = e;
+      }
+      return;
+    }
+    panTimeout = setTimeout(() => {
+      panTimeout = null;
+    }, throttleMs);
+    handlePointerMove(e);
+  };
+
+  canvas.addEventListener('pointermove', throttledPointerMove);
 
   canvas.addEventListener('pointerup', e=>{
     delete pointers[e.pointerId];
@@ -705,8 +1043,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if(ids.length < 2) initialDist = 0;
   });
 
-  // Wheel-zoom (desktop)
-  canvas.addEventListener('wheel', e=>{
+  // Wheel-zoom (desktop) - with adaptive throttling
+  const handleWheel = (e) => {
     const rect = canvas.getBoundingClientRect();
     // Use canvas pixel coordinates for correct zoom-at-cursor
     const fx = (e.clientX - rect.left) * (canvas.width / rect.width);
@@ -725,14 +1063,46 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     draw();
     e.preventDefault();
-  }, { passive: false });
+  };
+
+  // Apply adaptive throttling based on device performance
+  const throttleMs = deviceProfiler.profile ? deviceProfiler.profile.throttle_ms : 16;
+  let wheelTimeout;
+  const throttledWheel = (e) => {
+    if (wheelTimeout) return;
+    wheelTimeout = setTimeout(() => {
+      wheelTimeout = null;
+    }, throttleMs);
+    handleWheel(e);
+  };
+
+  canvas.addEventListener('wheel', throttledWheel, { passive: false });
+
+  // Helper function to get current zoom level (used by device profiler)
+  window.getCurrentZoom = function() {
+    return canvasScale;
+  };
 
   // Drawing helpers
   // If you need to re-render the handpad/buttons after certain actions, call renderHandpadAndActions() again.
   function drawGrid(r){
     ctx.strokeStyle = '#888'; ctx.lineWidth = 2 / canvasScale; // gray border
     ctx.beginPath(); ctx.arc(cx,cy,r,0,2*Math.PI); ctx.stroke();
+    
+    // Add altitude lines (radial lines from center to edge) - dashed
     ctx.setLineDash([4,4]);
+    ctx.strokeStyle = '#666'; 
+    ctx.lineWidth = 0.5 / canvasScale;
+    // Draw lines every 22.5 degrees (doubled from 45 degrees)
+    for (let az = 0; az < 360; az += 22.5) {
+      const ang = (az + 180) * Math.PI / 180; // Rotate coordinate system
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + r * Math.sin(ang), cy - r * Math.cos(ang));
+      ctx.stroke();
+    }
+    
+    // Altitude circles (concentric circles for elevation angles)
     [30,60].forEach(a=>{
       const rr=(90-a)/90*r;
       ctx.lineWidth = 0.7 / canvasScale; // dashed grid lines narrower
@@ -740,13 +1110,40 @@ document.addEventListener('DOMContentLoaded', async () => {
       ctx.beginPath(); ctx.arc(cx,cy,rr,0,2*Math.PI); ctx.stroke();
     });
     ctx.setLineDash([]);
+  }
+
+  // Draw NSEW labels outside the projection (called before clipping)
+  function drawNSEWLabels(r) {
     ctx.fillStyle = 'white';
-    ctx.font = `${Math.max(12,r*0.04)}px sans-serif`;
+    ctx.font = `${Math.max(14,r*0.05)}px sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('N',cx,cy-r-14);
-    ctx.fillText('S',cx,cy+r+14);
-    ctx.fillText('W',cx-r-14,cy);
-    ctx.fillText('E',cx+r+14,cy);
+    
+    // Position NSEW labels very close to the circle border
+    const labelOffset = Math.max(8, r*0.03); // Even closer to circle
+    
+    drawFlippableText('N', cx, cy-r-labelOffset);
+    drawFlippableText('S', cx, cy+r+labelOffset);
+    // When flipped, E and W swap positions AND labels
+    if (isFlipped) {
+      drawFlippableText('W', cx-r-labelOffset, cy);
+      drawFlippableText('E', cx+r+labelOffset, cy);
+    } else {
+      drawFlippableText('W', cx-r-labelOffset, cy);
+      drawFlippableText('E', cx+r+labelOffset, cy);
+    }
+  }
+
+  // Parse RA string "HH:MM:SS" to decimal hours
+  function parseRA(raStr) {
+    const parts = raStr.split(':').map(parseFloat);
+    return parts[0] + parts[1]/60 + parts[2]/3600;
+  }
+
+  // Parse Dec string "+DD:MM:SS" to decimal degrees
+  function parseDec(decStr) {
+    const sign = decStr.startsWith('-') ? -1 : 1;
+    const parts = decStr.replace(/^[+-]/, '').split(':').map(parseFloat);
+    return sign * (parts[0] + parts[1]/60 + parts[2]/3600);
   }
 
   function project(raH,decDeg,r){
@@ -757,6 +1154,25 @@ document.addEventListener('DOMContentLoaded', async () => {
       x: cx + rr * Math.sin(ang),
       y: cy - rr * Math.cos(ang)
     };
+  }
+
+  // Helper function to draw text that remains readable when flipped
+  function drawFlippableText(text, x, y) {
+    if (isFlipped) {
+      ctx.save();
+      // When flipped, change alignment to connect upper-left corner
+      const originalAlign = ctx.textAlign;
+      const originalBaseline = ctx.textBaseline;
+      ctx.textAlign = originalAlign === 'left' ? 'right' : 'left';
+      ctx.translate(x, y);
+      ctx.scale(-1, 1);
+      ctx.fillText(text, 0, 0);
+      ctx.textAlign = originalAlign;
+      ctx.textBaseline = originalBaseline;
+      ctx.restore();
+    } else {
+      ctx.fillText(text, x, y);
+    }
   }
 
   // Project Alt/Az directly to (x, y) on the chart
@@ -786,7 +1202,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     ctx.translate(translateX, translateY);
     ctx.scale(dpr * currentVpScale * canvasScale, dpr * currentVpScale * canvasScale);
 
+    // Apply horizontal flip if enabled
+    if (isFlipped) {
+      ctx.translate(cx, 0);
+      ctx.scale(-1, 1);
+      ctx.translate(-cx, 0);
+    }
+
     const effR = baseRadius;
+    
+    // Draw NSEW labels BEFORE clipping to ensure they're visible
+    drawNSEWLabels(effR);
+    
     ctx.save();
     ctx.beginPath(); ctx.arc(cx,cy,effR,0,2*Math.PI); ctx.clip();
 
@@ -821,7 +1248,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       console.log('[SkyView] Drawing constellation labels:', constFeatures.length);
       ctx.save();
       ctx.fillStyle='rgba(224,195,252,0.98)'; // more opaque for labels
-      ctx.font=`${Math.max(10, effR*0.045/Math.max(canvasScale,0.01))}px sans-serif`;
+      ctx.font=`${Math.max(2, 10/(canvasScale * canvasScale))}px sans-serif`;
       ctx.textAlign='center'; ctx.textBaseline='middle';
       constFeatures.forEach(f=>{
         let pts=[]; const g=f.geometry;
@@ -831,7 +1258,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(!ppts.length) return;
         const avgX=ppts.reduce((s,p)=>s+p.x,0)/ppts.length;
         const avgY=ppts.reduce((s,p)=>s+p.y,0)/ppts.length;
-        ctx.fillText(f.id,avgX,avgY);
+        drawFlippableText(f.id, avgX, avgY);
       });
       ctx.restore();
     }
@@ -844,31 +1271,32 @@ document.addEventListener('DOMContentLoaded', async () => {
         let p = project(s.RtAsc, s.Declin, effR);
         console.log('[SkyView] Sample projected star:', p, 'Mag:', s.Mag, 'RA:', s.RtAsc, 'Dec:', s.Declin);
       }
-      // Stepwise reveal of fainter stars as you zoom in
-      // At canvasScale < 2.0: Mag < 3
-      // At canvasScale < 3.0: Mag < 4
-      // At canvasScale < 4.0: Mag < 5
-      // At canvasScale < 5.0: Mag < 6
-      // At canvasScale < 6.0: Mag < 7
-      // At canvasScale >= 6.0: Mag < 8
-      // Show stars with Mag < 5 at default zoom, then resume stepped reveal at higher zoom
-      let magLimit = 5;
-      if (canvasScale >= 4.0) magLimit = 6;
-      if (canvasScale >= 5.0) magLimit = 7;
-      if (canvasScale >= 6.0) magLimit = 8;
+      
+      // Adaptive magnitude limit based on device performance (preserves original zoom progression)
+      const magLimit = deviceProfiler.getMagnitudeLimit('stars', canvasScale);
+      console.log(`[PERF] Star rendering - magLimit: ${magLimit}, canvasScale: ${canvasScale}`);
+      
+      // Filter stars using magnitude and viewport culling only (no count limiting)
+      let drawnStars = 0;
+      
+      // Batch drawing for better performance
+      ctx.save();
       stars.forEach(s=>{
-        if(s.Mag >= magLimit) return;
+        if (s.Mag >= magLimit) return;
+        if (!deviceProfiler.shouldDrawObject(s.RtAsc, s.Declin, s.Mag, 'stars', canvasScale)) return;
+        
         const p=project(s.RtAsc,s.Declin,effR);
         if(p.alt<=0) return;
+        
+        drawnStars++;
+        
         // --- Discrete star sizes by magnitude, 5x area per step ---
-        // 8 bins: <2, 2–3, 3–4, 4–5, 5–6, 6–7, 7–8, >=8
-        const minRadius = 1.2; // Reduce smallest star radius for default zoom
-        const areaStep = 1.5;  // Each step is 1.5x the area
-        // Compute bin index (0 = brightest, 7 = faintest)
+        const minRadius = 1.2;
+        const areaStep = 1.5;
         let bin = Math.floor(Math.max(0, Math.min(7, s.Mag < 2 ? 0 : Math.floor(s.Mag - 1))));
-        // Area for this bin
         const area = Math.PI * minRadius * minRadius * Math.pow(areaStep, 7 - bin);
         const sz = Math.sqrt(area / Math.PI);
+        
         // --- Color by spectral type ---
         let color = 'white';
         if (s.SpectType && typeof s.SpectType === 'string') {
@@ -885,9 +1313,30 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         ctx.save();
         ctx.setTransform(1,0,0,1,0,0); // reset transform to draw icon in screen space
-        ctx.beginPath(); ctx.arc(p.x * dpr * currentVpScale * canvasScale + translateX, p.y * dpr * currentVpScale * canvasScale + translateY, sz, 0, 2*Math.PI); ctx.fillStyle = color; ctx.fill();
+        
+        // Manually apply the same transformation sequence as the main canvas
+        let x = p.x * dpr * currentVpScale * canvasScale;
+        let y = p.y * dpr * currentVpScale * canvasScale;
+        
+        if (isFlipped) {
+          x = x - translateX;
+          y = y + translateY;
+        } else {
+          x = x + translateX;
+          y = y + translateY;
+        }
+        
+        if (isFlipped) {
+          const canvasCenterX = cx * dpr * currentVpScale * canvasScale;
+          x = canvasCenterX + (canvasCenterX - x);
+        }
+        
+        const starX = x;
+        const starY = y;
+        
+        ctx.beginPath(); ctx.arc(starX, starY, sz, 0, 2*Math.PI); ctx.fillStyle = color; ctx.fill();
         ctx.restore();
-        // For hit-test, use a larger radius: icon size or a minimum (e.g. 12px), whichever is greater
+        
         const hitR = Math.max(sz, 12);
         starHits.push({
           ...p,
@@ -895,10 +1344,106 @@ document.addEventListener('DOMContentLoaded', async () => {
           ...s,
           altDeg: p.alt,
           azDeg: (p.az + 180) % 360,
-          screenX: p.x * dpr * currentVpScale * canvasScale + translateX,
-          screenY: p.y * dpr * currentVpScale * canvasScale + translateY
+          screenX: starX,
+          screenY: starY
         });
       });
+      ctx.restore();
+      
+      console.log(`[PERF] Drew ${drawnStars}/${stars.length} stars (magnitude filtered, no count limits)`);
+    }
+
+    // --- Named Stars ---
+    if(stars && stars.length > 0) {
+      console.log('[SkyView] Drawing named stars, canvasScale:', canvasScale);
+      ctx.save();
+      ctx.fillStyle='rgba(255,255,255,0.9)'; // White for star names (different from Messier purple)
+      // Use same scaling pattern as constellation labels - account for canvas scaling
+      ctx.font=`${Math.max(2, 8/(canvasScale * canvasScale))}px sans-serif`;
+      ctx.textAlign='right'; ctx.textBaseline='top'; // Right-align so last letter connects to line
+      
+      // Determine visibility threshold based on zoom level and magnitude
+      let magThreshold;
+      if (canvasScale < 1.5) {
+        magThreshold = 2.5; // Show only very bright named stars when zoomed out
+      } else if (canvasScale < 3.0) {
+        magThreshold = 3.5; // Show brighter named stars at medium zoom
+      } else if (canvasScale < 5.0) {
+        magThreshold = 4.5; // Show more named stars when zoomed in
+      } else {
+        magThreshold = 6.0; // Show most named stars at high zoom
+      }
+      
+      console.log('[SkyView] Star name magnitude threshold:', magThreshold);
+      let namedStarCount = 0;
+      
+      // Check if star names toggle is enabled
+      const toggleStarNames = document.getElementById('toggleStarNames');
+      if (toggleStarNames && toggleStarNames.checked) {
+        stars.forEach(s => {
+          if (s.Name && s.Name !== 'NoName' && s.Mag <= magThreshold) {
+            const p = project(s.RtAsc, s.Declin, effR);
+            if (p.alt > 0) { // Only draw if above horizon
+              // Use new positioning system
+              drawLabelWithPointer(s.Name, p.x, p.y, 'star', 'rgba(255,255,255,0.7)', canvasScale);
+              namedStarCount++;
+            }
+          }
+        });
+      }
+      
+      console.log('[SkyView] Drew', namedStarCount, 'named stars above horizon');
+      ctx.restore();
+    }
+
+    // --- Messier Objects ---
+    const toggleMessierNames = document.getElementById('toggleMessierNames');
+    if(messierObjects && messierObjects.length > 0 && toggleMessierNames && toggleMessierNames.checked) {
+      console.log('[SkyView] Drawing Messier objects:', messierObjects.length, 'canvasScale:', canvasScale);
+      ctx.save();
+      ctx.fillStyle='rgba(224,195,252,0.8)'; // Same color as constellation labels but slightly transparent
+      // Fixed base size that accounts for canvas scaling
+      ctx.font=`${Math.max(2, 10/(canvasScale * canvasScale))}px sans-serif`;
+      // Text alignment will be set in drawLabelWithPointer function
+      
+      // Determine visibility threshold based on zoom level (show labels earlier)
+      let magThreshold;
+      if (canvasScale < 1.2) {
+        magThreshold = 5.0; // Show more objects earlier when zoomed out
+      } else if (canvasScale < 2.0) {
+        magThreshold = 7.0; // Show even more objects at medium zoom
+      } else {
+        magThreshold = 9.0; // Show all objects when zoomed in
+      }
+      
+      console.log('[SkyView] Magnitude threshold:', magThreshold);
+      let visibleCount = 0;
+      
+      messierObjects.forEach(obj => {
+        if (obj.mag <= magThreshold) {
+          // Use corrected coordinates if available, otherwise parse from original strings
+          let ra, dec;
+          if (obj.ra_corrected_hours !== undefined && obj.dec_corrected_degrees !== undefined) {
+            ra = obj.ra_corrected_hours;
+            dec = obj.dec_corrected_degrees;
+          } else {
+            ra = parseRA(obj.ra);
+            dec = parseDec(obj.dec);
+          }
+          
+          const p = project(ra, dec, effR);
+          if (p.alt > 0) { // Only draw if above horizon
+            // Use new positioning system for Messier objects
+            drawLabelWithPointer(obj.name, p.x, p.y, 'messier', 'rgba(224,195,252,0.9)', canvasScale);
+            visibleCount++;
+          }
+        }
+      });
+      
+      console.log('[SkyView] Drew', visibleCount, 'Messier objects above horizon');
+      ctx.restore();
+    } else {
+      console.log('[SkyView] No Messier objects available:', messierObjects);
     }
 
     // --- galaxies ---
@@ -909,22 +1454,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         let p = project(g.RtAsc, g.Declin, effR);
         console.log('[SkyView] Sample projected galaxy:', p, 'Mag:', g.mag, 'RA:', g.RtAsc, 'Dec:', g.Declin);
       }
+      
+      // Adaptive magnitude limit based on device performance (preserves zoom progression)
+      const galLimit = deviceProfiler.getMagnitudeLimit('galaxies', canvasScale);
+      console.log(`[PERF] Galaxy rendering - magLimit: ${galLimit}`);
+      
+      let drawnGalaxies = 0;
+      
       // Galaxy magnitude bins: 8 bins, 2.2–20, largest for <10, then step up
-      const galMinRadius = 2.2; // Smallest ellipse radius
-      const galAreaStep = 1.5;  // Each step is 1.5x the area
-      // Bin edges: <10, 10–12.25, 12.25–14.5, 14.5–16.75, 16.75–19, 19–20
-      // We'll use 8 bins, but most galaxies are faint, so bins are not uniform in width
+      const galMinRadius = 2.2;
+      const galAreaStep = 1.5;
+      
       galaxies.forEach(g=>{
-        // Visibility by zoom: show <10 at all zooms, then step in fainter bins as you zoom
-        let galLimit = 10;
-        if (canvasScale >= 4.0) galLimit = 12.25;
-        if (canvasScale >= 5.0) galLimit = 14.5;
-        if (canvasScale >= 6.0) galLimit = 16.75;
-        if (canvasScale >= 7.0) galLimit = 19;
-        if (canvasScale >= 8.0) galLimit = 20.1;
-        if(g.mag >= galLimit) return;
+        if (g.mag >= galLimit) return;
+        if (!deviceProfiler.shouldDrawObject(g.RtAsc, g.Declin, g.mag, 'galaxies', canvasScale)) return;
+        
         const p=project(g.RtAsc,g.Declin,effR);
         if(p.alt<=0) return;
+        
+        drawnGalaxies++;
+        
         // Bin index: 0 = brightest (<10), 1 = 10–12.25, ..., 7 = 19–20
         let bin = 0;
         if (g.mag >= 10) bin = Math.min(7, Math.floor((g.mag - 10) / ((20 - 10) / 7)) + 1);
@@ -935,7 +1484,28 @@ document.addEventListener('DOMContentLoaded', async () => {
         ctx.setTransform(1,0,0,1,0,0);
         ctx.strokeStyle = 'rgb(255,64,64)'; // fully opaque red
         ctx.lineWidth = 1.2 + Math.min((canvasScale - 1) * 0.7, 2.2); // gentler scaling
-        ctx.beginPath(); ctx.ellipse(p.x * dpr * currentVpScale * canvasScale + translateX, p.y * dpr * currentVpScale * canvasScale + translateY, maj, min, 0, 0, 2*Math.PI); ctx.stroke();
+        
+        // Manually apply the same transformation sequence as the main canvas
+        let x = p.x * dpr * currentVpScale * canvasScale;
+        let y = p.y * dpr * currentVpScale * canvasScale;
+        
+        if (isFlipped) {
+          x = x - translateX;
+          y = y + translateY;
+        } else {
+          x = x + translateX;
+          y = y + translateY;
+        }
+        
+        if (isFlipped) {
+          const canvasCenterX = cx * dpr * currentVpScale * canvasScale;
+          x = canvasCenterX + (canvasCenterX - x);
+        }
+        
+        const galX = x;
+        const galY = y;
+        
+        ctx.beginPath(); ctx.ellipse(galX, galY, maj, min, 0, 0, 2*Math.PI); ctx.stroke();
         ctx.restore();
         galaxyHits.push({
           ...p,
@@ -943,10 +1513,12 @@ document.addEventListener('DOMContentLoaded', async () => {
           ...g,
           altDeg: p.alt,
           azDeg: (p.az + 180) % 360,
-          screenX: p.x * dpr * currentVpScale * canvasScale + translateX,
-          screenY: p.y * dpr * currentVpScale * canvasScale + translateY
+          screenX: galX,
+          screenY: galY
         });
       });
+      
+      console.log(`[PERF] Drew ${drawnGalaxies}/${galaxies.length} galaxies (magnitude filtered, no count limits)`);
     }
 
     // --- open clusters ---
@@ -957,17 +1529,51 @@ document.addEventListener('DOMContentLoaded', async () => {
         let p = project(o.RtAsc, o.Declin, effR);
         console.log('[SkyView] Sample projected open cluster:', p, 'Mag:', o.Mag, 'RA:', o.RtAsc, 'Dec:', o.Declin);
       }
+      
+      // Adaptive magnitude limit based on device performance (preserves zoom progression)
+      const magLimit = deviceProfiler.getMagnitudeLimit('clusters', canvasScale);
+      let drawnClusters = 0;
+      
+      console.log(`[PERF] Drawing open clusters with magLimit: ${magLimit}`);
+      
       ctx.strokeStyle='rgb(100,100,255)'; // fully opaque blue
       openClusters.forEach(o=>{
+        if (o.Mag >= magLimit) return;
+        if (!deviceProfiler.shouldDrawObject(o.RtAsc, o.Declin, o.Mag, 'clusters', canvasScale)) return;
+        
         const p=project(o.RtAsc,o.Declin,effR);
         if(p.alt<=0) return;
+        
+        drawnClusters++;
+        
         const cl=Math.max(1,Math.min(25,o.Size));
         const frac=(cl-1)/(25-1);
         const pix=4+frac*(12-4);
         ctx.save();
         ctx.setTransform(1,0,0,1,0,0);
         ctx.lineWidth = 1.2 + Math.min((canvasScale - 1) * 0.7, 2.2); // gentler scaling
-        ctx.beginPath(); ctx.arc(p.x * dpr * currentVpScale * canvasScale + translateX, p.y * dpr * currentVpScale * canvasScale + translateY, pix, 0, 2*Math.PI); ctx.stroke();
+        
+        // Manually apply the same transformation sequence as the main canvas
+        let x = p.x * dpr * currentVpScale * canvasScale;
+        let y = p.y * dpr * currentVpScale * canvasScale;
+        
+        if (isFlipped) {
+          x = x - translateX;
+          y = y + translateY;
+        } else {
+          x = x + translateX;
+          y = y + translateY;
+        }
+        
+        if (isFlipped) {
+          const canvasCenterX = cx * dpr * currentVpScale * canvasScale;
+          x = canvasCenterX + (canvasCenterX - x);
+        }
+        
+        const openX = x;
+        const openY = y;
+        
+        ctx.beginPath(); ctx.arc(openX, openY, pix, 0, 2*Math.PI); ctx.stroke();
         ctx.restore();
         openHits.push({
           ...p,
@@ -975,10 +1581,12 @@ document.addEventListener('DOMContentLoaded', async () => {
           ...o,
           altDeg: p.alt,
           azDeg: (p.az + 180) % 360,
-          screenX: p.x * dpr * currentVpScale * canvasScale + translateX,
-          screenY: p.y * dpr * currentVpScale * canvasScale + translateY
+          screenX: openX,
+          screenY: openY
         });
       });
+      
+      console.log(`[PERF] Drew ${drawnClusters}/${openClusters.length} open clusters (magnitude filtered, no count limits)`);
     }
 
     // --- globular clusters ---
@@ -1001,12 +1609,36 @@ document.addEventListener('DOMContentLoaded', async () => {
         ctx.save();
         ctx.setTransform(1,0,0,1,0,0);
         ctx.lineWidth = 1.1 + Math.min((canvasScale - 1) * 0.6, 1.8); // slightly thinner
-        ctx.beginPath(); ctx.arc(p.x * dpr * currentVpScale * canvasScale + translateX, p.y * dpr * currentVpScale * canvasScale + translateY, r, 0, 2*Math.PI); ctx.stroke();
+        
+        // Manually apply the same transformation sequence as the main canvas
+        // 1. Scale to canvas pixel coordinates
+        let x = p.x * dpr * currentVpScale * canvasScale;
+        let y = p.y * dpr * currentVpScale * canvasScale;
+        
+        // 2. Apply translation (but flip translateX if we're in flipped mode)
+        if (isFlipped) {
+          x = x - translateX; // Reverse translateX for flipped mode
+          y = y + translateY;
+        } else {
+          x = x + translateX;
+          y = y + translateY;
+        }
+        
+        // 3. Apply flip transformation around center if needed (same as main canvas)
+        if (isFlipped) {
+          const canvasCenterX = cx * dpr * currentVpScale * canvasScale; // Include canvasScale for zoom
+          x = canvasCenterX + (canvasCenterX - x); // equivalent to translate(cx,0), scale(-1,1), translate(-cx,0)
+        }
+        
+        const globX = x;
+        const globY = y;
+        
+        ctx.beginPath(); ctx.arc(globX, globY, r, 0, 2*Math.PI); ctx.stroke();
         ctx.beginPath();
-        ctx.moveTo(p.x * dpr * currentVpScale * canvasScale + translateX - r*0.7, p.y * dpr * currentVpScale * canvasScale + translateY - r*0.7);
-        ctx.lineTo(p.x * dpr * currentVpScale * canvasScale + translateX + r*0.7, p.y * dpr * currentVpScale * canvasScale + translateY + r*0.7);
-        ctx.moveTo(p.x * dpr * currentVpScale * canvasScale + translateX + r*0.7, p.y * dpr * currentVpScale * canvasScale + translateY - r*0.7);
-        ctx.lineTo(p.x * dpr * currentVpScale * canvasScale + translateX - r*0.7, p.y * dpr * currentVpScale * canvasScale + translateY + r*0.7);
+        ctx.moveTo(globX - r*0.7, globY - r*0.7);
+        ctx.lineTo(globX + r*0.7, globY + r*0.7);
+        ctx.moveTo(globX + r*0.7, globY - r*0.7);
+        ctx.lineTo(globX - r*0.7, globY + r*0.7);
         ctx.stroke();
         ctx.restore();
         globularHits.push({
@@ -1016,8 +1648,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           Mag: mag, // ensure Mag is always present and numeric
           altDeg: p.alt,
           azDeg: (p.az + 180) % 360,
-          screenX: p.x * dpr * currentVpScale * canvasScale + translateX,
-          screenY: p.y * dpr * currentVpScale * canvasScale + translateY
+          screenX: globX,
+          screenY: globY
         });
       });
     }
@@ -1041,9 +1673,31 @@ document.addEventListener('DOMContentLoaded', async () => {
         ctx.save();
         ctx.setTransform(1,0,0,1,0,0);
         ctx.lineWidth = 1.1 + Math.min((canvasScale - 1) * 0.6, 1.8);
-        const x = p.x * dpr * currentVpScale * canvasScale + translateX;
-        const y = p.y * dpr * currentVpScale * canvasScale + translateY;
-        ctx.beginPath(); ctx.rect(x-sz/2, y-sz/2, sz, sz); ctx.stroke();
+        
+        // Manually apply the same transformation sequence as the main canvas
+        // 1. Scale to canvas pixel coordinates
+        let x = p.x * dpr * currentVpScale * canvasScale;
+        let y = p.y * dpr * currentVpScale * canvasScale;
+        
+        // 2. Apply translation (but flip translateX if we're in flipped mode)
+        if (isFlipped) {
+          x = x - translateX; // Reverse translateX for flipped mode
+          y = y + translateY;
+        } else {
+          x = x + translateX;
+          y = y + translateY;
+        }
+        
+        // 3. Apply flip transformation around center if needed (same as main canvas)
+        if (isFlipped) {
+          const canvasCenterX = cx * dpr * currentVpScale * canvasScale; // Include canvasScale for zoom
+          x = canvasCenterX + (canvasCenterX - x); // equivalent to translate(cx,0), scale(-1,1), translate(-cx,0)
+        }
+        
+        const nebX = x;
+        const nebY = y;
+        
+        ctx.beginPath(); ctx.rect(nebX-sz/2, nebY-sz/2, sz, sz); ctx.stroke();
         ctx.restore();
         nebulaHits.push({
           ...p,
@@ -1052,8 +1706,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           Mag: mag,
           altDeg: p.alt,
           azDeg: (p.az + 180) % 360,
-          screenX: x,
-          screenY: y
+          screenX: nebX,
+          screenY: nebY
         });
       });
     }
@@ -1077,12 +1731,34 @@ document.addEventListener('DOMContentLoaded', async () => {
         ctx.save();
         ctx.setTransform(1,0,0,1,0,0);
         ctx.lineWidth = 1.1 + Math.min((canvasScale - 1) * 0.6, 1.8);
-        const x = p.x * dpr * currentVpScale * canvasScale + translateX;
-        const y = p.y * dpr * currentVpScale * canvasScale + translateY;
+        
+        // Manually apply the same transformation sequence as the main canvas
+        // 1. Scale to canvas pixel coordinates
+        let x = p.x * dpr * currentVpScale * canvasScale;
+        let y = p.y * dpr * currentVpScale * canvasScale;
+        
+        // 2. Apply translation (but flip translateX if we're in flipped mode)
+        if (isFlipped) {
+          x = x - translateX; // Reverse translateX for flipped mode
+          y = y + translateY;
+        } else {
+          x = x + translateX;
+          y = y + translateY;
+        }
+        
+        // 3. Apply flip transformation around center if needed (same as main canvas)
+        if (isFlipped) {
+          const canvasCenterX = cx * dpr * currentVpScale * canvasScale; // Include canvasScale for zoom
+          x = canvasCenterX + (canvasCenterX - x); // equivalent to translate(cx,0), scale(-1,1), translate(-cx,0)
+        }
+        
+        const planX = x;
+        const planY = y;
+        
         ctx.beginPath();
-        ctx.moveTo(x, y - sz/1.2);
-        ctx.lineTo(x - sz/1.2, y + sz/1.2);
-        ctx.lineTo(x + sz/1.2, y + sz/1.2);
+        ctx.moveTo(planX, planY - sz/1.2);
+        ctx.lineTo(planX - sz/1.2, planY + sz/1.2);
+        ctx.lineTo(planX + sz/1.2, planY + sz/1.2);
         ctx.closePath();
         ctx.stroke();
         ctx.restore();
@@ -1093,8 +1769,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           Mag: mag,
           altDeg: p.alt,
           azDeg: (p.az + 180) % 360,
-          screenX: x,
-          screenY: y
+          screenX: planX,
+          screenY: planY
         });
       });
     }
@@ -1105,8 +1781,29 @@ document.addEventListener('DOMContentLoaded', async () => {
       const p = altAzToXY(mountPos.alt, azForDraw, effR);
       // Reticle radius fixed in screen space (like orange crosshair)
       const reticleRadius = 18; // px, visually matches orange crosshair
-      const screenX = p.x * dpr * currentVpScale * canvasScale + translateX;
-      const screenY = p.y * dpr * currentVpScale * canvasScale + translateY;
+      
+      // Manually apply the same transformation sequence as the main canvas
+      // 1. Scale to canvas pixel coordinates
+      let x = p.x * dpr * currentVpScale * canvasScale;
+      let y = p.y * dpr * currentVpScale * canvasScale;
+      
+      // 2. Apply translation (but flip translateX if we're in flipped mode)
+      if (isFlipped) {
+        x = x - translateX; // Reverse translateX for flipped mode
+        y = y + translateY;
+      } else {
+        x = x + translateX;
+        y = y + translateY;
+      }
+      
+      // 3. Apply flip transformation around center if needed (same as main canvas)
+      if (isFlipped) {
+        const canvasCenterX = cx * dpr * currentVpScale * canvasScale; // Include canvasScale for zoom
+        x = canvasCenterX + (canvasCenterX - x); // equivalent to translate(cx,0), scale(-1,1), translate(-cx,0)
+      }
+      
+      const screenX = x;
+      const screenY = y;
       console.log('[SkyView] Reticle debug:', {
         mountPos,
         azForDraw,
@@ -1142,8 +1839,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (selectedObject && selectedObject.altDeg !== undefined && selectedObject.az !== undefined) {
       // Recompute the object's current screen position based on its Alt/Az (use raw azimuth, not azDeg)
       const p = altAzToXY(selectedObject.altDeg, selectedObject.az, baseRadius);
-      const screenX = p.x * dpr * currentVpScale * canvasScale + translateX;
-      const screenY = p.y * dpr * currentVpScale * canvasScale + translateY;
+      
+      // Manually apply the same transformation sequence as the main canvas
+      // 1. Scale to canvas pixel coordinates
+      let x = p.x * dpr * currentVpScale * canvasScale;
+      let y = p.y * dpr * currentVpScale * canvasScale;
+      
+      // 2. Apply translation (but flip translateX if we're in flipped mode)
+      if (isFlipped) {
+        x = x - translateX; // Reverse translateX for flipped mode
+        y = y + translateY;
+      } else {
+        x = x + translateX;
+        y = y + translateY;
+      }
+      
+      // 3. Apply flip transformation around center if needed (same as main canvas)
+      if (isFlipped) {
+        const canvasCenterX = cx * dpr * currentVpScale * canvasScale; // Include canvasScale for zoom
+        x = canvasCenterX + (canvasCenterX - x); // equivalent to translate(cx,0), scale(-1,1), translate(-cx,0)
+      }
+      
+      const screenX = x;
+      const screenY = y;
+      
       const r = selectedObject.r || 12;
       ctx.save();
       ctx.setTransform(1,0,0,1,0,0);
@@ -1170,14 +1889,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // === Data loading ===
   try {
-    stars = await (await fetch('/stars-data')).json();
+    stars = await (await fetch('/corrected_stars.json')).json();
     console.log('[SkyView] Loaded stars:', stars.length);
   } catch(e) {
     console.error('stars load', e);
   }
 
   try {
-    const geo = await (await fetch('/static/constellations.json')).json();
+    const geo = await (await fetch('/corrected_constellations.json')).json();
     constFeatures = geo.features;
     geo.features.forEach(f=>{
       const g=f.geometry;
@@ -1190,7 +1909,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   try {
-    const resp = await fetch('/static/galaxies.json');
+    const resp = await fetch('/corrected_galaxies.json');
     if(!resp.ok) throw resp;
     const raw = await resp.json();
     galaxies = raw.map(g=>{
@@ -1212,7 +1931,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   try {
-    openClusters = await (await fetch('/static/open_clusters.json')).json();
+    openClusters = await (await fetch('/corrected_open_clusters.json')).json();
     // ensure RtAsc is float (in hours)
     openClusters = openClusters.map(o => ({
       ...o,
@@ -1227,15 +1946,31 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Load new object data
-  const [globularData, nebulaData, planetaryData] = await Promise.all([
-    fetch('static/globular_clusters.json').then(r=>r.json()),
-    fetch('static/nebula.json').then(r=>r.json()),
-    fetch('static/planetary_nebula.json').then(r=>r.json())
-  ]);
-  globularClusters = globularData;
-  nebulae = nebulaData;
-  planetaryNebulae = planetaryData;
-  console.log('[SkyView] Loaded globular:', globularClusters.length, 'nebulae:', nebulae.length, 'planetary:', planetaryNebulae.length);
+  try {
+    const [globularData, nebulaData, planetaryData] = await Promise.all([
+      fetch('/corrected_globular_clusters.json').then(r=>r.json()),
+      fetch('/corrected_nebula.json').then(r=>r.json()),
+      fetch('/corrected_planetary_nebula.json').then(r=>r.json())
+    ]);
+    globularClusters = globularData;
+    nebulae = nebulaData;
+    planetaryNebulae = planetaryData;
+    console.log('[SkyView] Loaded globular:', globularClusters.length, 'nebulae:', nebulae.length, 'planetary:', planetaryNebulae.length);
+  } catch(e) {
+    console.error('Error loading object data:', e);
+    globularClusters = [];
+    nebulae = [];
+    planetaryNebulae = [];
+  }
+
+  // Load Messier objects separately with error handling
+  try {
+    messierObjects = await (await fetch('/corrected_messier.json')).json();
+    console.log('[SkyView] Loaded Messier objects:', messierObjects.length);
+  } catch(e) {
+    console.error('Failed to load messier.json:', e);
+    messierObjects = [];
+  }
 
 
   // --- Calibration Points ---
@@ -1285,28 +2020,50 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!p) return;
       ctx.save();
       ctx.setTransform(1,0,0,1,0,0);
-      const x = p.x * dpr * currentVpScale * canvasScale + translateX;
-      const y = p.y * dpr * currentVpScale * canvasScale + translateY;
+      
+      // Manually apply the same transformation sequence as the main canvas
+      // 1. Scale to canvas pixel coordinates
+      let x = p.x * dpr * currentVpScale * canvasScale;
+      let y = p.y * dpr * currentVpScale * canvasScale;
+      
+      // 2. Apply translation (but flip translateX if we're in flipped mode)
+      if (isFlipped) {
+        x = x - translateX; // Reverse translateX for flipped mode
+        y = y + translateY;
+      } else {
+        x = x + translateX;
+        y = y + translateY;
+      }
+      
+      // 3. Apply flip transformation around center if needed (same as main canvas)
+      if (isFlipped) {
+        const canvasCenterX = cx * dpr * currentVpScale * canvasScale; // Include canvasScale for zoom
+        x = canvasCenterX + (canvasCenterX - x); // equivalent to translate(cx,0), scale(-1,1), translate(-cx,0)
+      }
+      
+      const finalX = x;
+      const finalY = y;
+      
       const r = 13;
       ctx.beginPath();
-      ctx.arc(x, y, r, 0, 2 * Math.PI);
+      ctx.arc(finalX, finalY, r, 0, 2 * Math.PI);
       ctx.strokeStyle = pt.enabled ? 'yellow' : 'red';
       ctx.lineWidth = 2.5;
       ctx.stroke();
       // Crosshair
       ctx.beginPath();
-      ctx.moveTo(x - r, y);
-      ctx.lineTo(x + r, y);
-      ctx.moveTo(x, y - r);
-      ctx.lineTo(x, y + r);
+      ctx.moveTo(finalX - r, finalY);
+      ctx.lineTo(finalX + r, finalY);
+      ctx.moveTo(finalX, finalY - r);
+      ctx.lineTo(finalX, finalY + r);
       ctx.strokeStyle = pt.enabled ? 'yellow' : 'red';
       ctx.lineWidth = 1.5;
       ctx.stroke();
       ctx.restore();
       calPointHits.push({
         ...pt,
-        x, y, r: r + 6, // hit area
-        screenX: x, screenY: y
+        x: finalX, y: finalY, r: r + 6, // hit area
+        screenX: finalX, screenY: finalY
       });
     });
   };
@@ -1390,7 +2147,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       background: #111 !important;
       color: #fff !important;
       -webkit-box-shadow: none !important;
-      -moz.box-shadow: none !important;
+      -moz.box.shadow: none !important;
       caret-color: red !important;
       transition: none !important;
     }
@@ -1401,8 +2158,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // IDs of all toggles
   const toggleIds = [
     'toggleStars',
+    'toggleStarNames',
     'toggleConst',
     'toggleConstLabels',
+    'toggleMessierNames',
     'toggleGal',
     'toggleOpen',
     'toggleGlobular',
@@ -1413,8 +2172,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Default state
   const defaultToggles = {
     toggleStars: true,
+    toggleStarNames: true,
     toggleConst: true,
     toggleConstLabels: false,
+    toggleMessierNames: true,
     toggleGal: false,
     toggleOpen: false,
     toggleGlobular: false,

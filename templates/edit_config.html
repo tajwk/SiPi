@@ -371,6 +371,7 @@ function showConfirm(msg, cb) {
       </div>
       <div style="text-align:center;">
         <button id="saveWifiBtn" class="btn">Save</button>
+        <button id="fixWifiBtn" class="btn" style="margin-left:10px;" title="Fix WiFi script permissions">Fix Permissions</button>
       </div>
     </div>
     <div class="grid-item">
@@ -664,13 +665,65 @@ $(function(){
     });
   });
   $('#syncTimeBtn').click(() => {
-    const now = new Date(),
-          hh  = String(now.getHours()).padStart(2,'0'),
-          mm  = String(now.getMinutes()).padStart(2,'0'),
-          t   = hh+':'+mm;
+    // Get current device time and timezone
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2,'0');
+    const mm = String(now.getMinutes()).padStart(2,'0');
+    const t = hh+':'+mm;
     $('#timeInput').val(t);
-    // Also trigger setTimeBtn click for unified behavior
-    $('#setTimeBtn').click();
+    
+    // Send full date/time with timezone to server
+    const dt_str = now.getFullYear() + '-' +
+                   String(now.getMonth() + 1).padStart(2,'0') + '-' +
+                   String(now.getDate()).padStart(2,'0') + ' ' +
+                   String(now.getHours()).padStart(2,'0') + ':' +
+                   String(now.getMinutes()).padStart(2,'0') + ':' +
+                   String(now.getSeconds()).padStart(2,'0');
+                   
+    // Get timezone identifier (e.g., "America/New_York")
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    
+    $.ajax({
+      url: '/set_time',
+      method: 'POST',
+      contentType: 'application/json',
+      data: JSON.stringify({ 
+        dt_str: dt_str,
+        timezone: timezone
+      }),
+      success: function(response) {
+        if (response.success) {
+          showModal('Device time and timezone synchronized!\\nTime: ' + dt_str + '\\nTimezone: ' + timezone);
+        } else {
+          showModal('Failed to sync time: ' + (response.error || 'Unknown error'));
+        }
+      },
+      error: function(xhr) {
+        showModal('Failed to sync device time: ' + (xhr.responseJSON?.error || xhr.statusText));
+      }
+    });
+  });
+
+  // Wi-Fi Fix Permissions
+  $('#fixWifiBtn').click(function(e) {
+    e.preventDefault();
+    $(this).prop('disabled', true).text('Fixing...');
+    
+    $.post('/fix_wifi_permissions')
+      .done(function(data) {
+        if (data && data.success) {
+          showModal('WiFi permissions fixed successfully!\\n' + data.message);
+        } else {
+          showModal('Failed to fix WiFi permissions: ' + (data.error || 'Unknown error'));
+        }
+      })
+      .fail(function(xhr) {
+        const errorMsg = xhr.responseJSON ? xhr.responseJSON.error : xhr.statusText;
+        showModal('Error fixing WiFi permissions: ' + errorMsg);
+      })
+      .always(function() {
+        $('#fixWifiBtn').prop('disabled', false).text('Fix Permissions');
+      });
   });
 
   // Wi-Fi Save

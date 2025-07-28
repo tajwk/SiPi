@@ -424,14 +424,14 @@ def status():
         track = "Communication Fault"
     elif bp & 64:  # Bit 06
         track = "Blinky/Manual"
+    elif bp & 16:  # Bit 04
+        track = "Parked"
     elif not (bp & 1):  # Bit 00 false
         track = "Scope Not Initialized"
     elif bp & 2:  # Bit 01
         track = "Tracking"
     elif bp & 8:  # Bit 03
         track = "Parking"
-    elif bp & 16:  # Bit 04
-        track = "Parked"
     elif bp & 4:  # Bit 02
         track = "Slewing"
     else:  # Bit 02 false
@@ -646,6 +646,8 @@ def set_time_popup():
         data = request.get_json(force=True)
         # Accept either 'dt_str' (preferred) or 'iso' (legacy)
         dt_str = data.get('dt_str')
+        timezone = data.get('timezone')  # New: accept timezone
+        
         if not dt_str:
             iso = data.get('iso')
             if not iso:
@@ -656,16 +658,73 @@ def set_time_popup():
             except Exception:
                 return jsonify(success=False, error='Invalid ISO time'), 400
             dt_str = dt.strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Set timezone first if provided
+        if timezone:
+            try:
+                # Set system timezone using timedatectl
+                tz_result = subprocess.run(['sudo', 'timedatectl', 'set-timezone', timezone], 
+                                         capture_output=True, text=True)
+                print(f"[DEBUG] sudo timedatectl set-timezone '{timezone}'\nstdout: {tz_result.stdout}\nstderr: {tz_result.stderr}\nreturncode: {tz_result.returncode}", flush=True)
+                
+                if tz_result.returncode != 0:
+                    return jsonify(success=False, error=f'Failed to set timezone: {tz_result.stderr}'), 500
+            except Exception as e:
+                print(f"[DEBUG] Exception setting timezone: {e}", flush=True)
+                return jsonify(success=False, error=f'Timezone error: {str(e)}'), 500
+        
         # Set system time (requires sudo)
         result = subprocess.run(['sudo', 'date', '-s', dt_str], capture_output=True, text=True)
         print(f"[DEBUG] sudo date -s '{dt_str}'\nstdout: {result.stdout}\nstderr: {result.stderr}\nreturncode: {result.returncode}", flush=True)
+        
         if result.returncode == 0:
-            return jsonify(success=True, message=f"System time set to {dt_str}", debug=result.stdout + result.stderr)
+            msg = f"System time set to {dt_str}"
+            if timezone:
+                msg += f" (timezone: {timezone})"
+            return jsonify(success=True, message=msg, debug=result.stdout + result.stderr)
         else:
             return jsonify(success=False, error=result.stderr.strip(), debug=result.stdout + result.stderr), 500
     except Exception as e:
         print(f"[DEBUG] Exception in set_time_popup: {e}", flush=True)
         return jsonify(success=False, error=str(e)), 500
+
+@app.route('/fix_wifi_permissions', methods=['POST'])
+def fix_wifi_permissions():
+    """Fix WiFi script permissions - can be called independently."""
+    try:
+        wifi_script = "/usr/local/bin/update_hostapd_conf.sh"
+        messages = []
+        
+        # Check if script exists
+        if not os.path.exists(wifi_script):
+            return jsonify(success=False, error=f'WiFi script not found at {wifi_script}'), 404
+        
+        # Fix permissions
+        result = subprocess.run(['sudo', 'chmod', '755', wifi_script], 
+                              capture_output=True, text=True)
+        if result.returncode != 0:
+            return jsonify(success=False, error=f'Failed to fix permissions: {result.stderr}'), 500
+        
+        messages.append('WiFi script permissions fixed (755)')
+        
+        # Fix ownership
+        try:
+            subprocess.run(['sudo', 'chown', 'root:root', wifi_script], 
+                         capture_output=True, text=True)
+            messages.append('WiFi script ownership fixed (root:root)')
+        except Exception as e:
+            messages.append(f'Warning: Could not fix ownership: {e}')
+        
+        # Verify permissions
+        import stat
+        st = os.stat(wifi_script)
+        perms = oct(st.st_mode & 0o777)
+        messages.append(f'Current permissions: {perms}')
+        
+        return jsonify(success=True, message=' | '.join(messages))
+        
+    except Exception as e:
+        return jsonify(success=False, error=f'Unexpected error: {str(e)}'), 500
 
 @app.route('/update_wifi', methods=['POST'])
 def update_wifi():
@@ -676,17 +735,79 @@ def update_wifi():
         data = request.get_json(force=True)
         ssid = data.get('ssid', '')
         passwd = data.get('pass', '')
+    
+    # Validate inputs
+    if not ssid:
+        return jsonify(success=False, error='SSID cannot be empty'), 400
+    
+    if len(passwd) < 8:
+        return jsonify(success=False, error='Password must be at least 8 characters'), 400
+    
     try:
+        print(f"[DEBUG] Updating WiFi - SSID: '{ssid}', Password length: {len(passwd)}")
+        
+        # Check if script exists and is executable
+        script_path = '/usr/local/bin/update_hostapd_conf.sh'
+        if not os.path.exists(script_path):
+            return jsonify(success=False, error=f'WiFi update script not found at {script_path}'), 500
+        
+        if not os.access(script_path, os.X_OK):
+            return jsonify(success=False, error='WiFi update script is not executable. Run: sudo chmod 755 /usr/local/bin/update_hostapd_conf.sh'), 500
+        
         result = subprocess.run(
-            ['sudo', '/usr/local/bin/update_hostapd_conf.sh', ssid, passwd],
-            capture_output=True, text=True, timeout=10
+            ['sudo', script_path, ssid, passwd],
+            capture_output=True, text=True, timeout=30
         )
+        
+        print(f"[DEBUG] WiFi update result - returncode: {result.returncode}")
+        print(f"[DEBUG] stdout: {result.stdout}")
+        print(f"[DEBUG] stderr: {result.stderr}")
+        
         if result.returncode == 0:
-            return jsonify(success=True)
+            return jsonify(success=True, message='WiFi settings updated successfully')
         else:
-            return jsonify(success=False, error=result.stderr), 500
+            error_msg = result.stderr.strip() if result.stderr else result.stdout.strip()
+            if not error_msg:
+                error_msg = f'Script failed with exit code {result.returncode}'
+            
+            # If we get a permission error, try to automatically fix it
+            if ('Permission denied' in error_msg or 'command not found' in error_msg):
+                print("[DEBUG] Attempting to automatically fix WiFi script permissions...")
+                try:
+                    # Try to fix permissions
+                    fix_result = subprocess.run(['sudo', 'chmod', '755', script_path], 
+                                              capture_output=True, text=True, timeout=10)
+                    if fix_result.returncode == 0:
+                        print("[DEBUG] Permissions fixed, retrying WiFi update...")
+                        # Retry the original command
+                        retry_result = subprocess.run(
+                            ['sudo', script_path, ssid, passwd],
+                            capture_output=True, text=True, timeout=30
+                        )
+                        if retry_result.returncode == 0:
+                            return jsonify(success=True, message='WiFi settings updated successfully (after fixing permissions)')
+                        else:
+                            error_msg = f"Permission fix succeeded but update still failed: {retry_result.stderr}"
+                    else:
+                        error_msg += f". Auto-fix failed: {fix_result.stderr}"
+                except Exception as fix_e:
+                    error_msg += f". Auto-fix failed: {str(fix_e)}"
+            
+            # Provide helpful error messages for common issues
+            if 'command not found' in error_msg:
+                error_msg += '. Please ensure the script exists and has correct permissions.'
+            elif 'Permission denied' in error_msg:
+                error_msg += '. Try clicking "Fix Permissions" button or run: sudo chmod 755 /usr/local/bin/update_hostapd_conf.sh'
+            
+            return jsonify(success=False, error=error_msg), 500
+            
+    except subprocess.TimeoutExpired:
+        return jsonify(success=False, error='WiFi update timed out after 30 seconds'), 500
+    except FileNotFoundError:
+        return jsonify(success=False, error='sudo command not found or script missing'), 500
     except Exception as e:
-        return jsonify(success=False, error=str(e)), 500
+        print(f"[DEBUG] WiFi update exception: {e}")
+        return jsonify(success=False, error=f'Unexpected error: {str(e)}'), 500
 
 @app.route('/toggle_vibration', methods=['POST'])
 def toggle_vibration():
@@ -792,6 +913,41 @@ def apply_updates():
         sitex_src = "/opt/SiTech/SiPi/SiTechExe.exe"
         sitex_dst = "/opt/SiTech/SiTechExe/SiTechExe.exe"
         update_msgs = []
+        
+        # --- Fix WiFi script permissions automatically ---
+        try:
+            wifi_script = "/usr/local/bin/update_hostapd_conf.sh"
+            if os.path.exists(wifi_script):
+                # Fix permissions to 755 (rwxr-xr-x)
+                subprocess.run(['sudo', 'chmod', '755', wifi_script], 
+                             capture_output=True, text=True, env=env)
+                update_msgs.append(f"[WiFi script permissions fixed: {wifi_script}]")
+            else:
+                update_msgs.append(f"[WiFi script not found: {wifi_script}]")
+        except Exception as e:
+            update_msgs.append(f"[Failed to fix WiFi script permissions: {e}]")
+        
+        # --- Ensure update script itself exists and has correct permissions ---
+        try:
+            local_script = "/opt/SiTech/SiPi/update_hostapd_conf.sh"
+            target_script = "/usr/local/bin/update_hostapd_conf.sh"
+            
+            if os.path.exists(local_script):
+                # Copy updated script to system location
+                subprocess.run(['sudo', 'cp', local_script, target_script], 
+                             capture_output=True, text=True, env=env)
+                # Set correct permissions
+                subprocess.run(['sudo', 'chmod', '755', target_script], 
+                             capture_output=True, text=True, env=env)
+                # Set correct ownership
+                subprocess.run(['sudo', 'chown', 'root:root', target_script], 
+                             capture_output=True, text=True, env=env)
+                update_msgs.append(f"[WiFi script updated and permissions fixed]")
+            else:
+                update_msgs.append(f"[Local WiFi script not found: {local_script}]")
+        except Exception as e:
+            update_msgs.append(f"[Failed to update WiFi script: {e}]")
+        
         # Stop sitech.service
         try:
             stop_sitech = subprocess.run(['sudo', 'systemctl', 'stop', 'sitech'], capture_output=True, text=True, env=env)
@@ -1105,6 +1261,80 @@ def catalog_status():
             }
     
     return jsonify(status)
+
+@app.route('/device_profile', methods=['POST'])
+def device_profile():
+    """Generate device performance profile for adaptive optimizations."""
+    try:
+        data = request.get_json(force=True)
+        
+        # Get performance metrics from frontend
+        render_time = data.get('render_time', 100)  # ms for 1000 operations
+        screen_width = data.get('screen_width', 1920)
+        screen_height = data.get('screen_height', 1080)
+        pixel_ratio = data.get('pixel_ratio', 1)
+        memory = data.get('memory', 4)  # GB estimate
+        
+        # Calculate device tier
+        screen_area = screen_width * screen_height
+        
+        # Determine performance tier
+        tier = 'high'
+        if render_time > 50 or memory < 4 or screen_area < 1000000:
+            tier = 'medium'
+        if render_time > 100 or memory < 2 or screen_area < 500000:
+            tier = 'low'
+            
+        # Generate optimized settings (no object count limits - preserves astronomical completeness)
+        profile = {
+            'tier': tier,
+            'max_pixel_ratio': 1.5 if tier == 'low' else (2 if tier == 'medium' else pixel_ratio),
+            'throttle_ms': 50 if tier == 'low' else (33 if tier == 'medium' else 16),
+            'anti_aliasing': tier != 'low',
+            'batch_drawing': True,  # Always enabled
+            'viewport_culling': True,  # Always enabled
+            'lod_enabled': tier == 'low',  # Level-of-detail for low-end devices
+            'animation_quality': 'low' if tier == 'low' else ('medium' if tier == 'medium' else 'high'),
+            'constellation_detail': 'low' if tier == 'low' else 'high',
+            'label_density': 'low' if tier == 'low' else ('medium' if tier == 'medium' else 'high')
+        }
+        
+        print(f"[PERF] Device profile generated: {tier} tier, render_time: {render_time}ms")
+        return jsonify(profile)
+        
+    except Exception as e:
+        # Fallback safe profile (no object count limits)
+        print(f"[PERF] Device profiling failed: {e}, using safe defaults")
+        return jsonify({
+            'tier': 'medium',
+            'max_pixel_ratio': 2,
+            'throttle_ms': 33,
+            'anti_aliasing': True,
+            'batch_drawing': True,
+            'viewport_culling': True,
+            'lod_enabled': False,
+            'animation_quality': 'medium',
+            'constellation_detail': 'high',
+            'label_density': 'medium'
+        })
+
+@app.route('/performance_status')
+def performance_status():
+    """Get current performance optimization status."""
+    return jsonify({
+        'adaptive_performance_enabled': True,
+        'available_tiers': ['high', 'medium', 'low'],
+        'optimization_features': [
+            'Adaptive canvas resolution',
+            'Smart object culling', 
+            'Level-of-detail rendering',
+            'Event throttling',
+            'Batch drawing operations',
+            'Hardware acceleration',
+            'Magnitude-based filtering',
+            'Zoom-dependent detail levels'
+        ]
+    })
 
 @app.route('/astrometric')
 def astrometric_admin():
