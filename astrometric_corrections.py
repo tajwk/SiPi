@@ -421,27 +421,19 @@ class CatalogPreprocessor:
                     for point in line_string:
                         lon, lat = point[0], point[1]
                         
-                        # Convert longitude to RA hours for correction processing
-                        ra_hours = lon / 15.0  # Convert degrees to hours
-                        # Handle negative longitude by adding 24 hours to get positive RA
-                        if ra_hours < 0:
-                            ra_hours += 24  # Normalize to 0-24 hours
+                        # Constellation coordinates appear to be in RA degrees, Dec degrees format
+                        # NOT longitude/latitude. Convert RA degrees directly to hours
+                        ra_hours = lon / 15.0  # Convert RA degrees to hours
                         
                         # Apply astrometric corrections
                         ra_corrected, dec_corrected = self.corrector.correct_coordinates(
                             ra_hours, lat, target_jd
                         )
                         
-                        # Convert corrected RA back to longitude degrees
-                        lon_corrected = ra_corrected * 15.0  # Convert hours back to degrees
+                        # Convert back to RA degrees (not longitude)
+                        ra_degrees_corrected = ra_corrected * 15.0  # Convert hours back to degrees
                         
-                        # Keep longitude in standard -180 to +180 range for consistency with original data
-                        while lon_corrected > 180:
-                            lon_corrected -= 360
-                        while lon_corrected <= -180:
-                            lon_corrected += 360
-                        
-                        corrected_line.append([lon_corrected, dec_corrected])
+                        corrected_line.append([ra_degrees_corrected, dec_corrected])
                     
                     corrected_coordinates.append(corrected_line)
                 
