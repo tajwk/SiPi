@@ -21,7 +21,7 @@ from flask import (
 from astrometric_corrections import preprocess_catalogs_for_current_epoch
 
 # Initial SiPi version (bump patch for simple fixes)
-__version__ = "0.9.6"
+__version__ = "0.9.4"
 
 # Base directory for Git operations
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -174,6 +174,26 @@ def format_hms_no_decimals(value):
         s = 0
         m += 1
     return f"{sign}{h:02d}:{m:02d}:{s:02d}"
+
+def format_dms(value):
+    """Format degrees to DDD:MM:SS to match SkyView format"""
+    try:
+        num = float(value)
+    except:
+        return value
+    sign = "-" if num < 0 else ""
+    num = abs(num)
+    d = int(num)
+    rem = (num - d) * 60
+    m = int(rem)
+    s = int(round((rem - m) * 60))
+    if s == 60:
+        s = 0
+        m += 1
+        if m == 60:
+            m = 0
+            d += 1
+    return f"{sign}{d:03d}:{m:02d}:{s:02d}"
 
 def get_site_location():
     global site_latitude, site_longitude
@@ -412,8 +432,8 @@ def status():
         dec = format_hms(fields[2].strip())
         sid = format_hms_no_decimals(fields[7].strip())
         try:
-            alt = f"{float(fields[3]):.2f}"
-            az  = f"{float(fields[4]):.2f}"
+            alt = format_dms(fields[3].strip())
+            az  = format_dms(fields[4].strip())
         except:
             alt, az = fields[3].strip(), fields[4].strip()
     else:
@@ -550,6 +570,40 @@ def cal_points():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     return jsonify(points=points)
+
+@app.route('/solar_system')
+def solar_system():
+    try:
+        # Send GetSunMoonPlanets command to SiTech
+        response = send_command("GetSunMoonPlanets\n", timeout=10, terminator="\n")
+        if not response or response.strip() == "":
+            return jsonify({'error': 'No response from SiTech'}), 500
+        
+        # Parse the semicolon-delimited response
+        # Format: "ra;dec;ra;dec;ra;dec;ra;dec;ra;dec;ra;dec;ra;dec;ra;dec;ra;dec;ra;dec"
+        # Order: Mercury, Venus, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto, Sun, Moon
+        coords = response.strip().split(';')
+        if len(coords) < 20:
+            return jsonify({'error': f'Invalid response format, expected 20 values, got {len(coords)}'}), 500
+        
+        # Parse coordinates into objects
+        objects = {}
+        names = ['Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto', 'Sun', 'Moon']
+        
+        for i in range(10):
+            ra_idx = i * 2
+            dec_idx = i * 2 + 1
+            if ra_idx < len(coords) and dec_idx < len(coords):
+                try:
+                    ra = float(coords[ra_idx])
+                    dec = float(coords[dec_idx])
+                    objects[names[i].lower()] = {'ra': ra, 'dec': dec}
+                except ValueError:
+                    continue
+        
+        return jsonify(objects)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/enable_cal_point', methods=['POST'])
 def enable_cal_point():

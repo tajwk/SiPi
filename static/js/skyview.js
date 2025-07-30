@@ -227,10 +227,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Convert degrees → "DDD:MM:SS"
   function degToDMS(deg) {
-    const d = Math.floor(deg);
-    const m = Math.floor(Math.abs(deg - d) * 60);
-    const s = Math.round((Math.abs(deg - d) * 60 - m) * 60);
-    return `${String(d).padStart(3, '0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    const isNegative = deg < 0;
+    const absDeg = Math.abs(deg);
+    const d = Math.floor(absDeg);
+    const m = Math.floor((absDeg - d) * 60);
+    const s = Math.round(((absDeg - d) * 60 - m) * 60);
+    const sign = isNegative ? '-' : '';
+    return `${sign}${String(d).padStart(3, '0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+  
+  // Convert RA degrees → "HH:MM:SS" (RA is in hours, so divide by 15)
+  function degToHMS(deg) {
+    const hours = deg / 15; // Convert degrees to hours
+    const h = Math.floor(hours);
+    const m = Math.floor((hours - h) * 60);
+    const s = Math.round(((hours - h) * 60 - m) * 60);
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
   }
   // Convert “DDD:MM:SS” → degrees
   function dmsToDeg(dms) {
@@ -258,6 +270,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Top-bar UI elements
   const azInput       = document.getElementById('gotoAz');
   const altInput      = document.getElementById('gotoAlt');
+  const raInput       = document.getElementById('gotoRA');
+  const decInput      = document.getElementById('gotoDec');
   const magInfo       = document.getElementById('magInfo');
   const hipInfo       = document.getElementById('hipInfo');
   const hdInfo        = document.getElementById('hdInfo');
@@ -268,6 +282,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   const nameInfo      = document.getElementById('nameInfo');
   const popup         = document.getElementById('popup');
   const gotoBtn       = document.getElementById('gotoCoordsBtn');
+  
+  // Toggle elements
+  const toggleStars          = document.getElementById('toggleStars');
+  const toggleStarNames      = document.getElementById('toggleStarNames');
+  const toggleConst          = document.getElementById('toggleConst');
+  const toggleConstLabels    = document.getElementById('toggleConstLabels');
+  const toggleMessierNames   = document.getElementById('toggleMessierNames');
+  const toggleGal            = document.getElementById('toggleGal');
+  const toggleOpen           = document.getElementById('toggleOpen');
+  const toggleGlobular       = document.getElementById('toggleGlobular');
+  const toggleNebula         = document.getElementById('toggleNebula');
+  const togglePlanetary      = document.getElementById('togglePlanetary');
+  const toggleSolarSystem    = document.getElementById('toggleSolarSystem');
   // const fullscreenBtn = document.getElementById('fullscreenBtn'); // Removed: button no longer exists
   // Attach event handlers to Back and Redraw buttons (new IDs: backBtn, redrawBtn)
   const backBtn = document.getElementById('backBtn');
@@ -321,6 +348,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let nebulae = [];
   let planetaryNebulae = [];
   let messierObjects = [];
+  let solarSystemData = {}; // Solar system objects (planets, sun, moon)
 
   // Hit-test buffers
   let starHits     = [];
@@ -329,6 +357,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let globularHits = [];
   let nebulaHits   = [];
   let planetaryHits = [];
+  let solarSystemHits = []; // Solar system hit detection
 
   // Performance-based object culling function (moved here to access canvas variables)
   function shouldDrawObject(ra, dec, magnitude, objectType, zoom) {
@@ -387,6 +416,35 @@ document.addEventListener('DOMContentLoaded', async () => {
   fetchMount();
   setInterval(fetchMount, 2000);
 
+  // --- Solar system position polling ---
+  async function fetchSolarSystem() {
+    try {
+      const resp = await fetch('/solar_system');
+      if (!resp.ok) throw new Error('Failed to fetch solar system positions');
+      const data = await resp.json();
+      if (data.error) {
+        console.error('[SkyView] Solar system fetch error:', data.error);
+        solarSystemData = {};
+        return;
+      }
+      solarSystemData = data;
+      console.log('[SkyView] Solar system positions updated:', Object.keys(solarSystemData).length, 'objects');
+      console.log('[SkyView] Solar system data details:', data);
+      // Log a few sample coordinates
+      if (data.sun) console.log('[SkyView] Sun coordinates:', data.sun);
+      if (data.moon) console.log('[SkyView] Moon coordinates:', data.moon);
+      if (data.mars) console.log('[SkyView] Mars coordinates:', data.mars);
+    } catch (e) {
+      solarSystemData = {};
+      console.error('[SkyView] Error fetching solar system positions:', e);
+    }
+    draw();
+  }
+
+  // Fetch solar system positions on load and every minute (60 seconds)
+  fetchSolarSystem();
+  setInterval(fetchSolarSystem, 60000);
+
   // Track the currently selected object (star, galaxy, or open cluster)
   let selectedObject = null;
 
@@ -405,7 +463,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       { id: 'toggleGlobular', def: false },
       { id: 'toggleNebula', def: false },
       { id: 'togglePlanetary', def: false },
-      { id: 'toggleCalPoints', def: false }
+      { id: 'toggleCalPoints', def: false },
+      { id: 'toggleSolarSystem', def: true }
     ];
     let anyRestored = false;
     toggles.forEach(t => {
@@ -433,7 +492,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // --- Save toggle state on change ---
   [
-    'toggleStars','toggleStarNames','toggleConst','toggleConstLabels','toggleMessierNames','toggleGal','toggleOpen','toggleGlobular','toggleNebula','togglePlanetary','toggleCalPoints'
+    'toggleStars','toggleStarNames','toggleConst','toggleConstLabels','toggleMessierNames','toggleGal','toggleOpen','toggleGlobular','toggleNebula','togglePlanetary','toggleCalPoints','toggleSolarSystem'
   ].forEach(id => {
     const el = document.getElementById(id);
     if (el) {
@@ -472,6 +531,34 @@ document.addEventListener('DOMContentLoaded', async () => {
     );
     let az = azR*180/Math.PI; if(az<0) az+=360;
     return { alt: altR*180/Math.PI, az };
+  }
+
+  // Convert Alt/Az to RA/Dec (inverse of eqToAltAz)
+  function altAzToEq(altDeg, azDeg, latDeg, lonDeg, date) {
+    const lst = computeLST(date, lonDeg);
+    const altR = altDeg * Math.PI / 180;
+    const azR = azDeg * Math.PI / 180;
+    const latR = latDeg * Math.PI / 180;
+    
+    const decR = Math.asin(
+      Math.sin(altR) * Math.sin(latR) +
+      Math.cos(altR) * Math.cos(latR) * Math.cos(azR)
+    );
+    
+    const haR = Math.atan2(
+      Math.sin(azR),
+      Math.cos(azR) * Math.sin(latR) - Math.tan(altR) * Math.cos(latR)
+    );
+    
+    const ha = haR * 180 / Math.PI;
+    let raH = lst - ha / 15;
+    if (raH < 0) raH += 24;
+    if (raH >= 24) raH -= 24;
+    
+    return { 
+      ra: raH * 15, // Convert back to degrees
+      dec: decR * 180 / Math.PI 
+    };
   }
 
   // Resize & HiDPI
@@ -608,6 +695,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     addHits(globularHits);
     addHits(nebulaHits);
     addHits(planetaryHits);
+    addHits(solarSystemHits);
     if (toggleCalPoints && toggleCalPoints.checked && calPointHits.length) {
       for (let pt of calPointHits) {
         if (Math.hypot(mx - pt.x, my - pt.y) < pt.r + HIT_PADDING) {
@@ -845,12 +933,21 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
           }
         }
+        console.log(`[SkyView] Click at screen coordinates: (${upX}, ${upY})`);
         addHits(starHits);
         addHits(galaxyHits);
         addHits(openHits);
         addHits(globularHits);
         addHits(nebulaHits);
         addHits(planetaryHits);
+        addHits(solarSystemHits);
+        console.log('[SkyView] Click detection - Solar system hits:', solarSystemHits.length, 'total candidates:', candidates.length);
+        if (solarSystemHits.length > 0) {
+          console.log('[SkyView] Solar system objects available for click:', solarSystemHits.map(s => `${s.Name} at (${s.screenX},${s.screenY}) r=${s.r}`));
+        }
+        if (candidates.length > 0) {
+          console.log('[SkyView] Found candidates:', candidates.map(c => c.Name || c.name || 'unnamed'));
+        }
         if (toggleCalPoints && toggleCalPoints.checked && calPointHits.length) {
           for (let pt of calPointHits) {
             if (Math.hypot(upX - pt.x, upY - pt.y) < pt.r + HIT_PADDING) {
@@ -878,11 +975,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         if (hitObj) {
           selectedObject = hitObj;
+          console.log('[SkyView] Object selected:', hitObj.Name || hitObj.name, 'type:', hitObj.type);
           showSelectedAttributes(selectedObject);
           if (hitObj.isCalPoint) {
             if (altInput && azInput) {
               altInput.value = degToDMS(hitObj.dec);
               azInput.value = degToDMS(hitObj.ra);
+            }
+            if (raInput && decInput) {
+              raInput.value = degToHMS(hitObj.ra);
+              decInput.value = degToDMS(hitObj.dec);
             }
             let html = `<div><strong>Cal Point #${hitObj.index}</strong></div>` +
               `<div>Az: ${hitObj.ra.toFixed(5)}°</div>` +
@@ -921,9 +1023,23 @@ document.addEventListener('DOMContentLoaded', async () => {
               }
             }, 0);
           } else {
+            // Update coordinate textboxes based on available object data
+            console.log('[SkyView] Setting coordinates for selected object:', hitObj.Name || hitObj.name);
+            console.log('[SkyView] Object properties - altDeg:', hitObj.altDeg, 'azDeg:', hitObj.azDeg, 'ra:', hitObj.ra, 'dec:', hitObj.dec);
+            console.log('[SkyView] Input elements - altInput:', !!altInput, 'azInput:', !!azInput, 'raInput:', !!raInput, 'decInput:', !!decInput);
+            
             if (altInput && azInput && typeof hitObj.altDeg === 'number' && typeof hitObj.azDeg === 'number') {
               altInput.value = degToDMS(hitObj.altDeg);
               azInput.value = degToDMS(hitObj.azDeg);
+              console.log('[SkyView] Set Alt/Az coordinates - Alt:', altInput.value, 'Az:', azInput.value);
+              
+              // Convert Alt/Az to RA/Dec for the textboxes
+              if (raInput && decInput) {
+                const coords = altAzToEq(hitObj.altDeg, hitObj.azDeg, lat, lon, new Date());
+                raInput.value = degToHMS(coords.ra);
+                decInput.value = degToDMS(coords.dec);
+                console.log('[SkyView] Converted Alt/Az to RA/Dec - RA:', raInput.value, 'Dec:', decInput.value);
+              }
             }
             popup.style.display = 'none';
           }
@@ -1110,13 +1226,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     drawFlippableText('N', cx, cy-r-labelOffset);
     drawFlippableText('S', cx, cy+r+labelOffset);
-    // When flipped, E and W swap positions AND labels
+    // When flipped, E and W swap positions
     if (isFlipped) {
-      drawFlippableText('W', cx-r-labelOffset, cy);
-      drawFlippableText('E', cx+r+labelOffset, cy);
+      drawFlippableText('W', cx-r-labelOffset, cy);  // W goes to left position
+      drawFlippableText('E', cx+r+labelOffset, cy);  // E goes to right position
     } else {
-      drawFlippableText('W', cx-r-labelOffset, cy);
-      drawFlippableText('E', cx+r+labelOffset, cy);
+      drawFlippableText('E', cx+r+labelOffset, cy);  // E goes to right position
+      drawFlippableText('W', cx-r-labelOffset, cy);  // W goes to left position
     }
   }
 
@@ -1145,21 +1261,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Helper function to draw text that remains readable when flipped
   function drawFlippableText(text, x, y) {
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
     if (isFlipped) {
-      ctx.save();
-      // When flipped, change alignment to connect upper-left corner
-      const originalAlign = ctx.textAlign;
-      const originalBaseline = ctx.textBaseline;
-      ctx.textAlign = originalAlign === 'left' ? 'right' : 'left';
+      // When flipped, apply scale transform but keep text centered
       ctx.translate(x, y);
       ctx.scale(-1, 1);
       ctx.fillText(text, 0, 0);
-      ctx.textAlign = originalAlign;
-      ctx.textBaseline = originalBaseline;
-      ctx.restore();
     } else {
       ctx.fillText(text, x, y);
     }
+    ctx.restore();
   }
 
   // Project Alt/Az directly to (x, y) on the chart
@@ -1272,6 +1385,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (s.Mag >= magLimit) return;
         if (!shouldDrawObject(s.RtAsc, s.Declin, s.Mag, 'stars', canvasScale)) return;
         
+        // Debug: log first few star coordinates for comparison
+        if (drawnStars < 3) {
+          console.log(`[SkyView] Star ${drawnStars}: RA=${s.RtAsc} Dec=${s.Declin} Mag=${s.Mag}`);
+        }
+        
         const p=project(s.RtAsc,s.Declin,effR);
         if(p.alt<=0) return;
         
@@ -1328,6 +1446,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         starHits.push({
           ...p,
           r: hitR,
+          visualRadius: sz, // Store the actual visual size for selection circle
           ...s,
           altDeg: p.alt,
           azDeg: (p.az + 180) % 360,
@@ -1762,6 +1881,159 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     }
 
+    // --- solar system objects ---
+    solarSystemHits = []; // Clear previous hits
+    if (solarSystemData && toggleSolarSystem && toggleSolarSystem.checked) {
+      console.log('[SkyView] Drawing solar system objects, data:', solarSystemData);
+      ['mercury', 'venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'pluto', 'sun', 'moon'].forEach(objName => {
+        const obj = solarSystemData[objName];
+        if (!obj || obj.ra === null || obj.dec === null) {
+          return;
+        }
+        
+        console.log(`[SkyView] ${objName}: RA=${obj.ra}° Dec=${obj.dec}°`);
+        const p = project(obj.ra, obj.dec, effR);
+        console.log(`[SkyView] ${objName}: Alt=${p.alt}° Az=${p.az}° Screen=(${p.x}, ${p.y})`);
+        if (p.alt <= 0) {
+          console.log(`[SkyView] ${objName}: Below horizon, skipping`);
+          return;
+        }
+        
+        const azForDraw = (p.az + 180) % 360;
+        const planX = p.x;
+        const planY = p.y;
+        
+        if (planX >= -50 && planX <= canvas.width + 50 && planY >= -50 && planY <= canvas.height + 50) {
+          // Size similar to open clusters (4-12 pixel range), scaled with zoom
+          let baseSz = 8; // base size
+          let color = '#FFFF00'; // default yellow
+          
+          // Object-specific styling
+          switch(objName) {
+            case 'sun':
+              baseSz = 12;
+              color = '#FFDD00';
+              break;
+            case 'moon':
+              baseSz = 10;
+              color = '#DDDDDD';
+              break;
+            case 'mercury':
+              baseSz = 6;
+              color = '#8C7853';
+              break;
+            case 'venus':
+              baseSz = 7;
+              color = '#FFC649';
+              break;
+            case 'mars':
+              baseSz = 7;
+              color = '#CD5C5C';
+              break;
+            case 'jupiter':
+              baseSz = 10;
+              color = '#D8CA9D';
+              break;
+            case 'saturn':
+              baseSz = 9;
+              color = '#FAD5A5';
+              break;
+            case 'uranus':
+              baseSz = 7;
+              color = '#4FD0E7';
+              break;
+            case 'neptune':
+              baseSz = 7;
+              color = '#4B70DD';
+              break;
+            case 'pluto':
+              baseSz = 5;
+              color = '#967117';
+              break;
+          }
+          
+          // Scale size with zoom level to maintain constant visual size on screen
+          const sz = baseSz / canvasScale;
+          
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          if (objName === 'sun') {
+            // Sun with rays
+            ctx.arc(planX, planY, sz/2, 0, 2 * Math.PI);
+            ctx.fill();
+            // Add rays that scale with the sun's size
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1;
+            const rayInnerOffset = sz/2 + (2 / canvasScale); // Scale ray start distance
+            const rayLength = 3 / canvasScale; // Scale ray length
+            for (let i = 0; i < 8; i++) {
+              const angle = (i * Math.PI) / 4;
+              const startX = planX + Math.cos(angle) * rayInnerOffset;
+              const startY = planY + Math.sin(angle) * rayInnerOffset;
+              const endX = planX + Math.cos(angle) * (rayInnerOffset + rayLength);
+              const endY = planY + Math.sin(angle) * (rayInnerOffset + rayLength);
+              ctx.beginPath();
+              ctx.moveTo(startX, startY);
+              ctx.lineTo(endX, endY);
+              ctx.stroke();
+            }
+          } else if (objName === 'saturn') {
+            // Saturn with rings
+            ctx.arc(planX, planY, sz/2, 0, 2 * Math.PI);
+            ctx.fill();
+            // Add rings
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(planX, planY, sz/2 + 2, 0, 2 * Math.PI);
+            ctx.stroke();
+          } else {
+            // Regular circle for other objects
+            ctx.arc(planX, planY, sz/2, 0, 2 * Math.PI);
+            ctx.fill();
+          }
+          
+          // Store hit detection info with screen coordinates
+          // Apply the same transformation sequence as calibration points and reticle
+          let screenX = planX * dpr * currentVpScale * canvasScale;
+          let screenY = planY * dpr * currentVpScale * canvasScale;
+          
+          // Apply translation (but flip translateX if we're in flipped mode)
+          if (isFlipped) {
+            screenX = screenX - translateX; // Reverse translateX for flipped mode
+            screenY = screenY + translateY;
+          } else {
+            screenX = screenX + translateX;
+            screenY = screenY + translateY;
+          }
+          
+          // Apply flip transformation around center if needed (same as main canvas)
+          if (isFlipped) {
+            const canvasCenterX = cx * dpr * currentVpScale * canvasScale; // Include canvasScale for zoom
+            screenX = canvasCenterX + (canvasCenterX - screenX); // equivalent to translate(cx,0), scale(-1,1), translate(-cx,0)
+          }
+          
+          const hitObj = {
+            Name: objName.charAt(0).toUpperCase() + objName.slice(1), // Use uppercase Name to match other objects
+            name: objName.charAt(0).toUpperCase() + objName.slice(1), // Also include lowercase for compatibility
+            type: 'Solar System',
+            ra: obj.ra,
+            dec: obj.dec,
+            x: planX,
+            y: planY,
+            r: sz/2 + 3, // slightly larger hit area
+            altDeg: p.alt,
+            azDeg: (p.az + 180) % 360,
+            screenX: screenX,
+            screenY: screenY
+          };
+          solarSystemHits.push(hitObj);
+          console.log(`[SkyView] Added ${objName} to solarSystemHits:`, hitObj);
+        }
+      });
+      console.log(`[SkyView] Solar system drawing complete. Total objects in solarSystemHits: ${solarSystemHits.length}`);
+    }
+
     // --- reticle ---
     if (mountPos.alt !== null && mountPos.az !== null) {
       const azForDraw = (mountPos.az + 180) % 360;
@@ -1823,43 +2095,63 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --- highlight selected object (dark orange circle only) ---
-    if (selectedObject && selectedObject.altDeg !== undefined && selectedObject.az !== undefined) {
-      // Recompute the object's current screen position based on its Alt/Az (use raw azimuth, not azDeg)
-      const p = altAzToXY(selectedObject.altDeg, selectedObject.az, baseRadius);
+    if (selectedObject && selectedObject.altDeg !== undefined && (selectedObject.az !== undefined || selectedObject.azDeg !== undefined)) {
+      // Use azDeg if available, otherwise use az, but handle the azimuth conversion properly
+      let azValue = selectedObject.azDeg !== undefined ? selectedObject.azDeg : selectedObject.az;
       
-      // Manually apply the same transformation sequence as the main canvas
-      // 1. Scale to canvas pixel coordinates
-      let x = p.x * dpr * currentVpScale * canvasScale;
-      let y = p.y * dpr * currentVpScale * canvasScale;
+      // If this is azDeg (which has the +180 applied), undo it
+      if (selectedObject.azDeg !== undefined) {
+        azValue = (azValue - 180 + 360) % 360;
+      }
       
-      // 2. Apply translation (but flip translateX if we're in flipped mode)
-      if (isFlipped) {
-        x = x - translateX; // Reverse translateX for flipped mode
-        y = y + translateY;
+      // Recompute the object's current screen position using the same method as other objects
+      const p = altAzToXY(selectedObject.altDeg, azValue, baseRadius);
+      
+      // Use the object's actual radius for appropriate sizing, but keep circle size constant on screen
+      let objectRadius = selectedObject.r || 3; // Default to 3 if no radius specified
+      
+      // Handle different object types appropriately
+      if (selectedObject.visualRadius !== undefined) {
+        // Stars store their visual radius separately
+        objectRadius = selectedObject.visualRadius;
+      } else if (selectedObject.Mag !== undefined && selectedObject.SpectType !== undefined) {
+        // This is likely a star, calculate visual radius from magnitude
+        const minRadius = 1.2;
+        const areaStep = 1.5;
+        let bin = Math.floor(Math.max(0, Math.min(7, selectedObject.Mag < 2 ? 0 : Math.floor(selectedObject.Mag - 1))));
+        const area = Math.PI * minRadius * minRadius * Math.pow(areaStep, 7 - bin);
+        objectRadius = Math.sqrt(area / Math.PI);
       } else {
-        x = x + translateX;
-        y = y + translateY;
+        // For other objects (galaxies, nebulae, planetary nebulae, globular clusters, etc.)
+        // Use their stored radius directly as it represents their visual size
+        objectRadius = selectedObject.r || 3;
       }
       
-      // 3. Apply flip transformation around center if needed (same as main canvas)
-      if (isFlipped) {
-        const canvasCenterX = cx * dpr * currentVpScale * canvasScale; // Include canvasScale for zoom
-        x = canvasCenterX + (canvasCenterX - x); // equivalent to translate(cx,0), scale(-1,1), translate(-cx,0)
+      // Make selection circle proportional to object size but maintain constant visual size regardless of zoom
+      let baseSelectionRadius;
+      if (objectRadius <= 2) {
+        // For very small objects like stars, use a small highlight
+        baseSelectionRadius = objectRadius + 0.3;
+      } else if (objectRadius <= 5) {
+        // For medium objects, add a bit more
+        baseSelectionRadius = objectRadius + 1;
+      } else if (objectRadius <= 10) {
+        // For larger objects, add proportionally more
+        baseSelectionRadius = objectRadius + 1.5;
+      } else {
+        // For very large objects, add even more space
+        baseSelectionRadius = objectRadius + 2;
       }
       
-      const screenX = x;
-      const screenY = y;
+      // Divide by canvasScale to maintain constant visual size on screen
+      const selectionRadius = baseSelectionRadius / canvasScale;
       
-      const r = selectedObject.r || 12;
-      ctx.save();
-      ctx.setTransform(1,0,0,1,0,0);
-      // Orange circle only (no crosshair)
+      // Orange circle only (no crosshair) - draw within the same transformation context as the objects
       ctx.beginPath();
-      ctx.arc(screenX, screenY, r + 6, 0, 2 * Math.PI);
+      ctx.arc(p.x, p.y, selectionRadius, 0, 2 * Math.PI);
       ctx.strokeStyle = 'rgba(255,120,30,0.75)'; // dark orange
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 1 / canvasScale; // Keep line width constant on screen
       ctx.stroke();
-      ctx.restore();
     }
 
     ctx.restore(); // restore sky circle clip before overlay
@@ -1979,6 +2271,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   if (toggleCalPoints) {
     toggleCalPoints.addEventListener('change', draw);
+  }
+
+  if (toggleSolarSystem) {
+    toggleSolarSystem.addEventListener('change', draw);
   }
 
   // Fetch cal points on load and every 10s
@@ -2154,7 +2450,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     'toggleGlobular',
     'toggleNebula',
     'togglePlanetary',
-    'toggleCalPoints'
+    'toggleCalPoints',
+    'toggleSolarSystem'
   ];
   // Default state
   const defaultToggles = {
@@ -2168,7 +2465,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     toggleGlobular: false,
     toggleNebula: false,
     togglePlanetary: false,
-    toggleCalPoints: false
+    toggleCalPoints: false,
+    toggleSolarSystem: true
   };
   // Restore from localStorage or set defaults
   function initToggles() {
@@ -2225,12 +2523,20 @@ function showSelectedAttributes(selected) {
     el.textContent = '';
   });
   if (!selected) return;
-  // Name
-  if (selected.Name) {
+  // Name (handle both uppercase Name and lowercase name properties)
+  if (selected.Name || selected.name) {
     const el = document.getElementById('nameInfo');
     if (el) {
       el.classList.add('active');
-      el.textContent = `Name: ${selected.Name}`;
+      el.textContent = `Name: ${selected.Name || selected.name}`;
+    }
+  }
+  // Type (for solar system objects)
+  if (selected.type && selected.type === 'Solar System') {
+    const el = document.getElementById('specInfo');
+    if (el) {
+      el.classList.add('active');
+      el.textContent = `Type: ${selected.type}`;
     }
   }
   // Magnitude

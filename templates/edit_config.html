@@ -927,26 +927,6 @@ $(function(){
                   // Reload with update parameter
                   window.location.href = window.location.pathname + '?updated=true';
                 });
-                
-                // Also add a live countdown in the modal text
-                let countdown = 3;
-                const updateModalText = function() {
-                  const countdownMsg = successMsg + '\n\n🔄 Auto-reload in ' + countdown + ' second' + (countdown !== 1 ? 's' : '') + '...';
-                  $('#modalMsg').html(countdownMsg.replace(/\n/g, '<br>'));
-                };
-                
-                updateModalText(); // Update immediately
-                
-                const countdownInterval = setInterval(function() {
-                  countdown--;
-                  if (countdown > 0) {
-                    updateModalText();
-                  } else {
-                    clearInterval(countdownInterval);
-                    $('#modalBg').hide();
-                    window.location.href = window.location.pathname + '?updated=true';
-                  }
-                }, 1000);
               } else {
                 btn.prop('disabled', false).text(originalText);
                 let errorMsg = "❌ Update failed: " + (res2.message || 'Unknown error');

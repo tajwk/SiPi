@@ -640,8 +640,24 @@
   <!-- SKYVIEW CONTAINER (hidden by default) -->
   <div id="skyviewContainer" style="display:none;">
     <div id="skyviewTopBar">
-      <label>Alt: <input id="gotoAlt" type="text" placeholder="DD:MM:SS"></label>
-      <label>Az:  <input id="gotoAz"  type="text" placeholder="DD:MM:SS"></label>
+      <div style="display: flex; flex-direction: column; gap: 3px; align-items: flex-start;">
+        <div style="display: flex; gap: 10px;">
+          <label style="display: flex; align-items: center; min-width: 120px;">
+            Alt: <input id="gotoAlt" type="text" placeholder="DD:MM:SS" style="margin-left: 12px; width: 80px;">
+          </label>
+          <label style="display: flex; align-items: center; min-width: 120px;">
+            Az: <input id="gotoAz" type="text" placeholder="DD:MM:SS" style="margin-left: 12px; width: 80px;">
+          </label>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <label style="display: flex; align-items: center; min-width: 120px;">
+            Dec: <input id="gotoDec" type="text" placeholder="DD:MM:SS" style="margin-left: 9px; width: 80px;">
+          </label>
+          <label style="display: flex; align-items: center; min-width: 120px;">
+            RA: <input id="gotoRA" type="text" placeholder="HH:MM:SS" style="margin-left: 12px; width: 80px;">
+          </label>
+        </div>
+      </div>
       <button id="gotoCoordsBtn">GoTo</button>
     </div>
     <div class="skyview-bottom-btns">
@@ -751,6 +767,7 @@
       <label><input type="checkbox" id="toggleGlobular"> Globular Clusters</label>
       <label><input type="checkbox" id="toggleNebula"> Nebulae</label>
       <label><input type="checkbox" id="togglePlanetary"> Planetary Nebulae</label>
+      <label><input type="checkbox" id="toggleSolarSystem" checked> Solar System</label>
       <label><input type="checkbox" id="toggleCalPoints" checked> Calibration Points</label>
     </div>
     <canvas id="skyviewCanvas"
@@ -835,7 +852,7 @@
 
         $('#status').html(
           '<div class="status-panel__left">'+
-            '<div>RA: '+d.ra+' | DEC: '+d.dec+'</div>'+
+            '<div>DEC: '+d.dec+' | RA: '+d.ra+'</div>'+
             '<div>Alt: '+d.alt+' | Az: '+d.az+'</div>'+
             '<div>Status: '+d.tracking+'</div>'+
           '</div>'+
