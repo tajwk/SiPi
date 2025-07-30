@@ -21,7 +21,7 @@ from flask import (
 from astrometric_corrections import preprocess_catalogs_for_current_epoch
 
 # Initial SiPi version (bump patch for simple fixes)
-__version__ = "0.9.6"
+__version__ = "0.9.66"
 
 # Base directory for Git operations
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -1263,15 +1263,29 @@ def apply_updates():
         except Exception as e:
             update_msgs.append(f"[Failed to restart sitech.service: {e}]")
         
-        # Note: sipi.service restart removed to prevent connection termination
-        # The service will be updated on next manual restart or system reboot
-        update_msgs.append("[Update complete - please refresh page to see changes]")
-        
         # Final corruption check
         final_check = check_and_repair_git_corruption(env)
         if final_check['corruption_detected']:
             update_msgs.append("Warning: Git corruption detected after update")
             update_msgs.extend(final_check['messages'])
+        
+        # Schedule sipi.service restart after response is sent
+        def delayed_restart():
+            import time
+            time.sleep(2)  # Wait 2 seconds for response to be sent
+            try:
+                subprocess.run(['sudo', 'systemctl', 'restart', 'sipi'], 
+                             check=False, timeout=30)
+                print("[DEBUG] sipi.service restarted after delay", flush=True)
+            except Exception as e:
+                print(f"[DEBUG] Failed to restart sipi.service: {e}", flush=True)
+        
+        # Start delayed restart in background thread
+        import threading
+        restart_thread = threading.Thread(target=delayed_restart, daemon=True)
+        restart_thread.start()
+        
+        update_msgs.append("[sipi.service will restart in 2 seconds - page will need refresh]")
         
         return jsonify(success=True, message="Force-updated to latest remote.\n" + "\n".join(update_msgs), should_refresh=True)
         
