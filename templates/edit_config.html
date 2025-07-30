@@ -932,7 +932,7 @@ $(function(){
                 let countdown = 3;
                 const updateModalText = function() {
                   const countdownMsg = successMsg + '\n\n🔄 Auto-reload in ' + countdown + ' second' + (countdown !== 1 ? 's' : '') + '...';
-                  $('#modalText').html(countdownMsg.replace(/\n/g, '<br>'));
+                  $('#modalMsg').html(countdownMsg.replace(/\n/g, '<br>'));
                 };
                 
                 updateModalText(); // Update immediately
