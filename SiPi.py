@@ -21,7 +21,7 @@ from flask import (
 from astrometric_corrections import preprocess_catalogs_for_current_epoch
 
 # Initial SiPi version (bump patch for simple fixes)
-__version__ = "0.9.66"
+__version__ = "0.9.444"
 
 # Base directory for Git operations
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -1269,31 +1269,41 @@ def apply_updates():
             update_msgs.append("Warning: Git corruption detected after update")
             update_msgs.extend(final_check['messages'])
         
-        # Schedule sipi.service restart after response is sent
-        def delayed_restart():
-            import time
-            time.sleep(2)  # Wait 2 seconds for response to be sent
-            try:
-                subprocess.run(['sudo', 'systemctl', 'restart', 'sipi'], 
-                             check=False, timeout=30)
-                print("[DEBUG] sipi.service restarted after delay", flush=True)
-            except Exception as e:
-                print(f"[DEBUG] Failed to restart sipi.service: {e}", flush=True)
+        update_msgs.append("[Update complete - sipi.service restart required]")
         
-        # Start delayed restart in background thread
-        import threading
-        restart_thread = threading.Thread(target=delayed_restart, daemon=True)
-        restart_thread.start()
-        
-        update_msgs.append("[sipi.service will restart in 2 seconds - page will need refresh]")
-        
-        return jsonify(success=True, message="Force-updated to latest remote.\n" + "\n".join(update_msgs), should_refresh=True)
+        return jsonify(
+            success=True, 
+            message="Force-updated to latest remote.\n" + "\n".join(update_msgs),
+            requires_restart=True,
+            restart_message="Update complete! Click OK to restart the service and refresh the page to see changes."
+        )
         
     except subprocess.TimeoutExpired as te:
         print(f"[DEBUG] apply_updates: Timeout: {te}", flush=True)
         return jsonify(success=False, message=f"Update timed out: {te}")
     except Exception as e:
         print(f"[DEBUG] apply_updates: Exception: {e}", flush=True)
+        return jsonify(success=False, message=str(e))
+
+@app.route('/restart_service', methods=['POST'])
+def restart_service():
+    """Restart sipi.service after user confirmation"""
+    try:
+        env = os.environ.copy()
+        if not env.get('HOME'):
+            env['HOME'] = f"/home/{subprocess.run(['whoami'], capture_output=True, text=True).stdout.strip()}"
+        
+        print("[DEBUG] /restart_service called", flush=True)
+        
+        # Restart sipi.service
+        subprocess.run(['sudo', 'systemctl', 'restart', 'sipi'], 
+                     check=False, env=env, timeout=30)
+        
+        # This response may not reach the client since the service is restarting
+        return jsonify(success=True, message="Service restarting...")
+        
+    except Exception as e:
+        print(f"[DEBUG] restart_service: Exception: {e}", flush=True)
         return jsonify(success=False, message=str(e))
 
 # ────────────────────────────────────────────────────────────────────────────
