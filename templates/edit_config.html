@@ -183,6 +183,51 @@
       color: var(--fg);
       border-color: var(--accent);
     }
+    
+    /* Version display styling */
+    .version-info {
+      background: var(--surface);
+      border: 1px solid var(--accent);
+      border-radius: var(--radius);
+      padding: 10px;
+      margin: 10px 0;
+    }
+    .version-item {
+      margin: 5px 0;
+      font-size: 14px;
+    }
+    .version-number {
+      font-family: 'Courier New', monospace;
+      background: rgba(var(--accent-rgb), 0.1);
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-weight: bold;
+    }
+    body.night-mode .version-info {
+      background: #1a1a1a;
+      border-color: red;
+    }
+    body.night-mode .version-number {
+      background: rgba(255, 0, 0, 0.1);
+      color: red;
+    }
+    
+    /* Update button enhancements */
+    #updateSipiBtn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    
+    /* Version update animation */
+    .version-updated {
+      animation: versionPulse 2s ease-in-out;
+    }
+    
+    @keyframes versionPulse {
+      0% { background: rgba(0, 255, 0, 0.6); transform: scale(1); }
+      50% { background: rgba(0, 255, 0, 0.3); transform: scale(1.05); }
+      100% { background: rgba(0, 255, 0, 0); transform: scale(1); }
+    }
   </style>
 </head>
 <body>
@@ -395,9 +440,15 @@ function showConfirm(msg, cb) {
     </div>
     <div class="grid-item">
       <h2>Versions</h2>
-      <div>SiTech Version: {{ site_version }}</div>
-      <div>SiPi Version: {{ sipi_version }}</div>
-      <div style="text-align:center; margin-top:10px;">
+      <div class="version-info">
+        <div class="version-item">
+          <strong>SiTech Version:</strong> <span class="version-number">{{ site_version }}</span>
+        </div>
+        <div class="version-item">
+          <strong>SiPi Version:</strong> <span class="version-number" id="sipiVersionDisplay">{{ sipi_version }}</span>
+        </div>
+      </div>
+      <div style="text-align:center; margin-top:15px;">
         <button id="updateSipiBtn" class="btn btn-large">Update SiPi</button>
       </div>
     </div>
@@ -406,6 +457,38 @@ function showConfirm(msg, cb) {
 
 <script>
 $(function(){
+  // Helper function to update version display with animation
+  function updateVersionDisplay(newVersion) {
+    const versionElement = $('#sipiVersionDisplay');
+    const originalText = versionElement.text();
+    
+    if (newVersion && newVersion !== originalText) {
+      // Update the text and add animation class
+      versionElement.text(newVersion);
+      versionElement.addClass('version-updated');
+      
+      // Remove animation class after animation completes
+      setTimeout(function() {
+        versionElement.removeClass('version-updated');
+      }, 2000);
+    }
+  }
+  
+  // Check if we just completed an update (look for URL parameter)
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('updated') === 'true') {
+    // Show brief success message and clean URL
+    setTimeout(function() {
+      const currentVersion = $('#sipiVersionDisplay').text();
+      if (currentVersion) {
+        updateVersionDisplay(currentVersion); // Trigger animation
+        showModal("🎉 SiPi Successfully Updated!\n\nNow running version: " + currentVersion);
+      }
+      // Clean the URL without triggering reload
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }, 500);
+  }
+  
   // --- Flip SkyView Checkbox Persistence ---
   // On page load, set checkbox state from localStorage
   var flipSkyView = localStorage.getItem('flipSkyView');
@@ -754,26 +837,125 @@ $(function(){
 
   // Update SiPi
   $('#updateSipiBtn').click(function(){
+    const btn = $(this);
+    const originalText = btn.text();
+    
+    // Disable button and show checking status
+    btn.prop('disabled', true).text('Checking for updates...');
+    
     $.post('/check_updates', {}, function(resp){
       if (!resp.updates_available) {
-        showModal("SiPi is up to date.");
+        btn.prop('disabled', false).text(originalText);
+        let message = "SiPi is up to date.";
+        
+        // Add corruption repair info if applicable
+        if (resp.corruption_detected) {
+          message += "\n\nNote: Git corruption was detected and automatically repaired during the update check.";
+          if (resp.repair_messages && resp.repair_messages.length > 0) {
+            message += "\n\nRepair details:\n" + resp.repair_messages.join('\n');
+          }
+        }
+        
+        showModal(message);
       } else {
-        const msg = "New version available: " + resp.latest_version +
-                    "\nCurrent: " + resp.current_version +
-                    "\n\nProceed with update?";
+        let msg = "New version available: " + resp.latest_version +
+                  "\nCurrent: " + resp.current_version;
+        
+        // Add corruption info if detected
+        if (resp.corruption_detected) {
+          msg += "\n\nNote: Git corruption was detected and automatically repaired.";
+        }
+        
+        msg += "\n\nProceed with update?";
+        
         showConfirm(msg, function(confirmed) {
           if (confirmed) {
+            btn.text('Applying update...');
+            
             $.post('/apply_updates', {}, function(res2){
-              showModal((res2.message || 'Update complete.') + "<br>The page will reload in 2 seconds to complete the update.", function(){
-                setTimeout(function(){
-                  location.reload(true);
-                }, 2000);
-              });
-            }, 'json');
+              if (res2.success) {
+                let successMsg = "🎉 SiPi Update Completed Successfully! 🎉";
+                
+                // Add version info
+                if (resp.latest_version) {
+                  successMsg += "\n\n📦 Updated to version: " + resp.latest_version;
+                  if (resp.current_version) {
+                    successMsg += "\n📦 Previous version: " + resp.current_version;
+                  }
+                }
+                
+                // Add corruption repair info if applicable
+                if (res2.message && res2.message.includes('corruption')) {
+                  successMsg += "\n\n🔧 Git corruption was automatically detected and repaired during the update.";
+                }
+                
+                // Show services restart info
+                if (res2.message && res2.message.includes('service')) {
+                  successMsg += "\n\n🔄 System services have been restarted with the new version.";
+                }
+                
+                successMsg += "\n\n✨ Your SiPi system is now running the latest version!";
+                
+                // Reset button state
+                btn.prop('disabled', false).text(originalText);
+                
+                showModal(successMsg, function(){
+                  // Update version display immediately with new version
+                  if (resp.latest_version) {
+                    updateVersionDisplay(resp.latest_version);
+                  }
+                  
+                  // Reload with update parameter
+                  window.location.href = window.location.pathname + '?updated=true';
+                });
+                
+                // Also add a live countdown in the modal text
+                let countdown = 3;
+                const updateModalText = function() {
+                  const countdownMsg = successMsg + '\n\n🔄 Auto-reload in ' + countdown + ' second' + (countdown !== 1 ? 's' : '') + '...';
+                  $('#modalText').html(countdownMsg.replace(/\n/g, '<br>'));
+                };
+                
+                updateModalText(); // Update immediately
+                
+                const countdownInterval = setInterval(function() {
+                  countdown--;
+                  if (countdown > 0) {
+                    updateModalText();
+                  } else {
+                    clearInterval(countdownInterval);
+                    $('#modalBg').hide();
+                    window.location.href = window.location.pathname + '?updated=true';
+                  }
+                }, 1000);
+              } else {
+                btn.prop('disabled', false).text(originalText);
+                let errorMsg = "❌ Update failed: " + (res2.message || 'Unknown error');
+                
+                // Provide helpful suggestions for common failures
+                if (res2.message && res2.message.includes('corruption')) {
+                  errorMsg += "\n\n💡 Tip: Git corruption was detected. You may need to try the update again, or contact support if the issue persists.";
+                } else if (res2.message && res2.message.includes('timeout')) {
+                  errorMsg += "\n\n💡 Tip: The update timed out. Please check your internet connection and try again.";
+                } else if (res2.message && res2.message.includes('permission')) {
+                  errorMsg += "\n\n💡 Tip: Permission error. Please ensure the system has proper sudo access.";
+                }
+                
+                showModal(errorMsg);
+              }
+            }, 'json').fail(function(xhr, status, error) {
+              btn.prop('disabled', false).text(originalText);
+              showModal("❌ Update request failed: " + error + "\n\nPlease check your connection and try again.");
+            });
+          } else {
+            btn.prop('disabled', false).text(originalText);
           }
         });
       }
-    }, 'json');
+    }, 'json').fail(function(xhr, status, error) {
+      btn.prop('disabled', false).text(originalText);
+      showModal("❌ Failed to check for updates: " + error + "\n\nPlease check your connection and try again.");
+    });
   });
 });
 </script>
