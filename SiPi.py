@@ -21,7 +21,7 @@ from flask import (
 from astrometric_corrections import preprocess_catalogs_for_current_epoch
 
 # Initial SiPi version (bump patch for simple fixes)
-__version__ = "0.9.5"
+__version__ = "0.9.54"
 
 # Base directory for Git operations
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -1263,13 +1263,9 @@ def apply_updates():
         except Exception as e:
             update_msgs.append(f"[Failed to restart sitech.service: {e}]")
         
-        # Restart sipi.service
-        try:
-            subprocess.run(['sudo', 'systemctl', 'restart', 'sipi'], 
-                         check=False, env=env, timeout=30)
-            update_msgs.append("[sipi.service restarted]")
-        except Exception as e:
-            update_msgs.append(f"[Failed to restart sipi.service: {e}]")
+        # Note: sipi.service restart removed to prevent connection termination
+        # The service will be updated on next manual restart or system reboot
+        update_msgs.append("[Update complete - please refresh page to see changes]")
         
         # Final corruption check
         final_check = check_and_repair_git_corruption(env)
@@ -1277,7 +1273,7 @@ def apply_updates():
             update_msgs.append("Warning: Git corruption detected after update")
             update_msgs.extend(final_check['messages'])
         
-        return jsonify(success=True, message="Force-updated to latest remote.\n" + "\n".join(update_msgs))
+        return jsonify(success=True, message="Force-updated to latest remote.\n" + "\n".join(update_msgs), should_refresh=True)
         
     except subprocess.TimeoutExpired as te:
         print(f"[DEBUG] apply_updates: Timeout: {te}", flush=True)
