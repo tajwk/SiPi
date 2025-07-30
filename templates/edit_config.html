@@ -184,33 +184,7 @@
       border-color: var(--accent);
     }
     
-    /* Version display styling */
-    .version-info {
-      background: var(--surface);
-      border: 1px solid var(--accent);
-      border-radius: var(--radius);
-      padding: 10px;
-      margin: 10px 0;
-    }
-    .version-item {
-      margin: 5px 0;
-      font-size: 14px;
-    }
-    .version-number {
-      font-family: 'Courier New', monospace;
-      background: rgba(var(--accent-rgb), 0.1);
-      padding: 2px 6px;
-      border-radius: 3px;
-      font-weight: bold;
-    }
-    body.night-mode .version-info {
-      background: #1a1a1a;
-      border-color: red;
-    }
-    body.night-mode .version-number {
-      background: rgba(255, 0, 0, 0.1);
-      color: red;
-    }
+
     
     /* Update button enhancements */
     #updateSipiBtn:disabled {
@@ -356,6 +330,11 @@ function showConfirm(msg, cb) {
             <input type="checkbox" id="xpxpCheckbox">
             UseActiveXPXP
           </label>
+          <br>
+          <label style="margin-top:8px; display:inline-block;">
+            <input type="checkbox" id="dontReverseCrossingCheckbox">
+            Don't Reverse Crossing
+          </label>
         </div>
         <div style="margin-bottom:8px;">
           <button type="button" id="backupConfigBtn" class="btn">Backup Config</button>
@@ -440,12 +419,12 @@ function showConfirm(msg, cb) {
     </div>
     <div class="grid-item">
       <h2>Versions</h2>
-      <div class="version-info">
-        <div class="version-item">
-          <strong>SiTech Version:</strong> <span class="version-number">{{ site_version }}</span>
+      <div>
+        <div>
+          <strong>SiTech Version:</strong> {{ site_version }}
         </div>
-        <div class="version-item">
-          <strong>SiPi Version:</strong> <span class="version-number" id="sipiVersionDisplay">{{ sipi_version }}</span>
+        <div>
+          <strong>SiPi Version:</strong> <span id="sipiVersionDisplay">{{ sipi_version }}</span>
         </div>
       </div>
       <div style="text-align:center; margin-top:15px;">
@@ -628,10 +607,28 @@ $(function(){
       line.startsWith('Option2Bits=') ? 'Option2Bits='+val : line
     );
   }
-  // On page load: set XPXP checkbox based on Option2Bits bit 30
+  // Helper: Get Option3Bits from config text
+  function getOption3Bits(lines) {
+    let val = 0;
+    lines.forEach(line => {
+      if(line.startsWith('Option3Bits=')) {
+        let v = line.split('=')[1];
+        if(/^\d+$/.test(v)) val = parseInt(v,10);
+      }
+    });
+    return val;
+  }
+  function setOption3Bits(lines, val) {
+    return lines.map(line =>
+      line.startsWith('Option3Bits=') ? 'Option3Bits='+val : line
+    );
+  }
+  // On page load: set XPXP checkbox based on Option2Bits bit 30, and Don't Reverse Crossing based on Option3Bits bit 29
   const lines0 = $('#configTextarea').val().split('\n');
   const o2init = getOption2Bits(lines0);
+  const o3init = getOption3Bits(lines0);
   if ((o2init & 1073741824) !== 0) $('#xpxpCheckbox').prop('checked', true);
+  if ((o3init & 536870912) !== 0) $('#dontReverseCrossingCheckbox').prop('checked', true);
   // Mount type mapping
   $('input[name="mountType"]').change(function(){
     const mode = this.value;
@@ -648,8 +645,8 @@ $(function(){
     const drag   = $('#dragModeCheckbox').is(':checked');
     const noWrap = $('#noWrapCheckbox').is(':checked');
     let lines = $('#configTextarea').val().split('\n');
-    // Get current OptionBits and Option2Bits
-    let ob = 0, o2 = 0;
+    // Get current OptionBits, Option2Bits, and Option3Bits
+    let ob = 0, o2 = 0, o3 = 0;
     lines.forEach(line => {
       if(line.startsWith('OptionBits=')) {
         let v = line.split('=')[1];
@@ -659,12 +656,17 @@ $(function(){
         let v = line.split('=')[1];
         if(/^\d+$/.test(v)) o2 = parseInt(v,10);
       }
+      if(line.startsWith('Option3Bits=')) {
+        let v = line.split('=')[1];
+        if(/^\d+$/.test(v)) o3 = parseInt(v,10);
+      }
     });
-    // Clear only the bits we control, preserve others (including XPXP)
+    // Clear only the bits we control, preserve others (including XPXP and Don't Reverse Crossing)
     // OptionBits: clear bits 0,1,2,3,17,18,19,24
     ob &= ~(1|2|4|8|(1<<17)|(1<<18)|(1<<19)|(1<<24));
     // Option2Bits: clear bits 22,23 (cascade bits), preserve all others
     o2 &= ~((1<<22)|(1<<23));
+    // Option3Bits: preserve all bits (no changes from encoder options)
     // Set bits according to UI
     if (az==='ignore')   ob |= 1;
     if (az==='precise')  ob |= 2;
@@ -680,14 +682,20 @@ $(function(){
     lines = lines.map(l => {
       if (l.startsWith('OptionBits='))   return 'OptionBits='+ob;
       if (l.startsWith('Option2Bits='))  return 'Option2Bits='+o2;
+      if (l.startsWith('Option3Bits='))  return 'Option3Bits='+o3;
       return l;
     });
     $('#configTextarea').val(lines.join('\n'));
-    // Also update XPXP checkbox to reflect preserved bit
+    // Also update checkboxes to reflect preserved bits
     if ((o2 & 1073741824) !== 0) {
       $('#xpxpCheckbox').prop('checked', true);
     } else {
       $('#xpxpCheckbox').prop('checked', false);
+    }
+    if ((o3 & 536870912) !== 0) {
+      $('#dontReverseCrossingCheckbox').prop('checked', true);
+    } else {
+      $('#dontReverseCrossingCheckbox').prop('checked', false);
     }
   });
   // XPXP checkbox logic
@@ -700,6 +708,17 @@ $(function(){
       o2 = o2 & ~1073741824;
     }
     $('#configTextarea').val(setOption2Bits(lines, o2).join('\n'));
+  });
+  // Don't Reverse Crossing checkbox logic (Option3Bits bit 29)
+  $('#dontReverseCrossingCheckbox').change(function(){
+    let lines = $('#configTextarea').val().split('\n');
+    let o3 = getOption3Bits(lines);
+    if(this.checked) {
+      o3 = o3 | 536870912; // Set bit 29 (2^29 = 536870912)
+    } else {
+      o3 = o3 & ~536870912; // Clear bit 29
+    }
+    $('#configTextarea').val(setOption3Bits(lines, o3).join('\n'));
   });
   // Set Park
   $('#setParkButton').click(() => {
