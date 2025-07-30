@@ -21,7 +21,7 @@ from flask import (
 from astrometric_corrections import preprocess_catalogs_for_current_epoch
 
 # Initial SiPi version (bump patch for simple fixes)
-__version__ = "0.9.3"
+__version__ = "0.9.4"
 
 # Base directory for Git operations
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -823,6 +823,158 @@ def toggle_tilt():
     save_web_config(web_config)
     return jsonify(success=True)
 
+# ─── Git Corruption Handling ───────────────────────────────────────────────
+
+def check_and_repair_git_corruption(env, force_repair=False):
+    """Check for git corruption and attempt automatic repair"""
+    corruption_detected = False
+    repair_successful = False
+    messages = []
+    
+    try:
+        # Test basic git operations to detect corruption
+        test_commands = [
+            ['git', 'status', '--porcelain'],
+            ['git', 'log', '--oneline', '-1'],
+            ['git', 'rev-parse', 'HEAD']
+        ]
+        
+        for cmd in test_commands:
+            try:
+                result = subprocess.run(cmd, cwd=BASE_DIR, capture_output=True, text=True, env=env, timeout=10)
+                if result.returncode != 0:
+                    stderr_lower = result.stderr.lower()
+                    if any(keyword in stderr_lower for keyword in ['corrupt', 'empty', 'bad object', 'loose object']):
+                        corruption_detected = True
+                        messages.append(f"Corruption detected in: {' '.join(cmd)}")
+                        break
+            except subprocess.TimeoutExpired:
+                messages.append(f"Timeout during git operation: {' '.join(cmd)}")
+                corruption_detected = True
+                break
+        
+        # Also check for empty or corrupt object files directly
+        if not corruption_detected:
+            git_objects_dir = os.path.join(BASE_DIR, '.git', 'objects')
+            if os.path.exists(git_objects_dir):
+                for root, dirs, files in os.walk(git_objects_dir):
+                    if 'pack' in dirs:
+                        dirs.remove('pack')  # Skip pack directory
+                    for file in files:
+                        if len(file) == 38:  # Git object filename length
+                            filepath = os.path.join(root, file)
+                            try:
+                                if os.path.getsize(filepath) == 0:
+                                    corruption_detected = True
+                                    messages.append(f"Empty object file found: {filepath}")
+                                    break
+                            except OSError:
+                                corruption_detected = True
+                                messages.append(f"Corrupt object file found: {filepath}")
+                                break
+                    if corruption_detected:
+                        break
+        
+        # Attempt repair if corruption detected or forced
+        if corruption_detected or force_repair:
+            messages.append("Attempting git corruption repair...")
+            
+            # Method 1: Git fsck and prune
+            try:
+                # Run git fsck to identify corruption
+                fsck_result = subprocess.run(
+                    ['git', 'fsck', '--full'],
+                    cwd=BASE_DIR, capture_output=True, text=True, env=env, timeout=30
+                )
+                if fsck_result.returncode != 0:
+                    messages.append(f"Git fsck found issues: {fsck_result.stderr}")
+                
+                # Try to repair with git gc and prune
+                gc_result = subprocess.run(
+                    ['git', 'gc', '--aggressive', '--prune=now'],
+                    cwd=BASE_DIR, capture_output=True, text=True, env=env, timeout=60
+                )
+                
+                if gc_result.returncode == 0:
+                    # Test if repair worked
+                    test_result = subprocess.run(
+                        ['git', 'status', '--porcelain'],
+                        cwd=BASE_DIR, capture_output=True, text=True, env=env, timeout=10
+                    )
+                    if test_result.returncode == 0:
+                        repair_successful = True
+                        messages.append("Git corruption repaired successfully with gc/prune")
+                    else:
+                        messages.append("Git gc completed but corruption persists")
+                else:
+                    messages.append(f"Git gc failed: {gc_result.stderr}")
+            
+            except subprocess.TimeoutExpired:
+                messages.append("Git repair operations timed out")
+            except Exception as e:
+                messages.append(f"Git repair attempt failed: {e}")
+            
+            # Method 2: Fresh clone fallback if repair failed
+            if not repair_successful:
+                messages.append("Attempting fresh clone as fallback...")
+                try:
+                    # Get the remote URL
+                    remote_url_result = subprocess.run(
+                        ['git', 'remote', 'get-url', 'origin'],
+                        cwd=BASE_DIR, capture_output=True, text=True, env=env, timeout=10
+                    )
+                    
+                    if remote_url_result.returncode == 0:
+                        remote_url = remote_url_result.stdout.strip()
+                        
+                        # Create backup directory name
+                        import time
+                        backup_dir = f"{BASE_DIR}_corrupt_backup_{int(time.time())}"
+                        
+                        # Move current directory to backup
+                        os.rename(BASE_DIR, backup_dir)
+                        messages.append(f"Moved corrupt repository to: {backup_dir}")
+                        
+                        # Fresh clone
+                        clone_result = subprocess.run(
+                            ['git', 'clone', remote_url, BASE_DIR],
+                            capture_output=True, text=True, env=env, timeout=120
+                        )
+                        
+                        if clone_result.returncode == 0:
+                            repair_successful = True
+                            messages.append("Fresh clone completed successfully")
+                            
+                            # Try to remove backup if clone successful
+                            try:
+                                import shutil
+                                shutil.rmtree(backup_dir)
+                                messages.append("Corrupt backup removed")
+                            except Exception as e:
+                                messages.append(f"Warning: Could not remove backup {backup_dir}: {e}")
+                        else:
+                            # Restore backup if clone failed
+                            try:
+                                if os.path.exists(backup_dir):
+                                    os.rename(backup_dir, BASE_DIR)
+                                    messages.append("Clone failed, restored from backup")
+                            except Exception as restore_e:
+                                messages.append(f"Critical: Clone failed and backup restore failed: {restore_e}")
+                    else:
+                        messages.append("Could not determine remote URL for fresh clone")
+                        
+                except Exception as e:
+                    messages.append(f"Fresh clone attempt failed: {e}")
+    
+    except Exception as e:
+        messages.append(f"Corruption check failed: {e}")
+    
+    return {
+        'corruption_detected': corruption_detected,
+        'repair_successful': repair_successful,
+        'messages': messages
+    }
+
 # ─── New Update Routes ─────────────────────────────────────────────────────
 
 @app.route('/check_updates', methods=['POST'])
@@ -832,28 +984,67 @@ def check_updates():
         env = os.environ.copy()
         if not env.get('HOME'):
             env['HOME'] = f"/home/{subprocess.run(['whoami'], capture_output=True, text=True).stdout.strip()}"
-        # Always fetch from origin
+        
+        corruption_detected = False
+        repair_messages = []
+        
+        # Check for git corruption first
+        corruption_result = check_and_repair_git_corruption(env)
+        if corruption_result['corruption_detected']:
+            corruption_detected = True
+            repair_messages = corruption_result['messages']
+            if not corruption_result['repair_successful']:
+                return jsonify(
+                    updates_available=False, 
+                    error="Git corruption detected but repair failed",
+                    corruption_detected=True,
+                    repair_messages=repair_messages
+                )
+        
+        # Always fetch from origin with timeout
         fetch = subprocess.run(
             ['git', 'fetch', 'origin'],
-            cwd=BASE_DIR, capture_output=True, text=True, env=env)
+            cwd=BASE_DIR, capture_output=True, text=True, env=env, timeout=30)
+        
+        # Check if fetch failed due to corruption
+        if fetch.returncode != 0 and ('corrupt' in fetch.stderr.lower() or 'empty' in fetch.stderr.lower()):
+            # Attempt repair and retry
+            corruption_result = check_and_repair_git_corruption(env, force_repair=True)
+            repair_messages.extend(corruption_result['messages'])
+            if corruption_result['repair_successful']:
+                fetch = subprocess.run(
+                    ['git', 'fetch', 'origin'],
+                    cwd=BASE_DIR, capture_output=True, text=True, env=env, timeout=30)
+            else:
+                return jsonify(
+                    updates_available=False,
+                    error="Git fetch failed due to corruption, repair unsuccessful",
+                    corruption_detected=True,
+                    repair_messages=repair_messages
+                )
+        
         # Get local HEAD commit
         local_hash_proc = subprocess.run(
             ['git', 'rev-parse', 'HEAD'],
-            cwd=BASE_DIR, capture_output=True, text=True, env=env)
+            cwd=BASE_DIR, capture_output=True, text=True, env=env, timeout=10)
         local_hash = local_hash_proc.stdout.strip()
+        
         # Get remote main commit
         remote_hash_proc = subprocess.run(
             ['git', 'rev-parse', 'origin/main'],
-            cwd=BASE_DIR, capture_output=True, text=True, env=env)
+            cwd=BASE_DIR, capture_output=True, text=True, env=env, timeout=10)
         remote_hash = remote_hash_proc.stdout.strip()
+        
         # Get git status and log for debug
         git_status = subprocess.run(
             ['git', 'status', '-b', '-u', '--porcelain'],
-            cwd=BASE_DIR, capture_output=True, text=True, env=env).stdout.strip()
+            cwd=BASE_DIR, capture_output=True, text=True, env=env, timeout=10).stdout.strip()
         git_log = subprocess.run(
             ['git', 'log', '--oneline', '--decorate', '--graph', '-20'],
-            cwd=BASE_DIR, capture_output=True, text=True, env=env).stdout.strip()
+            cwd=BASE_DIR, capture_output=True, text=True, env=env, timeout=10).stdout.strip()
+        
         updates_available = (local_hash != remote_hash)
+        
         # Add environment and user info for debugging
         debug_info = {
             'user': getpass.getuser(),
@@ -868,14 +1059,19 @@ def check_updates():
             'remote_hash_stderr': remote_hash_proc.stderr,
             'env': {k: env[k] for k in ('USER','HOME','PATH') if k in env}
         }
+        
         return jsonify(
             updates_available=updates_available,
             current_version=local_hash,
             latest_version=remote_hash,
             git_status=git_status,
             git_log=git_log,
-            debug_info=debug_info
+            debug_info=debug_info,
+            corruption_detected=corruption_detected,
+            repair_messages=repair_messages
         )
+    except subprocess.TimeoutExpired:
+        return jsonify(updates_available=False, error="Git operation timed out")
     except Exception as e:
         return jsonify(updates_available=False, error=str(e))
 
@@ -886,33 +1082,71 @@ def apply_updates():
         if not env.get('HOME'):
             env['HOME'] = f"/home/{subprocess.run(['whoami'], capture_output=True, text=True).stdout.strip()}"
         print("[DEBUG] /apply_updates called", flush=True)
+        
+        update_msgs = []
+        
+        # Check and repair git corruption before attempting update
+        corruption_result = check_and_repair_git_corruption(env)
+        if corruption_result['corruption_detected']:
+            update_msgs.extend(corruption_result['messages'])
+            if not corruption_result['repair_successful']:
+                return jsonify(
+                    success=False, 
+                    message="Git corruption detected and repair failed.\n" + "\n".join(update_msgs)
+                )
+        
         # Find current branch
         current_branch = subprocess.run(
             ['git','rev-parse','--abbrev-ref','HEAD'],
-            cwd=BASE_DIR, capture_output=True, text=True, env=env).stdout.strip()
+            cwd=BASE_DIR, capture_output=True, text=True, env=env, timeout=10).stdout.strip()
         print(f"[DEBUG] current_branch: {current_branch}", flush=True)
-        # Force update: fetch, hard reset, clean, pull
-        fetch = subprocess.run(
-            ['git', 'fetch', '--all'],
-            cwd=BASE_DIR, capture_output=True, text=True, env=env)
-        print(f"[DEBUG] git fetch: {fetch.stdout}\n{fetch.stderr}", flush=True)
-        reset = subprocess.run(
-            ['git', 'reset', '--hard', f'origin/{current_branch}'],
-            cwd=BASE_DIR, capture_output=True, text=True, env=env)
-        print(f"[DEBUG] git reset: {reset.stdout}\n{reset.stderr}", flush=True)
-        clean = subprocess.run(
-            ['git', 'clean', '-fdx'],
-            cwd=BASE_DIR, capture_output=True, text=True, env=env)
-        print(f"[DEBUG] git clean: {clean.stdout}\n{clean.stderr}", flush=True)
-        # Optionally, pull again to ensure all is up to date
-        pull = subprocess.run(
-            ['git', 'pull', 'origin', current_branch],
-            cwd=BASE_DIR, capture_output=True, text=True, env=env)
-        print(f"[DEBUG] git pull: {pull.stdout}\n{pull.stderr}", flush=True)
+        
+        # Force update: fetch, hard reset, clean, pull with corruption handling
+        try:
+            fetch = subprocess.run(
+                ['git', 'fetch', '--all'],
+                cwd=BASE_DIR, capture_output=True, text=True, env=env, timeout=60)
+            print(f"[DEBUG] git fetch: {fetch.stdout}\n{fetch.stderr}", flush=True)
+            
+            # Check if fetch failed due to corruption
+            if fetch.returncode != 0 and ('corrupt' in fetch.stderr.lower() or 'empty' in fetch.stderr.lower()):
+                update_msgs.append("Fetch failed due to corruption, attempting repair...")
+                corruption_result = check_and_repair_git_corruption(env, force_repair=True)
+                update_msgs.extend(corruption_result['messages'])
+                if corruption_result['repair_successful']:
+                    # Retry fetch after repair
+                    fetch = subprocess.run(
+                        ['git', 'fetch', '--all'],
+                        cwd=BASE_DIR, capture_output=True, text=True, env=env, timeout=60)
+                    print(f"[DEBUG] git fetch after repair: {fetch.stdout}\n{fetch.stderr}", flush=True)
+                else:
+                    return jsonify(
+                        success=False,
+                        message="Git fetch failed due to corruption, repair unsuccessful.\n" + "\n".join(update_msgs)
+                    )
+            
+            reset = subprocess.run(
+                ['git', 'reset', '--hard', f'origin/{current_branch}'],
+                cwd=BASE_DIR, capture_output=True, text=True, env=env, timeout=30)
+            print(f"[DEBUG] git reset: {reset.stdout}\n{reset.stderr}", flush=True)
+            
+            clean = subprocess.run(
+                ['git', 'clean', '-fdx'],
+                cwd=BASE_DIR, capture_output=True, text=True, env=env, timeout=30)
+            print(f"[DEBUG] git clean: {clean.stdout}\n{clean.stderr}", flush=True)
+            
+            # Optionally, pull again to ensure all is up to date
+            pull = subprocess.run(
+                ['git', 'pull', 'origin', current_branch],
+                cwd=BASE_DIR, capture_output=True, text=True, env=env, timeout=60)
+            print(f"[DEBUG] git pull: {pull.stdout}\n{pull.stderr}", flush=True)
+            
+        except subprocess.TimeoutExpired as te:
+            return jsonify(success=False, message=f"Git operation timed out: {te}")
+        
         # --- SiTechExe.exe update logic ---
         sitex_src = "/opt/SiTech/SiPi/SiTechExe.exe"
         sitex_dst = "/opt/SiTech/SiTechExe/SiTechExe.exe"
-        update_msgs = []
         
         # --- Fix WiFi script permissions automatically ---
         try:
@@ -920,7 +1154,7 @@ def apply_updates():
             if os.path.exists(wifi_script):
                 # Fix permissions to 755 (rwxr-xr-x)
                 subprocess.run(['sudo', 'chmod', '755', wifi_script], 
-                             capture_output=True, text=True, env=env)
+                             capture_output=True, text=True, env=env, timeout=10)
                 update_msgs.append(f"[WiFi script permissions fixed: {wifi_script}]")
             else:
                 update_msgs.append(f"[WiFi script not found: {wifi_script}]")
@@ -935,13 +1169,13 @@ def apply_updates():
             if os.path.exists(local_script):
                 # Copy updated script to system location
                 subprocess.run(['sudo', 'cp', local_script, target_script], 
-                             capture_output=True, text=True, env=env)
+                             capture_output=True, text=True, env=env, timeout=10)
                 # Set correct permissions
                 subprocess.run(['sudo', 'chmod', '755', target_script], 
-                             capture_output=True, text=True, env=env)
+                             capture_output=True, text=True, env=env, timeout=10)
                 # Set correct ownership
                 subprocess.run(['sudo', 'chown', 'root:root', target_script], 
-                             capture_output=True, text=True, env=env)
+                             capture_output=True, text=True, env=env, timeout=10)
                 update_msgs.append(f"[WiFi script updated and permissions fixed]")
             else:
                 update_msgs.append(f"[Local WiFi script not found: {local_script}]")
@@ -950,10 +1184,12 @@ def apply_updates():
         
         # Stop sitech.service
         try:
-            stop_sitech = subprocess.run(['sudo', 'systemctl', 'stop', 'sitech'], capture_output=True, text=True, env=env)
+            stop_sitech = subprocess.run(['sudo', 'systemctl', 'stop', 'sitech'], 
+                                       capture_output=True, text=True, env=env, timeout=30)
             update_msgs.append("[sitech.service stopped]")
         except Exception as e:
             update_msgs.append(f"[Failed to stop sitech.service: {e}]")
+        
         # Copy new SiTechExe.exe
         try:
             if os.path.exists(sitex_src):
@@ -964,19 +1200,34 @@ def apply_updates():
                 update_msgs.append(f"[SiTechExe.exe not found at {sitex_src}]")
         except Exception as e:
             update_msgs.append(f"[Failed to update SiTechExe.exe: {e}]")
+        
         # Restart sitech.service
         try:
-            subprocess.run(['sudo', 'systemctl', 'start', 'sitech'], check=False, env=env)
+            subprocess.run(['sudo', 'systemctl', 'start', 'sitech'], 
+                         check=False, env=env, timeout=30)
             update_msgs.append("[sitech.service restarted]")
         except Exception as e:
             update_msgs.append(f"[Failed to restart sitech.service: {e}]")
+        
         # Restart sipi.service
         try:
-            subprocess.run(['sudo', 'systemctl', 'restart', 'sipi'], check=False, env=env)
+            subprocess.run(['sudo', 'systemctl', 'restart', 'sipi'], 
+                         check=False, env=env, timeout=30)
             update_msgs.append("[sipi.service restarted]")
         except Exception as e:
             update_msgs.append(f"[Failed to restart sipi.service: {e}]")
+        
+        # Final corruption check
+        final_check = check_and_repair_git_corruption(env)
+        if final_check['corruption_detected']:
+            update_msgs.append("Warning: Git corruption detected after update")
+            update_msgs.extend(final_check['messages'])
+        
         return jsonify(success=True, message="Force-updated to latest remote.\n" + "\n".join(update_msgs))
+        
+    except subprocess.TimeoutExpired as te:
+        print(f"[DEBUG] apply_updates: Timeout: {te}", flush=True)
+        return jsonify(success=False, message=f"Update timed out: {te}")
     except Exception as e:
         print(f"[DEBUG] apply_updates: Exception: {e}", flush=True)
         return jsonify(success=False, message=str(e))
