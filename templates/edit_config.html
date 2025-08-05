@@ -456,12 +456,12 @@ $(function(){
   // Check if we just completed an update (look for URL parameter)
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('updated') === 'true') {
-    // Show brief success message and clean URL
+    // Wait a moment for the page to fully load, then get the actual new version
     setTimeout(function() {
       const currentVersion = $('#sipiVersionDisplay').text();
       if (currentVersion) {
         updateVersionDisplay(currentVersion); // Trigger animation
-        showModal("🎉 SiPi Successfully Updated!\n\nNow running version: " + currentVersion);
+        showModal("🎉 SiPi Successfully Updated!\n\nNow running version: " + currentVersion + "\n\n✨ Update completed successfully!");
       }
       // Clean the URL without triggering reload
       window.history.replaceState({}, document.title, window.location.pathname);
@@ -895,12 +895,10 @@ $(function(){
               if (res2.success) {
                 let successMsg = "🎉 SiPi Update Completed Successfully! 🎉";
                 
-                // Add version info
-                if (resp.latest_version) {
-                  successMsg += "\n\n📦 Updated to version: " + resp.latest_version;
-                  if (resp.current_version) {
-                    successMsg += "\n📦 Previous version: " + resp.current_version;
-                  }
+                // Show that we're updating to the latest version
+                successMsg += "\n\n📦 Updating to latest version...";
+                if (resp.current_version) {
+                  successMsg += "\n📦 Previous version: " + resp.current_version;
                 }
                 
                 // Add corruption repair info if applicable
@@ -910,22 +908,39 @@ $(function(){
                 
                 // Show services restart info
                 if (res2.message && res2.message.includes('service')) {
-                  successMsg += "\n\n🔄 System services have been restarted with the new version.";
+                  successMsg += "\n\n🔄 System services are restarting with the new version.";
                 }
                 
-                successMsg += "\n\n✨ Your SiPi system is now running the latest version!";
+                successMsg += "\n\n✨ Your SiPi system will be running the latest version momentarily!";
                 
                 // Reset button state
                 btn.prop('disabled', false).text(originalText);
                 
                 showModal(successMsg, function(){
-                  // Update version display immediately with new version
-                  if (resp.latest_version) {
-                    updateVersionDisplay(resp.latest_version);
+                  // The service is restarting, so we need to wait and then reload
+                  // Show waiting message with countdown
+                  
+                  let countdown = 8; // Start countdown from 8 seconds (service restarts in 5, give 3 extra)
+                  
+                  function updateCountdown() {
+                    $('#modalMsg').html(`🔄 Service restarting...<br><br>Page will refresh in ${countdown} seconds...`);
                   }
                   
-                  // Reload with update parameter
-                  window.location.href = window.location.pathname + '?updated=true';
+                  // Show initial countdown
+                  updateCountdown();
+                  $('#modalBg').fadeIn(80);
+                  
+                  const countdownInterval = setInterval(function() {
+                    countdown--;
+                    if (countdown > 0) {
+                      updateCountdown();
+                    } else {
+                      clearInterval(countdownInterval);
+                      $('#modalBg').fadeOut(80);
+                      // Reload the page after service restart completes
+                      window.location.href = window.location.pathname + '?updated=true';
+                    }
+                  }, 1000);
                 });
               } else {
                 btn.prop('disabled', false).text(originalText);

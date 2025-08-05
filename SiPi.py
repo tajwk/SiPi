@@ -22,7 +22,7 @@ from flask import (
 from astrometric_corrections import preprocess_catalogs_for_current_epoch
 
 # Initial SiPi version (bump patch for simple fixes)
-__version__ = "0.9.7"
+__version__ = "0.9.7a"
 
 # Base directory for Git operations
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -1188,6 +1188,10 @@ def check_updates():
         
         updates_available = (local_hash != remote_hash)
         
+        # Try to get version info from commits for better version display
+        current_version_info = f"{__version__} (commit: {local_hash[:8]})"
+        latest_version_info = f"Latest (commit: {remote_hash[:8]})"
+        
         # Add environment and user info for debugging
         debug_info = {
             'user': getpass.getuser(),
@@ -1205,8 +1209,8 @@ def check_updates():
         
         return jsonify(
             updates_available=updates_available,
-            current_version=local_hash,
-            latest_version=remote_hash,
+            current_version=current_version_info,
+            latest_version=latest_version_info,
             git_status=git_status,
             git_log=git_log,
             debug_info=debug_info,
@@ -1361,7 +1365,7 @@ def apply_updates():
         # Schedule sipi.service restart after response is sent
         def delayed_restart():
             import time
-            time.sleep(3)  # Wait 3 seconds for response to be sent
+            time.sleep(5)  # Wait 5 seconds for response to be sent and processed
             try:
                 subprocess.run(['sudo', 'systemctl', 'restart', 'sipi'], 
                              check=False, timeout=30)
@@ -1374,12 +1378,15 @@ def apply_updates():
         restart_thread = threading.Thread(target=delayed_restart, daemon=True)
         restart_thread.start()
         
-        update_msgs.append("[Service will restart in 3 seconds]")
-        update_msgs.append("[Please refresh page after service restarts to see changes]")
+        update_msgs.append("[Service will restart in 5 seconds]")
+        update_msgs.append("[Page will reload automatically after service restart]")
+        update_msgs.append(f"[Current version: {__version__}]")
+        update_msgs.append("[Updated version will be shown after restart]")
         
         return jsonify(
             success=True, 
-            message="Update completed successfully!\n\n" + "\n".join(update_msgs) + "\n\nService restarting automatically - refresh page when connection resumes."
+            message="Update completed successfully!\n\n" + "\n".join(update_msgs) + "\n\nService restarting automatically - refresh page when connection resumes.",
+            current_version=__version__  # Include current version for reference
         )
         
     except subprocess.TimeoutExpired as te:
