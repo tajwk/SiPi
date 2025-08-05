@@ -908,7 +908,7 @@ $(function(){
                 
                 // Show services restart info
                 if (res2.message && res2.message.includes('service')) {
-                  successMsg += "\n\n🔄 System services are restarting with the new version.";
+                  successMsg += "\n\n🔄 Both SiPi and SiTech services are restarting with the new version.";
                 }
                 
                 successMsg += "\n\n✨ Your SiPi system will be running the latest version momentarily!";
@@ -917,31 +917,71 @@ $(function(){
                 btn.prop('disabled', false).text(originalText);
                 
                 showModal(successMsg, function(){
-                  // The service is restarting, so we need to wait and then reload
-                  // Show waiting message with countdown (no OK button - automatic)
+                  // Enhanced progress tracking for service restart
+                  let countdown = 10; // Reduced from 20 to 10 seconds after sitech is ready
+                  let checkInterval;
+                  let countdownInterval;
+                  let sitechReady = false;
                   
-                  let countdown = 20; // Start countdown from 20 seconds (service restarts in 5, give 15 extra for full startup)
-                  
-                  function updateCountdown() {
-                    $('#modalMsg').html(`🔄 Service restarting...<br><br>Page will refresh in ${countdown} seconds...`);
+                  function updateProgressMessage(message) {
+                    $('#modalMsg').html(message);
                   }
                   
-                  // Show initial countdown without buttons
-                  updateCountdown();
+                  function startFinalCountdown() {
+                    countdownInterval = setInterval(function() {
+                      countdown--;
+                      if (countdown > 0) {
+                        updateProgressMessage(`✅ SiTech service ready!<br><br>🔄 Restarting SiPi service...<br><br>Page will refresh in ${countdown} seconds...`);
+                      } else {
+                        clearInterval(countdownInterval);
+                        $('#modalBg').fadeOut(80);
+                        // Reload the page after service restart completes
+                        window.location.href = window.location.pathname + '?updated=true';
+                      }
+                    }, 1000);
+                  }
+                  
+                  function checkSitechStatus() {
+                    $.post('/check_sitech_status', {}, function(response) {
+                      if (response.ready && !sitechReady) {
+                        // SiTech is ready for the first time
+                        sitechReady = true;
+                        clearInterval(checkInterval);
+                        updateProgressMessage('✅ SiTech service ready!<br><br>🔄 Restarting SiPi service...');
+                        
+                        // Start the final countdown
+                        setTimeout(startFinalCountdown, 1000);
+                        
+                      } else if (response.service_running && !response.tcp_connected) {
+                        updateProgressMessage('🔄 SiTech service started...<br><br>⏳ Waiting for TCP connection...');
+                      } else if (!response.service_running) {
+                        updateProgressMessage('🔄 Starting SiTech service...<br><br>⏳ Please wait...');
+                      }
+                    }).fail(function() {
+                      updateProgressMessage('🔄 Checking SiTech service status...<br><br>⏳ Please wait...');
+                    });
+                  }
+                  
+                  // Show initial progress message
+                  updateProgressMessage('🔄 Starting SiTech service...<br><br>⏳ Please wait...');
                   $('#modalBtns').html(''); // Remove all buttons
                   $('#modalBg').fadeIn(80);
                   
-                  const countdownInterval = setInterval(function() {
-                    countdown--;
-                    if (countdown > 0) {
-                      updateCountdown();
-                    } else {
-                      clearInterval(countdownInterval);
-                      $('#modalBg').fadeOut(80);
-                      // Reload the page after service restart completes
-                      window.location.href = window.location.pathname + '?updated=true';
+                  // Start checking sitech status every 2 seconds
+                  checkInterval = setInterval(checkSitechStatus, 2000);
+                  
+                  // Fallback timeout in case something goes wrong (30 seconds total)
+                  setTimeout(function() {
+                    if (!sitechReady) {
+                      clearInterval(checkInterval);
+                      if (countdownInterval) clearInterval(countdownInterval);
+                      updateProgressMessage('⚠️ SiTech service taking longer than expected...<br><br>🔄 Proceeding with page refresh...');
+                      setTimeout(function() {
+                        $('#modalBg').fadeOut(80);
+                        window.location.href = window.location.pathname + '?updated=true';
+                      }, 3000);
                     }
-                  }, 1000);
+                  }, 30000);
                 });
               } else {
                 btn.prop('disabled', false).text(originalText);
