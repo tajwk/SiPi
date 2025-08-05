@@ -1000,15 +1000,41 @@
     };
 
     // SkyView toggle logic
-    $('#skyviewButton').off('click').on('click', function() {
+    $('#skyviewButton').off('click').on('click', function(e) {
+      console.log('[SkyView] Button clicked');
+      
+      const mainContainer = document.getElementById('mainViewContainer');
+      const skyContainer = document.getElementById('skyviewContainer');
+      
+      // Hide main container
+      if (mainContainer) {
+        mainContainer.style.display = 'none';
+      }
+      
+      // Show sky container  
+      if (skyContainer) {
+        skyContainer.style.display = 'block';
+        skyContainer.style.visibility = 'visible';
+      }
+      
+      // Double-check with jQuery too
       $('#mainViewContainer').hide();
       $('#skyviewContainer').show();
+      
+      console.log('[SkyView] Containers toggled successfully');
+      
       // Force SkyView JS to re-initialize if needed
       if (typeof window.dispatchEvent === 'function') {
         setTimeout(function() {
+          console.log('[SkyView] Dispatching resize event');
           window.dispatchEvent(new Event('resize'));
         }, 100);
       }
+      
+      // Prevent any default behavior
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
     });
     // SkyView Stop button
     $('#stopBtn').off('click').on('click', function() {

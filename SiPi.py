@@ -22,7 +22,7 @@ from flask import (
 from astrometric_corrections import preprocess_catalogs_for_current_epoch
 
 # Initial SiPi version (bump patch for simple fixes)
-__version__ = "0.9.7"
+__version__ = "0.9.7x"
 
 # Base directory for Git operations
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
