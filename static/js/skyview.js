@@ -244,6 +244,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     const s = Math.round(((hours - h) * 60 - m) * 60);
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
   }
+  
+  // Convert decimal HMS (like 9.764188) to HH:MM:SS format  
+  function decimalHMStoHMS(decimalHMS) {
+    console.log('[SkyView] DEBUG - decimalHMStoHMS input:', decimalHMS);
+    const h = Math.floor(decimalHMS);
+    const minutesDecimal = (decimalHMS - h) * 60;
+    const m = Math.floor(minutesDecimal);
+    const s = Math.round((minutesDecimal - m) * 60);
+    const result = `${String(h).padStart(2, '0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    console.log('[SkyView] DEBUG - decimalHMStoHMS output:', result, 'from h:', h, 'm:', m, 's:', s);
+    return result;
+  }
   // Convert “DDD:MM:SS” → degrees
   function dmsToDeg(dms) {
     const [d, m, s] = dms.split(':').map(Number);
@@ -412,11 +424,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     draw();
   }
 
-  // Fetch mount position on load and every 2 seconds
+  // Fetch mount position on load and every 2 seconds  
   fetchMount();
-  setInterval(fetchMount, 2000);
-
-  // --- Solar system position polling ---
+  // Comment out the interval to stop auto-updates for debugging
+  // setInterval(fetchMount, 2000);  // --- Solar system position polling ---
   async function fetchSolarSystem() {
     try {
       const resp = await fetch('/solar_system');
@@ -443,7 +454,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Fetch solar system positions on load and every minute (60 seconds)
   fetchSolarSystem();
-  setInterval(fetchSolarSystem, 60000);
+  // Comment out the interval to stop auto-updates for debugging
+  // setInterval(fetchSolarSystem, 60000);
 
   // Track the currently selected object (star, galaxy, or open cluster)
   let selectedObject = null;
@@ -536,6 +548,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Convert Alt/Az to RA/Dec (inverse of eqToAltAz)
   function altAzToEq(altDeg, azDeg, latDeg, lonDeg, date) {
     const lst = computeLST(date, lonDeg);
+    console.log('[SkyView] DEBUG - altAzToEq inputs:', { altDeg, azDeg, latDeg, lonDeg, date });
+    console.log('[SkyView] DEBUG - LST calculated:', lst, 'hours');
+    
     const altR = altDeg * Math.PI / 180;
     const azR = azDeg * Math.PI / 180;
     const latR = latDeg * Math.PI / 180;
@@ -546,14 +561,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     );
     
     const haR = Math.atan2(
-      Math.sin(azR),
+      -Math.sin(azR),  // Change sign here
       Math.cos(azR) * Math.sin(latR) - Math.tan(altR) * Math.cos(latR)
     );
     
     const ha = haR * 180 / Math.PI;
+    console.log('[SkyView] DEBUG - Hour angle calculated:', ha, 'degrees, or', ha/15, 'hours');
+    
     let raH = lst - ha / 15;
     if (raH < 0) raH += 24;
     if (raH >= 24) raH -= 24;
+    
+    console.log('[SkyView] DEBUG - Final RA calculation: lst(', lst, ') - ha/15(', ha/15, ') = raH(', raH, ')');
     
     return { 
       ra: raH * 15, // Convert back to degrees
@@ -976,6 +995,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (hitObj) {
           selectedObject = hitObj;
           console.log('[SkyView] Object selected:', hitObj.Name || hitObj.name, 'type:', hitObj.type);
+          console.log('[SkyView] DEBUG - Full object properties:');
+          for (let key in hitObj) {
+            console.log(`[SkyView] DEBUG - ${key}:`, hitObj[key]);
+          }
+          console.log('[SkyView] DEBUG - isCalPoint:', hitObj.isCalPoint);
+          console.log('[SkyView] DEBUG - Has RA/Dec:', hitObj.ra !== undefined, hitObj.dec !== undefined);
+          console.log('[SkyView] DEBUG - Has RtAsc/Declin:', hitObj.RtAsc !== undefined, hitObj.Declin !== undefined);
           showSelectedAttributes(selectedObject);
           if (hitObj.isCalPoint) {
             if (altInput && azInput) {
@@ -1023,23 +1049,69 @@ document.addEventListener('DOMContentLoaded', async () => {
               }
             }, 0);
           } else {
-            // Update coordinate textboxes based on available object data
-            console.log('[SkyView] Setting coordinates for selected object:', hitObj.Name || hitObj.name);
-            console.log('[SkyView] Object properties - altDeg:', hitObj.altDeg, 'azDeg:', hitObj.azDeg, 'ra:', hitObj.ra, 'dec:', hitObj.dec);
-            console.log('[SkyView] Input elements - altInput:', !!altInput, 'azInput:', !!azInput, 'raInput:', !!raInput, 'decInput:', !!decInput);
+            // Update coordinate textboxes for catalog objects (stars, galaxies, etc.)
+            console.log('[SkyView] Selected object:', hitObj.Name || hitObj.name);
             
-            if (altInput && azInput && typeof hitObj.altDeg === 'number' && typeof hitObj.azDeg === 'number') {
-              altInput.value = degToDMS(hitObj.altDeg);
-              azInput.value = degToDMS(hitObj.azDeg);
-              console.log('[SkyView] Set Alt/Az coordinates - Alt:', altInput.value, 'Az:', azInput.value);
+            // All catalog objects have RtAsc/Declin - use them directly
+            if (hitObj.RtAsc !== undefined && hitObj.Declin !== undefined) {
+              console.log('[SkyView] DEBUG - hitObj.RtAsc value:', hitObj.RtAsc, 'type:', typeof hitObj.RtAsc);
+              console.log('[SkyView] DEBUG - Expected: 9.787334 should give 09:47:14');
               
-              // Convert Alt/Az to RA/Dec for the textboxes
-              if (raInput && decInput) {
-                const coords = altAzToEq(hitObj.altDeg, hitObj.azDeg, lat, lon, new Date());
-                raInput.value = degToHMS(coords.ra);
-                decInput.value = degToDMS(coords.dec);
-                console.log('[SkyView] Converted Alt/Az to RA/Dec - RA:', raInput.value, 'Dec:', decInput.value);
+              // Set RA/Dec textboxes from catalog values
+              raInput.value = decimalHMStoHMS(hitObj.RtAsc);  // RtAsc decimal hours → HH:MM:SS
+              decInput.value = degToDMS(hitObj.Declin);       // Declin degrees → DDD:MM:SS
+              
+              // Calculate Alt/Az from catalog RA/Dec
+              const raHours = hitObj.RtAsc; // RA is already in decimal hours format
+              console.log('[SkyView] DEBUG - Converting to Alt/Az with:', {
+                raHours: raHours,
+                decDeg: hitObj.Declin,
+                lat: lat,
+                lon: lon,
+                date: new Date()
+              });
+              const coords = eqToAltAz(raHours, hitObj.Declin, lat, lon, new Date());
+              console.log('[SkyView] DEBUG - eqToAltAz result:', coords);
+              
+              // Fix azimuth reference frame - add 180° if needed
+              let correctedAz = coords.az;
+              if (correctedAz < 180) {
+                correctedAz += 180;
+              } else {
+                correctedAz -= 180;
               }
+              
+              console.log('[SkyView] DEBUG - Azimuth correction:', {
+                originalAz: coords.az,
+                correctedAz: correctedAz,
+                objectAz: hitObj.az
+              });
+              
+              altInput.value = degToDMS(coords.alt);
+              azInput.value = degToDMS(correctedAz); // Use corrected azimuth
+              
+              console.log('[SkyView] Using catalog RtAsc/Declin - RA:', raInput.value, 'Dec:', decInput.value);
+              console.log('[SkyView] Calculated Alt/Az - Alt:', altInput.value, 'Az:', azInput.value);
+            } else if (hitObj.ra !== undefined && hitObj.dec !== undefined) {
+              // Fallback for objects with ra/dec properties
+              raInput.value = decimalHMStoHMS(hitObj.ra);
+              decInput.value = degToDMS(hitObj.dec);
+              
+              const raHours = hitObj.ra;
+              const coords = eqToAltAz(raHours, hitObj.dec, lat, lon, new Date());
+              
+              // Apply the same azimuth reference frame correction as catalog objects
+              let correctedAz = coords.az;
+              if (correctedAz < 180) {
+                correctedAz += 180;
+              } else {
+                correctedAz -= 180;
+              }
+              
+              altInput.value = degToDMS(coords.alt);
+              azInput.value = degToDMS(correctedAz);
+            } else {
+              console.log('[SkyView] Warning: Object has no RA/Dec coordinates');
             }
             popup.style.display = 'none';
           }
@@ -1373,8 +1445,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       
       // Adaptive magnitude limit based on device performance (preserves original zoom progression)
-      const magLimit = deviceProfiler.getMagnitudeLimit('stars', canvasScale);
-      console.log(`[PERF] Star rendering - magLimit: ${magLimit}, canvasScale: ${canvasScale}`);
+      const deviceMagLimit = deviceProfiler.getMagnitudeLimit('stars', canvasScale);
+      
+      // Override with user slider selection
+      const starMagSlider = document.getElementById('starMagSlider');
+      const sliderValue = starMagSlider ? parseInt(starMagSlider.value) : 18;
+      // Convert slider position to magnitude: position 1 = 0.5, position 2 = 1.0, position 18 = 9.0
+      const userStarMagLimit = sliderValue * 0.5;
+      const magLimit = Math.min(deviceMagLimit, userStarMagLimit);
+      
+      console.log(`[PERF] Star rendering - deviceLimit: ${deviceMagLimit}, sliderPos: ${sliderValue}, userLimit: ${userStarMagLimit}, final: ${magLimit}, canvasScale: ${canvasScale}`);
       
       // Filter stars using magnitude and viewport culling only (no count limiting)
       let drawnStars = 0;
@@ -1562,8 +1642,28 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       
       // Adaptive magnitude limit based on device performance (preserves zoom progression)
-      const galLimit = deviceProfiler.getMagnitudeLimit('galaxies', canvasScale);
-      console.log(`[PERF] Galaxy rendering - magLimit: ${galLimit}`);
+      const deviceGalLimit = deviceProfiler.getMagnitudeLimit('galaxies', canvasScale);
+      
+      // Override with user slider selection
+      const galMagSlider = document.getElementById('galMagSlider');
+      const galSliderValue = galMagSlider ? parseInt(galMagSlider.value) : 18;
+      
+      // Custom galaxy magnitude scale based on actual data distribution
+      // Most galaxies are 11-17, so give more resolution in that range
+      let userGalMagLimit;
+      if (galSliderValue <= 6) {
+        // Positions 1-6: 2.2, 8, 10, 11, 12, 13
+        const earlyMags = [2.2, 8, 10, 11, 12, 13];
+        userGalMagLimit = earlyMags[galSliderValue - 1];
+      } else {
+        // Positions 7-18: 13.5, 14, 14.5, 15, 15.5, 16, 16.5, 17, 17.5, 18, 19, 20
+        userGalMagLimit = 13 + (galSliderValue - 6) * 0.5;
+      }
+      
+      // For galaxies, if user sets to max position, allow all magnitudes
+      const galLimit = galSliderValue >= 18 ? Math.max(deviceGalLimit, 20) : Math.min(deviceGalLimit, userGalMagLimit);
+      
+      console.log(`[PERF] Galaxy rendering - deviceLimit: ${deviceGalLimit}, sliderPos: ${galSliderValue}, userLimit: ${userGalMagLimit}, final: ${galLimit}`);
       
       let drawnGalaxies = 0;
       
@@ -1588,7 +1688,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const min = maj / 2;
         ctx.save();
         ctx.setTransform(1,0,0,1,0,0);
-        ctx.strokeStyle = 'rgb(255,64,64)'; // fully opaque red
+        ctx.strokeStyle = 'rgb(255,100,150)'; // more pink but still reddish
         ctx.lineWidth = 1.2 + Math.min((canvasScale - 1) * 0.7, 2.2); // gentler scaling
         
         // Manually apply the same transformation sequence as the main canvas
@@ -2078,6 +2178,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         translateY,
         currentVpScale
       });
+      
+      console.log('[SkyView] Reticle debug - selectedObject:', selectedObject);
+      console.log('[SkyView] selectedObject has ra/dec?', selectedObject ? (selectedObject.ra !== undefined && selectedObject.dec !== undefined) : 'no selectedObject');
+      
+      // DEBUGGING: Compare mount coordinates with calculated coordinates for selected object
+      if (selectedObject && selectedObject.ra !== undefined && selectedObject.dec !== undefined) {
+        const calcCoords = eqToAltAz(selectedObject.ra, selectedObject.dec, lat, lon, new Date());
+        console.log('COORDS: Mount Alt=' + mountPos.alt + ' Az=' + mountPos.az + ' | Calc Alt=' + calcCoords.alt.toFixed(3) + ' Az=' + calcCoords.az.toFixed(3) + ' | Diff Alt=' + (calcCoords.alt - mountPos.alt).toFixed(3) + ' Az=' + (calcCoords.az - mountPos.az).toFixed(3) + ' | Obj RA=' + selectedObject.ra + ' Dec=' + selectedObject.dec);
+      } else {
+        console.log('COORDS: No valid selectedObject for comparison');
+      }
       ctx.save();
       ctx.setTransform(1,0,0,1,0,0);
       ctx.strokeStyle='red'; ctx.lineWidth=2;
@@ -2276,6 +2387,63 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (toggleSolarSystem) {
     toggleSolarSystem.addEventListener('change', draw);
   }
+
+  // Add slider event listeners for magnitude filtering
+  const starMagSlider = document.getElementById('starMagSlider');
+  if (starMagSlider) {
+    starMagSlider.addEventListener('input', () => {
+      updateSliderStyle(starMagSlider);
+      draw();
+    });
+  }
+
+  const galMagSlider = document.getElementById('galMagSlider');
+  if (galMagSlider) {
+    galMagSlider.addEventListener('input', () => {
+      updateSliderStyle(galMagSlider);
+      draw();
+    });
+  }
+
+  // Function to update slider styling based on current value and night mode
+  function updateSliderStyle(slider) {
+    if (!slider) return;
+    
+    const value = slider.value;
+    const min = slider.min;
+    const max = slider.max;
+    const percentage = ((value - min) / (max - min)) * 100;
+    
+    // Check if night mode is active
+    const isNightMode = document.body.classList.contains('night-mode');
+    
+    if (isNightMode) {
+      // Night mode: filled part red, unfilled dark gray
+      const filledColor = '#ff0000';
+      const unfilledColor = '#333333';
+      const gradient = `linear-gradient(to right, ${filledColor} 0%, ${filledColor} ${percentage}%, ${unfilledColor} ${percentage}%, ${unfilledColor} 100%)`;
+      
+      slider.style.background = gradient;
+    } else {
+      // Day mode: default browser styling
+      slider.style.background = '';
+    }
+  }
+
+  // Initialize slider styles
+  if (starMagSlider) updateSliderStyle(starMagSlider);
+  if (galMagSlider) updateSliderStyle(galMagSlider);
+
+  // Update slider styles when night mode changes
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+        if (starMagSlider) updateSliderStyle(starMagSlider);
+        if (galMagSlider) updateSliderStyle(galMagSlider);
+      }
+    });
+  });
+  observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
   // Fetch cal points on load and every 10s
   fetchCalPoints();

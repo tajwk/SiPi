@@ -440,16 +440,20 @@
 
     /* Search results styling */
     .search-results__info {
-      background: #222;
-      color: #ff0000;
+      background: #f5f5f5;
+      color: #333;
       padding: 12px 18px;
       border-radius: 8px 8px 0 0;
       text-align: center;
       font-size: 1.08em;
       margin-top: 10px;
     }
-    .search-results__actions {
+    body.night-mode .search-results__info {
       background: #222;
+      color: #ff0000;
+    }
+    .search-results__actions {
+      background: #f5f5f5;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -457,6 +461,9 @@
       padding: 14px 0 18px 0;
       border-radius: 0 0 8px 8px;
       margin-bottom: 10px;
+    }
+    body.night-mode .search-results__actions {
+      background: #222;
     }
     .search-results__actions--horizontal {
       flex-direction: row !important;
@@ -466,9 +473,9 @@
       padding: 14px 0 18px 0;
     }
     .search-results__actions .btn {
-      background: var(--surface, #222);
-      color: #ff0000;
-      border: 1.5px solid #ff0000;
+      background: #f5f5f5;
+      color: #333;
+      border: 1.5px solid #28a;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -477,15 +484,27 @@
       padding: 0 16px;
     }
     .search-results__actions .btn:active {
+      background: #e0eaff;
+    }
+    body.night-mode .search-results__actions .btn {
+      background: var(--surface, #222);
+      color: #ff0000;
+      border: 1.5px solid #ff0000;
+    }
+    body.night-mode .search-results__actions .btn:active {
       background: #333;
     }
     .search-results__none {
-      background: #222;
-      color: #ff0000;
+      background: #f5f5f5;
+      color: #333;
       padding: 14px 18px;
       border-radius: 8px;
       text-align: center;
       margin-top: 10px;
+    }
+    body.night-mode .search-results__none {
+      background: #222;
+      color: #ff0000;
     }
   </style>
 
@@ -757,18 +776,18 @@
     </div>
     <button id="toggleMenuBtn">Objects &#x25BC;</button>
     <div id="toggleBar" class="hide">
-      <label><input type="checkbox" id="toggleStars" checked> Stars</label>
+      <label><input type="checkbox" id="toggleStars" checked> <span style="color: white;">●</span> Stars <input type="range" id="starMagSlider" min="1" max="18" value="18" step="1" style="width: 120px; margin-left: 8px;"></label>
       <label style="margin-left:0.5em;"><input type="checkbox" id="toggleStarNames" checked> Names</label>
-      <label><input type="checkbox" id="toggleConst"> Constellations</label>
+      <label><input type="checkbox" id="toggleConst"> <span style="color: #a259e6;">─</span> Constellations</label>
       <label style="margin-left:0.5em;"><input type="checkbox" id="toggleConstLabels" checked> Names</label>
       <label><input type="checkbox" id="toggleMessierNames" checked> Messier Names</label>
-      <label><input type="checkbox" id="toggleGal"> Galaxies</label>
-      <label><input type="checkbox" id="toggleOpen"> Open Clusters</label>
-      <label><input type="checkbox" id="toggleGlobular"> Globular Clusters</label>
-      <label><input type="checkbox" id="toggleNebula"> Nebulae</label>
-      <label><input type="checkbox" id="togglePlanetary"> Planetary Nebulae</label>
-      <label><input type="checkbox" id="toggleSolarSystem" checked> Solar System</label>
-      <label><input type="checkbox" id="toggleCalPoints" checked> Calibration Points</label>
+      <label><input type="checkbox" id="toggleGal"> <span style="color: rgb(255,100,150); font-size: 14px;">⬭</span> Galaxies <input type="range" id="galMagSlider" min="1" max="18" value="18" step="1" style="width: 120px; margin-left: 8px;"></label>
+      <label><input type="checkbox" id="toggleOpen"> <span style="color: rgb(100,100,255);">○</span> Open Clusters</label>
+      <label><input type="checkbox" id="toggleGlobular"> <span style="color: rgb(0,180,80);">⊕</span> Globular Clusters</label>
+      <label><input type="checkbox" id="toggleNebula"> <span style="color: rgb(255,100,255);">□</span> Nebulae</label>
+      <label><input type="checkbox" id="togglePlanetary"> <span style="color: rgb(127,255,0);">△</span> Planetary Nebulae</label>
+      <label><input type="checkbox" id="toggleSolarSystem" checked> <span style="color: orange;">☉</span> Solar System</label>
+      <label><input type="checkbox" id="toggleCalPoints" checked> <span style="color: yellow;">⊕</span> Calibration Points</label>
     </div>
     <canvas id="skyviewCanvas"
             data-latitude="{{ site_latitude }}"
@@ -905,7 +924,35 @@
         if(data.results.length>1){
           var html = '<div class="modal__body"><h3>Select result</h3>';
           data.results.forEach((it,i) => {
-            html += '<button class="btn btn--full" onclick="selectSearchResult('+i+')">'+it.rawResult+'</button>';
+            // Extract Name, Magnitude, and Type from the info string
+            var info = it.info || '';
+            
+            // Extract magnitude (Mag=X.X)
+            var magMatch = info.match(/Mag=([0-9.-]+)/);
+            var mag = magMatch ? magMatch[1] : 'N/A';
+            
+            // Extract type (Type=Something)
+            var typeMatch = info.match(/Type=([^,]+)/);
+            var type = typeMatch ? typeMatch[1] : 'Unknown';
+            
+            // Extract name (usually the last part after the last comma, or use a fallback)
+            var name = 'Unknown';
+            var parts = info.split(',');
+            if (parts.length > 0) {
+              // Try to find the name - it's often the last part or the first part
+              var lastPart = parts[parts.length - 1].trim();
+              var firstPart = parts[0].trim();
+              
+              // Use the last part if it doesn't contain '=' or special characters
+              if (lastPart && !lastPart.includes('=') && !lastPart.includes('Size=')) {
+                name = lastPart;
+              } else if (firstPart && !firstPart.includes('=')) {
+                name = firstPart;
+              }
+            }
+            
+            var buttonText = name + ' | Mag: ' + mag + ' | Type: ' + type;
+            html += '<button class="btn btn--full" onclick="selectSearchResult('+i+')">'+buttonText+'</button>';
           });
           html += '</div>';
           showModal(html);
@@ -1029,10 +1076,10 @@
     function sendMove(axis,arg){ $.post('/moveaxis',{axis:axis,arg:arg}); }
     function startMove(axis,dir,btn){
       var code = window.currentSpeed==="Slew"
-        ? ((dir==="down"||dir==="right")?"S":"s")
+        ? ((dir==="up"||dir==="right")?"S":"s")
         : window.currentSpeed==="Pan"
-          ? ((dir==="down"||dir==="right")?"P":"p")
-          : ((dir==="down"||dir==="right")?"G":"g");
+          ? ((dir==="up"||dir==="right")?"P":"p")
+          : ((dir==="up"||dir==="right")?"G":"g");
       sendMove(axis,code);
       if(vibrationEnabled) navigator.vibrate?.(150);
       var id = setInterval(()=>{
@@ -1455,12 +1502,14 @@
     background: #f5f5f5;
     border: 2.5px solid #28a;
     border-radius: 8px;
-    width: 100px;
-    height: 100px;
-    min-width: 100px;
-    min-height: 100px;
+    width: 100px !important;
+    height: 100px !important;
+    min-width: 100px !important;
+    min-height: 100px !important;
+    max-width: 100px !important;
+    max-height: 100px !important;
     font-size: 2em;
-    display: inline-flex;
+    display: inline-flex !important;
     align-items: center;
     justify-content: center;
     cursor: pointer;
@@ -1470,12 +1519,21 @@
     z-index: 2101;
     margin: 0;
     padding: 0;
+    box-sizing: border-box !important;
   }
   .start-action-btn {
     font-weight: bold;
-    background: #fff;
+    background: #f5f5f5;
     color: #111;
     border: 2.5px solid #28a;
+    /* Force exact same dimensions as base action-btn */
+    width: 100px !important;
+    height: 100px !important;
+    min-width: 100px !important;
+    min-height: 100px !important;
+    max-width: 100px !important;
+    max-height: 100px !important;
+    box-sizing: border-box !important;
   }
   .start-action-btn:active, .start-action-btn:focus {
     background: #e0eaff;
@@ -1501,19 +1559,22 @@
     background: transparent;
     border: 2.5px solid #28a;
     box-shadow: none;
-    width: 100px;
-    height: 100px;
-    min-width: 100px;
-    min-height: 100px;
+    width: 100px !important;
+    height: 100px !important;
+    min-width: 100px !important;
+    min-height: 100px !important;
+    max-width: 100px !important;
+    max-height: 100px !important;
     padding: 0;
     font-size: 2.7em;
-    display: inline-flex;
+    display: inline-flex !important;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     position: relative;
     z-index: 2101;
     margin: 0;
+    box-sizing: border-box !important;
   }
   .stop-octagon-btn:active, .stop-octagon-btn:focus {
     background: transparent;
@@ -1521,8 +1582,8 @@
     border: 2.5px solid #1a5a8a;
   }
   .stop-octagon-svg {
-    width: 80px;
-    height: 80px;
+    width: 70px !important;
+    height: 70px !important;
     display: block;
   }
   .stop-octagon-shape {

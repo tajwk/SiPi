@@ -12,6 +12,7 @@ import json
 import uuid
 import getpass
 import stat
+import shutil
 from flask import (
     Flask, render_template, jsonify, request,
     flash, redirect, url_for, send_from_directory
@@ -21,7 +22,7 @@ from flask import (
 from astrometric_corrections import preprocess_catalogs_for_current_epoch
 
 # Initial SiPi version (bump patch for simple fixes)
-__version__ = "0.9.6"
+__version__ = "0.9.7"
 
 # Base directory for Git operations
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -244,28 +245,37 @@ def get_sipi_version():
 def connect_persistent_socket():
     global persistent_socket
     try:
+        print(f"[SiPi CONNECTION] Attempting to connect persistent socket to {SI_TECH_HOST}:{SI_TECH_PORT}")
         persistent_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         persistent_socket.connect((SI_TECH_HOST, SI_TECH_PORT))
         persistent_socket.settimeout(5)
-    except:
+        print("[SiPi CONNECTION] Persistent socket connected successfully")
+    except Exception as e:
+        print(f"[SiPi CONNECTION] Failed to connect persistent socket: {e}")
         persistent_socket = None
 
 def connect_move_socket():
     global move_socket
     try:
+        print(f"[SiPi CONNECTION] Attempting to connect move socket to {SI_TECH_HOST}:{SI_TECH_PORT}")
         move_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         move_socket.connect((SI_TECH_HOST, SI_TECH_PORT))
         move_socket.settimeout(5)
-    except:
+        print("[SiPi CONNECTION] Move socket connected successfully")
+    except Exception as e:
+        print(f"[SiPi CONNECTION] Failed to connect move socket: {e}")
         move_socket = None
 
 def connect_command_socket():
     global command_socket
     try:
+        print(f"[SiPi CONNECTION] Attempting to connect command socket to {SI_TECH_HOST}:{SI_TECH_PORT}")
         command_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         command_socket.connect((SI_TECH_HOST, SI_TECH_PORT))
         command_socket.settimeout(5)
-    except:
+        print("[SiPi CONNECTION] Command socket connected successfully")
+    except Exception as e:
+        print(f"[SiPi CONNECTION] Failed to connect command socket: {e}")
         command_socket = None
 
 # Fire-and-forget for movement & tracking
@@ -288,16 +298,20 @@ def send_command(command, timeout=5, retries=1, terminator=None):
     global command_socket
     with command_socket_lock:
         if command_socket is None:
+            print("[SiPi COMMAND] No command socket, attempting to connect")
             connect_command_socket()
         s = command_socket
         if s is None:
+            print("[SiPi COMMAND] Failed to establish command socket connection")
             return ""
         try:
             orig_to = s.gettimeout()
-        except:
+        except Exception as e:
+            print(f"[SiPi COMMAND] Error getting socket timeout: {e}")
             orig_to = None
         try:
             s.settimeout(timeout)
+            print(f"[SiPi COMMAND] Sending command: {command.strip()}")
             s.sendall(command.encode('ascii'))
             response = ""
             while True:
@@ -306,19 +320,22 @@ def send_command(command, timeout=5, retries=1, terminator=None):
                     if not data:
                         break
                     decoded = data.decode('ascii')
-                    #print("RECV DEBUG:", repr(decoded))  # <--- INSERT THIS LINE
                     response += decoded
                     if terminator and terminator in response:
                         break  # Early exit
                 except socket.timeout:
+                    print("[SiPi COMMAND] Socket timeout while receiving response")
                     break
 
+            print(f"[SiPi COMMAND] Response length: {len(response)} chars")
             return response
-        except:
+        except Exception as e:
+            print(f"[SiPi COMMAND] Exception in send_command: {e}")
             try: s.close()
             except: pass
             command_socket = None
             if retries > 0:
+                print(f"[SiPi COMMAND] Retrying command (retries left: {retries-1})")
                 return send_command(command, timeout, retries - 1, terminator)
             return ""
         finally:
@@ -345,6 +362,7 @@ def get_site_version():
 # Status update loop (persistent_socket)
 def status_update_loop():
     global scope_status, persistent_socket
+    print("[SiPi STATUS] Starting status update loop")
     if persistent_socket is None:
         connect_persistent_socket()
     while True:
@@ -355,11 +373,22 @@ def status_update_loop():
                 if data:
                     with status_lock:
                         scope_status = data.decode('ascii')
+                        # Log first few status updates to verify communication
+                        if hasattr(status_update_loop, 'count'):
+                            status_update_loop.count += 1
+                        else:
+                            status_update_loop.count = 1
+                        if status_update_loop.count <= 5:
+                            print(f"[SiPi STATUS] Update #{status_update_loop.count}: {scope_status.strip()}")
+                else:
+                    print("[SiPi STATUS] No data received from ReadScopeStatus")
             else:
+                print("[SiPi STATUS] No persistent socket, attempting to connect")
                 connect_persistent_socket()
             # poll every 200 ms instead of 500 ms
             time.sleep(0.2)
-        except:
+        except Exception as e:
+            print(f"[SiPi STATUS] Exception in status loop: {e}")
             try: persistent_socket.close()
             except: pass
             persistent_socket = None
@@ -463,51 +492,111 @@ def status():
         boot_id=BOOT_ID
     )
 
+@app.route('/test_connection', methods=['GET'])
+def test_connection():
+    """Test connectivity to SiTechExe for debugging purposes"""
+    try:
+        # Test basic socket connection
+        test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        test_socket.settimeout(2)
+        test_socket.connect((SI_TECH_HOST, SI_TECH_PORT))
+        test_socket.close()
+        
+        # Test sending a simple command
+        version = send_command("GetSiTechVersion\n", timeout=2)
+        
+        # Check current socket states
+        status_info = {
+            'socket_test': 'SUCCESS - Can connect to SiTechExe',
+            'sitech_host': SI_TECH_HOST,
+            'sitech_port': SI_TECH_PORT,
+            'version_response': version.strip() if version else 'No response',
+            'persistent_socket': 'Connected' if persistent_socket else 'Disconnected',
+            'command_socket': 'Connected' if command_socket else 'Disconnected',
+            'move_socket': 'Connected' if move_socket else 'Disconnected',
+            'scope_status': scope_status
+        }
+        
+        return jsonify(status_info)
+        
+    except Exception as e:
+        return jsonify({
+            'socket_test': f'FAILED - {str(e)}',
+            'sitech_host': SI_TECH_HOST,
+            'sitech_port': SI_TECH_PORT,
+            'persistent_socket': 'Disconnected' if persistent_socket is None else 'Unknown',
+            'command_socket': 'Disconnected' if command_socket is None else 'Unknown',
+            'move_socket': 'Disconnected' if move_socket is None else 'Unknown',
+            'scope_status': scope_status
+        })
+
 @app.route('/search', methods=['POST'])    
 def search():
     q = request.form.get('query','')
     if not q:
         return jsonify(results=[])
-    # --- Debug print: command being sent ---
-    print(f"[SiPi SEARCH DEBUG] Sending: SearchDatabase {q}\\n")
-    raw = send_command(f"SearchDatabase {q}\n", timeout=5, retries=1, terminator="\n")
-    # --- Debug print: raw reply received ---
-    print(f"[SiPi SEARCH DEBUG] Reply: {repr(raw)}")
-    lines = raw.split('~') if '~' in raw else raw.splitlines()
-    results = []    
-    for ln in lines:
-        ln = ln.strip()
-        if not ln:
-            continue
-        main = ln.split(';')[0]
-        parts = [p.strip() for p in main.split(',')]
-        if len(parts) >= 2:
-            try:
-                raf = float(parts[0]); dcf = float(parts[1])
-            except:
-                raf = dcf = 0.0
-            with status_lock:
-                st = scope_status.split(';')
-            try:
-                lst = float(st[7].strip())
-            except:
-                lst = 0.0
-            if site_latitude is not None:
-                altf, azf = eq_to_alt_az(raf, dcf, lst, site_latitude)
-                alts = f"{altf:.2f}"
-                azs  = f"{azf:.2f}"
+    
+    try:
+        # --- Debug print: command being sent ---
+        print(f"[SiPi SEARCH DEBUG] Sending: SearchDatabase {q}")
+        raw = send_command(f"SearchDatabase {q}\n", timeout=5, retries=1, terminator="\n")
+        # --- Debug print: raw reply received ---
+        print(f"[SiPi SEARCH DEBUG] Reply: {repr(raw)}")
+        
+        if not raw or raw.strip() == "":
+            print("[SiPi SEARCH DEBUG] Empty response from SiTechExe")
+            return jsonify(results=[])
+        
+        lines = raw.split('~') if '~' in raw else raw.splitlines()
+        results = []    
+        
+        for ln in lines:
+            ln = ln.strip()
+            if not ln:
+                continue
+            main = ln.split(';')[0]
+            parts = [p.strip() for p in main.split(',')]
+            if len(parts) >= 2:
+                try:
+                    raf = float(parts[0]); dcf = float(parts[1])
+                except ValueError:
+                    print(f"[SiPi SEARCH DEBUG] Invalid coordinates: {parts[0]}, {parts[1]}")
+                    raf = dcf = 0.0
+                
+                with status_lock:
+                    st = scope_status.split(';')
+                try:
+                    lst = float(st[7].strip()) if len(st) > 7 else 0.0
+                except (ValueError, IndexError):
+                    lst = 0.0
+                
+                if site_latitude is not None:
+                    try:
+                        altf, azf = eq_to_alt_az(raf, dcf, lst, site_latitude)
+                        alts = f"{altf:.2f}"
+                        azs  = f"{azf:.2f}"
+                    except Exception as e:
+                        print(f"[SiPi SEARCH DEBUG] Alt/Az calculation error: {e}")
+                        alts = azs = "N/A"
+                else:
+                    alts = azs = "N/A"
+                
+                results.append({
+                    'ra': format_hms(parts[0]), 'raw_ra': parts[0],
+                    'dec': format_hms(parts[1]), 'raw_dec': parts[1],
+                    'alt': alts, 'az': azs,
+                    'info': ", ".join(parts[2:]) if len(parts)>2 else "",
+                    'rawResult': ln
+                })
             else:
-                alts = azs = "N/A"
-            results.append({
-                'ra': format_hms(parts[0]), 'raw_ra': parts[0],
-                'dec': format_hms(parts[1]), 'raw_dec': parts[1],
-                'alt': alts, 'az': azs,
-                'info': ", ".join(parts[2:]) if len(parts)>2 else "",
-                'rawResult': ln
-            })
-        else:
-            results.append({'result': ln, 'rawResult': ln})
-    return jsonify(results=results)
+                results.append({'result': ln, 'rawResult': ln})
+        
+        print(f"[SiPi SEARCH DEBUG] Processed {len(results)} results")
+        return jsonify(results=results)
+        
+    except Exception as e:
+        print(f"[SiPi SEARCH DEBUG] Exception in search: {e}")
+        return jsonify(results=[], error=str(e))
 
 @app.route('/sync', methods=['POST'])
 def sync():
@@ -1661,10 +1750,27 @@ def astrometric_admin():
     return render_template('astrometric.html')
 
 if __name__ == '__main__':
+    print(f"[SiPi STARTUP] Starting SiPi v{__version__}")
+    print(f"[SiPi STARTUP] Attempting to connect to SiTechExe at {SI_TECH_HOST}:{SI_TECH_PORT}")
+    
     get_site_location()
     connect_command_socket()
     connect_persistent_socket()
+    
+    # Test basic connectivity during startup
+    try:
+        test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        test_socket.settimeout(2)
+        test_socket.connect((SI_TECH_HOST, SI_TECH_PORT))
+        test_socket.close()
+        print("[SiPi STARTUP] SUCCESS: Can connect to SiTechExe")
+    except Exception as e:
+        print(f"[SiPi STARTUP] ERROR: Cannot connect to SiTechExe - {e}")
+        print("[SiPi STARTUP] Check if SiTechExe.exe is running and listening on port 8078")
+    
     initialize_astrometric_corrections()  # Initialize corrected catalogs
     wait_for_ip()
+    print("[SiPi STARTUP] Starting status update thread")
     threading.Thread(target=status_update_loop, daemon=True).start()
+    print("[SiPi STARTUP] Starting Flask web server on port 5000")
     app.run(host='0.0.0.0', port=5000, debug=False)
