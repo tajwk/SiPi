@@ -918,16 +918,17 @@ $(function(){
                 
                 showModal(successMsg, function(){
                   // The service is restarting, so we need to wait and then reload
-                  // Show waiting message with countdown
+                  // Show waiting message with countdown (no OK button - automatic)
                   
-                  let countdown = 12; // Start countdown from 12 seconds (service restarts in 5, give 7 extra for full startup)
+                  let countdown = 20; // Start countdown from 20 seconds (service restarts in 5, give 15 extra for full startup)
                   
                   function updateCountdown() {
                     $('#modalMsg').html(`🔄 Service restarting...<br><br>Page will refresh in ${countdown} seconds...`);
                   }
                   
-                  // Show initial countdown
+                  // Show initial countdown without buttons
                   updateCountdown();
+                  $('#modalBtns').html(''); // Remove all buttons
                   $('#modalBg').fadeIn(80);
                   
                   const countdownInterval = setInterval(function() {
