@@ -920,7 +920,7 @@ $(function(){
                   // The service is restarting, so we need to wait and then reload
                   // Show waiting message with countdown
                   
-                  let countdown = 8; // Start countdown from 8 seconds (service restarts in 5, give 3 extra)
+                  let countdown = 12; // Start countdown from 12 seconds (service restarts in 5, give 7 extra for full startup)
                   
                   function updateCountdown() {
                     $('#modalMsg').html(`🔄 Service restarting...<br><br>Page will refresh in ${countdown} seconds...`);
