@@ -22,7 +22,7 @@ from flask import (
 from astrometric_corrections import preprocess_catalogs_for_current_epoch
 
 # Initial SiPi version (bump patch for simple fixes)
-__version__ = "0.9.7x"
+__version__ = "0.9.7"
 
 # Base directory for Git operations
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -1395,6 +1395,44 @@ def apply_updates():
     except Exception as e:
         print(f"[DEBUG] apply_updates: Exception: {e}", flush=True)
         return jsonify(success=False, message=str(e))
+
+@app.route('/check_sitech_status', methods=['POST'])
+def check_sitech_status():
+    """Check if sitech.service is running and TCP connection is available"""
+    try:
+        # Check systemctl status
+        status_result = subprocess.run(
+            ['sudo', 'systemctl', 'is-active', 'sitech'],
+            capture_output=True, text=True, timeout=5
+        )
+        service_running = (status_result.returncode == 0 and status_result.stdout.strip() == 'active')
+        
+        # Check TCP connection
+        tcp_connected = False
+        if service_running:
+            try:
+                test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                test_socket.settimeout(2)
+                test_socket.connect((SI_TECH_HOST, SI_TECH_PORT))
+                test_socket.close()
+                tcp_connected = True
+            except Exception:
+                tcp_connected = False
+        
+        return jsonify({
+            'service_running': service_running,
+            'tcp_connected': tcp_connected,
+            'status_output': status_result.stdout.strip() if status_result.stdout else '',
+            'ready': service_running and tcp_connected
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'service_running': False,
+            'tcp_connected': False,
+            'error': str(e),
+            'ready': False
+        })
 
 # ────────────────────────────────────────────────────────────────────────────
 
