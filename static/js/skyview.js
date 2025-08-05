@@ -211,6 +211,18 @@ const deviceProfiler = new DeviceProfiler();
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('📡 SkyView init - Initializing adaptive performance optimizations...');
   
+  // Test basic connectivity first
+  try {
+    console.log('[SkyView] Testing server connectivity...');
+    const testResponse = await fetch('/status');
+    console.log('[SkyView] Connectivity test:', testResponse.status, testResponse.statusText);
+    if (!testResponse.ok) {
+      console.warn('[SkyView] Server connectivity issue detected');
+    }
+  } catch (e) {
+    console.error('[SkyView] Connectivity test failed:', e);
+  }
+  
   // Initialize device profiler first
   await deviceProfiler.initialize();
   console.log('[PERF] Performance optimizations applied successfully!');
@@ -224,6 +236,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Flip state for East/West mirroring
   let isFlipped = localStorage.getItem('flipSkyView') === 'true';
+
+  // Guard to prevent overlapping draws
+  let isDrawing = false;
+
+  // UI Toggle Elements
+  const toggleCalPoints = document.getElementById('toggleCalPoints');
 
   // Convert degrees → "DDD:MM:SS"
   function degToDMS(deg) {
@@ -1359,23 +1377,30 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function draw(){
-    // Debug: log mountPos before drawing reticle
-    console.log('[SkyView] draw() called, mountPos:', mountPos);
-    console.log('[SkyView] draw() called');
-    console.log('[SkyView] Canvas size:', canvas.width, 'x', canvas.height, 'CSS:', canvas.style.width, 'x', canvas.style.height, 'dpr:', dpr, 'canvasScale:', canvasScale, 'translateX:', translateX, 'translateY:', translateY, 'currentVpScale:', currentVpScale);
-    // clear canvas with proper coordinate system
-    ctx.save();
-    ctx.resetTransform(); // Ensure we clear in untransformed space
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    ctx.restore();
+    if (isDrawing) {
+      console.log('[SkyView] Draw already in progress, skipping...');
+      return;
+    }
+    
+    isDrawing = true;
+    try {
+      // Debug: log mountPos before drawing reticle
+      console.log('[SkyView] draw() called, mountPos:', mountPos);
+      console.log('[SkyView] draw() called');
+      console.log('[SkyView] Canvas size:', canvas.width, 'x', canvas.height, 'CSS:', canvas.style.width, 'x', canvas.style.height, 'dpr:', dpr, 'canvasScale:', canvasScale, 'translateX:', translateX, 'translateY:', translateY, 'currentVpScale:', currentVpScale);
+      // clear canvas with proper coordinate system
+      ctx.save();
+      ctx.resetTransform(); // Ensure we clear in untransformed space
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.restore();
 
-    // apply pan & zoom
-    ctx.resetTransform();
-    ctx.translate(translateX, translateY);
-    ctx.scale(dpr * currentVpScale * canvasScale, dpr * currentVpScale * canvasScale);
+      // apply pan & zoom
+      ctx.resetTransform();
+      ctx.translate(translateX, translateY);
+      ctx.scale(dpr * currentVpScale * canvasScale, dpr * currentVpScale * canvasScale);
 
-    // Apply horizontal flip if enabled
-    if (isFlipped) {
+      // Apply horizontal flip if enabled
+      if (isFlipped) {
       ctx.translate(cx, 0);
       ctx.scale(-1, 1);
       ctx.translate(-cx, 0);
@@ -2275,18 +2300,59 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (skyViewContainer && skyViewContainer.style.display !== 'none') {
       // Removed extra STOP button overlay (red octagon) from canvas drawing
     }
+    } finally {
+      isDrawing = false;
+    }
   }
 
   // === Data loading ===
+  console.log('[SkyView] Starting catalog data loading...');
+  
+  // Load stars first
   try {
-    stars = await (await fetch('/corrected_stars.json')).json();
+    console.log('[SkyView] Fetching stars data...');
+    const starsResponse = await fetch('/corrected_stars.json');
+    console.log('[SkyView] Stars response status:', starsResponse.status, starsResponse.statusText);
+    
+    if (!starsResponse.ok) {
+      throw new Error(`HTTP ${starsResponse.status}: ${starsResponse.statusText}`);
+    }
+    
+    stars = await starsResponse.json();
     console.log('[SkyView] Loaded stars:', stars.length);
   } catch(e) {
-    console.error('stars load', e);
+    console.error('[SkyView] Stars load error:', e);
+    console.error('[SkyView] Error details:', {
+      name: e.name,
+      message: e.message,
+      stack: e.stack
+    });
+    // Try fallback to original stars.json
+    try {
+      console.log('[SkyView] Attempting fallback to original stars.json...');
+      const fallbackResponse = await fetch('/static/stars.json');
+      if (fallbackResponse.ok) {
+        stars = await fallbackResponse.json();
+        console.log('[SkyView] Loaded fallback stars:', stars.length);
+      }
+    } catch(fallbackError) {
+      console.error('[SkyView] Fallback stars load failed:', fallbackError);
+    }
   }
 
+  // Small delay before loading constellations
+  await new Promise(resolve => setTimeout(resolve, 100));
+
   try {
-    const geo = await (await fetch('/corrected_constellations.json')).json();
+    console.log('[SkyView] Fetching constellations data...');
+    const constResponse = await fetch('/corrected_constellations.json');
+    console.log('[SkyView] Constellations response status:', constResponse.status, constResponse.statusText);
+    
+    if (!constResponse.ok) {
+      throw new Error(`HTTP ${constResponse.status}: ${constResponse.statusText}`);
+    }
+    
+    const geo = await constResponse.json();
     constFeatures = geo.features;
     geo.features.forEach(f=>{
       const g=f.geometry;
@@ -2295,7 +2361,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     console.log('[SkyView] Loaded constellations:', constFeatures.length, 'lines:', constLines.length);
   } catch(e) {
-    console.error('constellations load', e);
+    console.error('[SkyView] Constellations load error:', e);
+    console.error('[SkyView] Constellations error details:', {
+      name: e.name,
+      message: e.message,
+      stack: e.stack
+    });
   }
 
   try {
@@ -2366,17 +2437,39 @@ document.addEventListener('DOMContentLoaded', async () => {
   // --- Calibration Points ---
   let calPoints = [];
   let calPointHits = [];
-  const toggleCalPoints = document.getElementById('toggleCalPoints');
+
+  let fetchingCalPoints = false; // Guard to prevent overlapping fetches
 
   async function fetchCalPoints() {
+    if (fetchingCalPoints) {
+      console.log('[SkyView] Cal points fetch already in progress, skipping...');
+      return;
+    }
+    
+    fetchingCalPoints = true;
     try {
+      console.log('[SkyView] Fetching calibration points...');
       const resp = await fetch('/cal_points');
+      console.log('[SkyView] Cal points response status:', resp.status, resp.statusText);
+      
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+      }
+      
       const data = await resp.json();
       calPoints = data.points || [];
-      draw();
+      console.log('[SkyView] Loaded calibration points:', calPoints.length);
+      // Don't call draw() automatically - let the main update loop handle it
     } catch (e) {
-      console.error('Failed to load calibration points', e);
+      console.error('[SkyView] Failed to load calibration points:', e);
+      console.error('[SkyView] Cal points error details:', {
+        name: e.name,
+        message: e.message,
+        stack: e.stack
+      });
       calPoints = [];
+    } finally {
+      fetchingCalPoints = false;
     }
   }
 
