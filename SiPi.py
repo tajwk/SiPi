@@ -429,8 +429,8 @@ def status_update_loop():
             try: persistent_socket.close()
             except: pass
             persistent_socket = None
-            # reconnect delay of 200 ms
-            time.sleep(0.2)
+            # Longer reconnect delay when service is restarting to prevent browser overload
+            time.sleep(2.0)  # Increased from 0.2 to 2.0 seconds
             connect_persistent_socket()
 
 # --- Flask routes ---
@@ -2060,7 +2060,10 @@ def sitech_service_control():
                               capture_output=True, text=True, timeout=30)
         
         if result.returncode == 0:
-            return jsonify(success=True, message=f"SiTech service {action} completed successfully")
+            # Add a brief delay after service operations to prevent connection issues
+            if action in ['start', 'restart']:
+                time.sleep(2)  # Give service time to fully start
+            return jsonify(success=True, message=f"SiTech service {action} completed successfully. Please wait a moment for connections to stabilize.")
         else:
             return jsonify(success=False, message=f"Failed to {action} service: {result.stderr}")
     except subprocess.TimeoutExpired:

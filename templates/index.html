@@ -549,7 +549,7 @@
   </style>
 
   <script src="{{ url_for('static', filename='js/jquery-3.6.0.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='js/skyview.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/skyview.js') }}?v={{ range(1000, 9999) | random }}" defer></script>
 </head>
 <body>
   <script type="text/javascript">
@@ -702,15 +702,15 @@
       <div style="display: flex; flex-direction: column; gap: 3px; align-items: flex-start;">
         <div style="display: flex; gap: 10px;">
           <label style="display: flex; align-items: center; min-width: 120px;">
-            Alt: <input id="gotoAlt" type="text" placeholder="DD:MM:SS" style="margin-left: 12px; width: 80px;">
+            Alt: <input id="gotoAlt" type="text" placeholder="DDD:MM:SS" style="margin-left: 12px; width: 80px;">
           </label>
           <label style="display: flex; align-items: center; min-width: 120px;">
-            Az: <input id="gotoAz" type="text" placeholder="DD:MM:SS" style="margin-left: 12px; width: 80px;">
+            Az: <input id="gotoAz" type="text" placeholder="DDD:MM:SS" style="margin-left: 12px; width: 80px;">
           </label>
         </div>
         <div style="display: flex; gap: 10px;">
           <label style="display: flex; align-items: center; min-width: 120px;">
-            Dec: <input id="gotoDec" type="text" placeholder="DD:MM:SS" style="margin-left: 9px; width: 80px;">
+            Dec: <input id="gotoDec" type="text" placeholder="DDD:MM:SS" style="margin-left: 9px; width: 80px;">
           </label>
           <label style="display: flex; align-items: center; min-width: 120px;">
             RA: <input id="gotoRA" type="text" placeholder="HH:MM:SS" style="margin-left: 12px; width: 80px;">

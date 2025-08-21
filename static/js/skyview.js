@@ -1,5 +1,35 @@
 // static/js/skyview.js
 
+// IMMEDIATE MOBILE DEBUG TEST - Show this appears right when script loads
+if (typeof window !== 'undefined') {
+  setTimeout(() => {
+    const testDiv = document.createElement('div');
+    testDiv.innerHTML = 'MOBILE DEBUG: SkyView JS Loaded!';
+    testDiv.style.cssText = `
+      position: fixed;
+      top: 50px;
+      left: 10px;
+      right: 10px;
+      background: #ff0000;
+      color: #ffffff;
+      padding: 10px;
+      font-size: 16px;
+      font-weight: bold;
+      text-align: center;
+      z-index: 99999;
+      border: 3px solid #ffff00;
+    `;
+    document.body.appendChild(testDiv);
+    
+    // Auto-hide after 3 seconds
+    setTimeout(() => {
+      if (testDiv && testDiv.parentNode) {
+        testDiv.parentNode.removeChild(testDiv);
+      }
+    }, 3000);
+  }, 500);
+}
+
 // Device Performance Profiling and Adaptive Optimizations
 class DeviceProfiler {
   constructor() {
@@ -512,6 +542,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   const altInput      = document.getElementById('gotoAlt');
   const raInput       = document.getElementById('gotoRA');
   const decInput      = document.getElementById('gotoDec');
+  
+  // Mobile debugging - check if input elements exist
+  console.log('[SkyView] MOBILE DEBUG - Input elements found:', {
+    azInput: !!azInput,
+    altInput: !!altInput,
+    raInput: !!raInput,
+    decInput: !!decInput
+  });
+  
   const magInfo       = document.getElementById('magInfo');
   const hipInfo       = document.getElementById('hipInfo');
   const hdInfo        = document.getElementById('hdInfo');
@@ -549,10 +588,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   const redrawBtn = document.getElementById('redrawBtn');
   if (redrawBtn) {
     redrawBtn.onclick = function() {
+      console.log('[SkyView] MOBILE DEBUG - Redraw button clicked');
       canvasScale = 1;
       translateX = 0;
       translateY = 0;
-      draw();
+      
+      // Force fresh mount position update on mobile
+      console.log('[SkyView] MOBILE DEBUG - Forcing mount position update');
+      fetchMount().then(() => {
+        console.log('[SkyView] MOBILE DEBUG - Mount position updated, redrawing');
+        draw();
+      }).catch(err => {
+        console.log('[SkyView] MOBILE DEBUG - Mount position update failed, drawing anyway:', err);
+        draw();
+      });
     };
   }
   
@@ -1093,6 +1142,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       if (hitObj) {
         selectedObject = hitObj;
+        
+        // MOBILE DEBUG - Show object selection happened
+        document.title = `MOBILE: Selected ${hitObj.Name || hitObj.name || 'Object'}`;
+        setTimeout(() => {
+          document.title = 'SiPi Telescope Control';
+        }, 3000);
+        
         showSelectedAttributes(selectedObject);
         // Show popup for cal point, else normal attributes
         if (hitObj.isCalPoint) {
@@ -1140,6 +1196,51 @@ document.addEventListener('DOMContentLoaded', async () => {
           if (altInput && azInput && typeof hitObj.altDeg === 'number' && typeof hitObj.azDeg === 'number') {
             altInput.value = degToDMS(hitObj.altDeg);
             azInput.value = degToDMS(hitObj.azDeg);
+          }
+          
+          // MOBILE DEBUG - Simple Dec/RA assignment (same pattern as Alt/Az above)
+          if (raInput && decInput) {
+            // Check if object has direct RA/Dec coordinates
+            if (typeof hitObj.RtAsc === 'number' && typeof hitObj.Declin === 'number') {
+              // Use the same format conversion as the complex logic but simpler
+              const raValue = decimalHMStoHMS(hitObj.RtAsc);
+              const decValue = degToDMS(hitObj.Declin);
+              
+              raInput.value = raValue;
+              decInput.value = decValue;
+              
+              // MOBILE DEBUG - Show success using page title
+              document.title = `MOBILE SIMPLE: RA/Dec assigned from RtAsc/Declin`;
+              setTimeout(() => {
+                document.title = 'SiPi Telescope Control';
+              }, 3000);
+              
+            } else if (typeof hitObj.ra === 'number' && typeof hitObj.dec === 'number') {
+              // Fallback to ra/dec properties
+              const raValue = decimalHMStoHMS(hitObj.ra);
+              const decValue = degToDMS(hitObj.dec);
+              
+              raInput.value = raValue;
+              decInput.value = decValue;
+              
+              // MOBILE DEBUG - Show success using page title
+              document.title = `MOBILE SIMPLE: RA/Dec assigned from ra/dec`;
+              setTimeout(() => {
+                document.title = 'SiPi Telescope Control';
+              }, 3000);
+            } else {
+              // MOBILE DEBUG - Show what properties are available
+              document.title = `MOBILE SIMPLE: No RA/Dec coords found`;
+              setTimeout(() => {
+                document.title = 'SiPi Telescope Control';
+              }, 3000);
+            }
+          } else {
+            // MOBILE DEBUG - Show input status
+            document.title = `MOBILE SIMPLE: raInput=${!!raInput} decInput=${!!decInput}`;
+            setTimeout(() => {
+              document.title = 'SiPi Telescope Control';
+            }, 3000);
           }
         }
         draw();
@@ -1285,8 +1386,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
   canvas.addEventListener('pointerup', e => {
-    // Mouse: fast click selection
-    if (pointerDownInfo && pointerDownInfo.pointerType === 'mouse') {
+    try {
+      console.log('[MOBILE CRITICAL] Starting pointerup event handler');
+      
+      // Mouse: fast click selection
+      if (pointerDownInfo && pointerDownInfo.pointerType === 'mouse') {
       const dt = Date.now() - pointerDownInfo.time;
       const {mx: downX, my: downY} = pointerDownInfo;
       const {mx: upX, my: upY} = transformEvent(e);
@@ -1315,6 +1419,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         if (candidates.length > 0) {
           console.log('[SkyView] Found candidates:', candidates.map(c => c.Name || c.name || 'unnamed'));
+          
+          // MOBILE DEBUG - Use page title to show we got this far
+          document.title = `MOBILE: Found ${candidates.length} candidates`;
+          setTimeout(() => {
+            document.title = 'SiPi Telescope Control';
+          }, 2000);
         }
         if (toggleCalPoints && toggleCalPoints.checked && calPointHits.length) {
           for (let pt of calPointHits) {
@@ -1343,6 +1453,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         if (hitObj) {
           selectedObject = hitObj;
+          
+          // MOBILE DEBUG - Alert to ensure this code is running
+          console.log('[MOBILE CRITICAL] Object selection triggered!');
+          console.log('[MOBILE CRITICAL] User agent:', navigator.userAgent);
+          console.log('[MOBILE CRITICAL] Touch device:', 'ontouchstart' in window);
+          console.log('[MOBILE CRITICAL] Input elements exist:', {
+            raInput: !!raInput,
+            decInput: !!decInput,
+            altInput: !!altInput,
+            azInput: !!azInput
+          });
+          
           console.log('[SkyView] Object selected:', hitObj.Name || hitObj.name, 'type:', hitObj.type);
           console.log('[SkyView] DEBUG - Full object properties:');
           for (let key in hitObj) {
@@ -1398,17 +1520,160 @@ document.addEventListener('DOMContentLoaded', async () => {
               }
             }, 0);
           } else {
-            // Update coordinate textboxes for catalog objects (stars, galaxies, etc.)
-            console.log('[SkyView] Selected object:', hitObj.Name || hitObj.name);
+            // MOBILE DEBUG - Show we entered the coordinate assignment section
+            document.title = `MOBILE: Entering coord assignment for ${hitObj.Name || hitObj.name}`;
+            setTimeout(() => {
+              document.title = 'SiPi Telescope Control';
+            }, 4000);
             
-            // All catalog objects have RtAsc/Declin - use them directly
-            if (hitObj.RtAsc !== undefined && hitObj.Declin !== undefined) {
-              console.log('[SkyView] DEBUG - hitObj.RtAsc value:', hitObj.RtAsc, 'type:', typeof hitObj.RtAsc);
-              console.log('[SkyView] DEBUG - Expected: 9.787334 should give 09:47:14');
+            try {
+              console.log('[MOBILE CRITICAL] Starting coordinate assignment logic');
               
-              // Set RA/Dec textboxes from catalog values
-              raInput.value = decimalHMStoHMS(hitObj.RtAsc);  // RtAsc decimal hours → HH:MM:SS
-              decInput.value = degToDMS(hitObj.Declin);       // Declin degrees → DDD:MM:SS
+              // MOBILE DEBUG - Re-verify input elements are still accessible
+              const freshRAInput = document.getElementById('gotoRA');
+              const freshDecInput = document.getElementById('gotoDec');
+              const freshAltInput = document.getElementById('gotoAlt');
+              const freshAzInput = document.getElementById('gotoAz');
+              
+              console.log('[MOBILE CRITICAL] Fresh input element check:', {
+                freshRAInput: !!freshRAInput,
+                freshDecInput: !!freshDecInput,
+                freshAltInput: !!freshAltInput,
+                freshAzInput: !!freshAzInput,
+                cachedRAInput: !!raInput,
+                cachedDecInput: !!decInput,
+                cachedAltInput: !!altInput,
+                cachedAzInput: !!azInput
+              });
+              
+              // Use fresh references if cached ones are null
+              const workingRAInput = raInput || freshRAInput;
+              const workingDecInput = decInput || freshDecInput;
+              
+              // MOBILE DEBUG - Show input element status immediately
+              document.title = `MOBILE: RA=${!!workingRAInput} Dec=${!!workingDecInput}`;
+              setTimeout(() => {
+                document.title = 'SiPi Telescope Control';
+              }, 5000);
+              
+              console.log('[MOBILE CRITICAL] Working input elements:', {
+                workingRAInput: !!workingRAInput,
+                workingDecInput: !!workingDecInput
+              });
+              
+              console.log('[MOBILE CRITICAL] Input elements found:', {
+                raInput: !!raInput,
+                decInput: !!decInput,
+                altInput: !!altInput,
+                azInput: !!azInput
+              });
+              
+              // MOBILE DEBUG - Check if inputs are actually writable
+              if (workingRAInput) {
+                console.log('[MOBILE CRITICAL] RA input details:', {
+                  id: workingRAInput.id,
+                  type: workingRAInput.type,
+                  disabled: workingRAInput.disabled,
+                  readonly: workingRAInput.readOnly,
+                  style: workingRAInput.style.cssText
+                });
+              }
+              if (workingDecInput) {
+                console.log('[MOBILE CRITICAL] Dec input details:', {
+                  id: workingDecInput.id,
+                  type: workingDecInput.type,
+                  disabled: workingDecInput.disabled,
+                  readonly: workingDecInput.readOnly,
+                  style: workingDecInput.style.cssText
+                });
+              }
+              
+              // Update coordinate textboxes for catalog objects (stars, galaxies, etc.)
+              console.log('[SkyView] Selected object:', hitObj.Name || hitObj.name);
+              
+              // All catalog objects have RtAsc/Declin - use them directly
+              if (hitObj.RtAsc !== undefined && hitObj.Declin !== undefined) {
+                console.log('[MOBILE CRITICAL] Entering RtAsc/Declin branch');
+                console.log('[SkyView] DEBUG - hitObj.RtAsc value:', hitObj.RtAsc, 'type:', typeof hitObj.RtAsc);
+                console.log('[SkyView] DEBUG - Expected: 9.787334 should give 09:47:14');
+                
+                // Set RA/Dec textboxes from catalog values
+                console.log('[MOBILE CRITICAL] About to call decimalHMStoHMS with:', hitObj.RtAsc);
+                const raValue = decimalHMStoHMS(hitObj.RtAsc);  // RtAsc decimal hours → HH:MM:SS
+                console.log('[MOBILE CRITICAL] decimalHMStoHMS returned:', raValue);
+                
+                console.log('[MOBILE CRITICAL] About to call degToDMS with:', hitObj.Declin);
+                const decValue = degToDMS(hitObj.Declin);       // Declin degrees → DDD:MM:SS (3 digits)
+                console.log('[MOBILE CRITICAL] degToDMS returned:', decValue);
+                
+                console.log('[MOBILE CRITICAL] About to assign coordinates - RA:', raValue, 'Dec:', decValue);
+                
+                if (raInput) {
+                  raInput.value = raValue;
+                  console.log('[MOBILE CRITICAL] RA assigned, actual value:', raInput.value);
+                }
+                if (decInput) {
+                  decInput.value = decValue;
+                  console.log('[MOBILE CRITICAL] Dec assigned, actual value:', decInput.value);
+                }
+                
+                // MOBILE DEBUG - Aggressive confirmation
+                console.log('[MOBILE CRITICAL] Coordinate assignment completed!');
+                console.log('[MOBILE CRITICAL] RA value:', raValue, 'set to input:', raInput ? raInput.value : 'NO INPUT');
+                console.log('[MOBILE CRITICAL] Dec value:', decValue, 'set to input:', decInput ? decInput.value : 'NO INPUT');
+              
+              // Mobile debugging - log coordinate assignment
+              console.log('[SkyView] MOBILE DEBUG - Coordinate assignment:');
+              console.log('  RA Input exists:', !!raInput, 'Value set to:', raValue);
+              console.log('  Dec Input exists:', !!decInput, 'Value set to:', decValue);
+              console.log('  RA Input actual value:', raInput ? raInput.value : 'N/A');
+              console.log('  Dec Input actual value:', decInput ? decInput.value : 'N/A');
+              
+              // Force input field visibility and highlighting for mobile debug
+              if (raInput) {
+                raInput.style.backgroundColor = '#333';
+                raInput.style.color = '#fff';
+                raInput.style.border = '2px solid #555';
+              }
+              if (decInput) {
+                decInput.style.backgroundColor = '#333';
+                decInput.style.color = '#fff';
+                decInput.style.border = '2px solid #555';
+              }
+              
+              // Add mobile-friendly coordinate display
+              let mobileCoordDisplay = document.getElementById('mobileCoordDisplay');
+              if (!mobileCoordDisplay) {
+                mobileCoordDisplay = document.createElement('div');
+                mobileCoordDisplay.id = 'mobileCoordDisplay';
+                mobileCoordDisplay.style.cssText = `
+                  position: fixed;
+                  bottom: 70px;
+                  left: 10px;
+                  right: 10px;
+                  background: rgba(0, 0, 0, 0.8);
+                  color: #fff;
+                  padding: 8px;
+                  border-radius: 4px;
+                  border: 1px solid #555;
+                  font-size: 14px;
+                  text-align: center;
+                  z-index: 1000;
+                  display: none;
+                `;
+                document.body.appendChild(mobileCoordDisplay);
+              }
+              
+              // Show coordinates prominently for mobile
+              mobileCoordDisplay.innerHTML = `Dec: ${decValue} | RA: ${raValue}`;
+              mobileCoordDisplay.style.display = 'block';
+              
+              // Auto-hide after 5 seconds
+              setTimeout(() => {
+                if (mobileCoordDisplay) {
+                  mobileCoordDisplay.style.display = 'none';
+                }
+              }, 5000);
               
               // Calculate Alt/Az from catalog RA/Dec
               const raHours = hitObj.RtAsc; // RA is already in decimal hours format
@@ -1439,12 +1704,85 @@ document.addEventListener('DOMContentLoaded', async () => {
               altInput.value = degToDMS(coords.alt);
               azInput.value = degToDMS(correctedAz); // Use corrected azimuth
               
+              // MOBILE DEBUG - Use page title to show Alt/Az success for comparison
+              const altValue = degToDMS(coords.alt);
+              const azValue = degToDMS(correctedAz);
+              const originalTitle = document.title;
+              document.title = `Alt/Az OK: ${altInput.value === altValue && azInput.value === azValue} | ${originalTitle}`;
+              setTimeout(() => {
+                document.title = originalTitle;
+              }, 5000);
+              
               console.log('[SkyView] Using catalog RtAsc/Declin - RA:', raInput.value, 'Dec:', decInput.value);
               console.log('[SkyView] Calculated Alt/Az - Alt:', altInput.value, 'Az:', azInput.value);
+              
+              // MOBILE DEBUG - Verify values stick after a short delay
+              setTimeout(() => {
+                console.log('[MOBILE CRITICAL] Post-assignment verification (after 100ms):');
+                if (workingRAInput) {
+                  console.log('[MOBILE CRITICAL] RA input final value:', workingRAInput.value);
+                  console.log('[MOBILE CRITICAL] RA still matches expected:', workingRAInput.value === raValue);
+                }
+                if (workingDecInput) {
+                  console.log('[MOBILE CRITICAL] Dec input final value:', workingDecInput.value);
+                  console.log('[MOBILE CRITICAL] Dec still matches expected:', workingDecInput.value === decValue);
+                }
+                
+                // Use status bar or page title for mobile debugging instead of overlay
+                const raMatch = workingRAInput ? (workingRAInput.value === raValue) : false;
+                const decMatch = workingDecInput ? (workingDecInput.value === decValue) : false;
+                
+                // Try to find and update an existing status element, or use document title
+                const statusElement = document.querySelector('.status') || document.querySelector('#status');
+                if (statusElement) {
+                  const originalText = statusElement.textContent;
+                  statusElement.textContent = `DEBUG: RA=${raMatch} Dec=${decMatch}`;
+                  setTimeout(() => {
+                    statusElement.textContent = originalText;
+                  }, 3000);
+                } else {
+                  // Fallback: Use document title for debug info
+                  const originalTitle = document.title;
+                  document.title = `DEBUG: RA=${raMatch} Dec=${decMatch} | ${originalTitle}`;
+                  setTimeout(() => {
+                    document.title = originalTitle;
+                  }, 3000);
+                }
+              }, 100);
             } else if (hitObj.ra !== undefined && hitObj.dec !== undefined) {
               // Fallback for objects with ra/dec properties
-              raInput.value = decimalHMStoHMS(hitObj.ra);
-              decInput.value = degToDMS(hitObj.dec);
+              console.log('[MOBILE CRITICAL] Entering ra/dec fallback branch');
+              console.log('[MOBILE CRITICAL] hitObj.ra:', hitObj.ra, 'hitObj.dec:', hitObj.dec);
+              
+              console.log('[MOBILE CRITICAL] About to call decimalHMStoHMS with:', hitObj.ra);
+              const raValue = decimalHMStoHMS(hitObj.ra);
+              console.log('[MOBILE CRITICAL] decimalHMStoHMS returned:', raValue);
+              
+              console.log('[MOBILE CRITICAL] About to call degToDMS with:', hitObj.dec);
+              const decValue = degToDMS(hitObj.dec);
+              console.log('[MOBILE CRITICAL] degToDMS returned:', decValue);
+              
+              console.log('[MOBILE CRITICAL] About to assign fallback values to inputs');
+              if (raInput) {
+                console.log('[MOBILE CRITICAL] Fallback RA input before assignment:', raInput.value);
+                raInput.value = raValue;
+                console.log('[MOBILE CRITICAL] Fallback RA input after assignment:', raInput.value);
+              } else {
+                console.error('[MOBILE CRITICAL] FALLBACK RA INPUT IS NULL!');
+              }
+              
+              if (decInput) {
+                console.log('[MOBILE CRITICAL] Fallback Dec input before assignment:', decInput.value);
+                decInput.value = decValue;
+                console.log('[MOBILE CRITICAL] Fallback Dec input after assignment:', decInput.value);
+              } else {
+                console.error('[MOBILE CRITICAL] FALLBACK DEC INPUT IS NULL!');
+              }
+              
+              // MOBILE DEBUG - Aggressive confirmation for fallback
+              console.log('[MOBILE CRITICAL] Fallback coordinate assignment completed!');
+              console.log('[MOBILE CRITICAL] RA value:', raValue, 'set to input:', raInput ? raInput.value : 'NO INPUT');
+              console.log('[MOBILE CRITICAL] Dec value:', decValue, 'set to input:', decInput ? decInput.value : 'NO INPUT');
               
               const raHours = hitObj.ra;
               const coords = eqToAltAz(raHours, hitObj.dec, lat, lon); // Use server time
@@ -1460,11 +1798,219 @@ document.addEventListener('DOMContentLoaded', async () => {
               altInput.value = degToDMS(coords.alt);
               azInput.value = degToDMS(correctedAz);
             } else {
-              console.log('[SkyView] Warning: Object has no RA/Dec coordinates');
+              console.log('[MOBILE CRITICAL] No RA/Dec coordinates found!');
+              console.log('[MOBILE CRITICAL] Object properties available:', Object.keys(hitObj));
+              console.log('[MOBILE CRITICAL] Checking for any coordinate-like properties...');
+              
+              // Try to find any coordinate data in the object
+              let foundRA = null;
+              let foundDec = null;
+              
+              // Check various possible property names
+              const raPossible = ['RtAsc', 'ra', 'RA', 'rightAscension'];
+              const decPossible = ['Declin', 'dec', 'DEC', 'declination'];
+              
+              for (let prop of raPossible) {
+                if (hitObj[prop] !== undefined) {
+                  foundRA = hitObj[prop];
+                  console.log('[MOBILE CRITICAL] Found RA as:', prop, '=', foundRA);
+                  break;
+                }
+              }
+              
+              for (let prop of decPossible) {
+                if (hitObj[prop] !== undefined) {
+                  foundDec = hitObj[prop];
+                  console.log('[MOBILE CRITICAL] Found Dec as:', prop, '=', foundDec);
+                  break;
+                }
+              }
+              
+              // If we found coordinates, assign them
+              if (foundRA !== null && foundDec !== null) {
+                console.log('[MOBILE CRITICAL] Attempting universal coordinate assignment');
+                
+                // Assume foundRA is in decimal hours, foundDec in decimal degrees
+                const raValue = decimalHMStoHMS(foundRA);
+                const decValue = degToDMS(foundDec);
+                console.log('[MOBILE CRITICAL] degToDMS returned:', decValue);
+                
+                console.log('[MOBILE CRITICAL] About to assign values to inputs');
+                console.log('[MOBILE CRITICAL] workingRAInput exists:', !!workingRAInput, 'workingDecInput exists:', !!workingDecInput);
+                
+                // MOBILE DEBUG - Try assignment with detailed logging
+                if (workingRAInput) {
+                  console.log('[MOBILE CRITICAL] RA input before assignment:', workingRAInput.value);
+                  
+                  // MOBILE DEBUG - Temporarily change the input placeholder to show debug info
+                  const originalRAPlaceholder = workingRAInput.placeholder;
+                  
+                  // Test different assignment methods for mobile compatibility
+                  console.log('[MOBILE CRITICAL] Testing RA assignment methods...');
+                  
+                  // Method 1: Direct assignment
+                  workingRAInput.value = raValue;
+                  console.log('[MOBILE CRITICAL] Method 1 - Direct assignment result:', workingRAInput.value);
+                  workingRAInput.placeholder = `DEBUG: Expected ${raValue}, Got ${workingRAInput.value}`;
+                  
+                  // Method 2: setAttribute
+                  workingRAInput.setAttribute('value', raValue);
+                  console.log('[MOBILE CRITICAL] Method 2 - setAttribute result:', workingRAInput.value);
+                  
+                  // Method 3: Focus and set value
+                  workingRAInput.focus();
+                  workingRAInput.value = raValue;
+                  workingRAInput.blur();
+                  console.log('[MOBILE CRITICAL] Method 3 - Focus/blur result:', workingRAInput.value);
+                  
+                  console.log('[MOBILE CRITICAL] RA assignment success:', workingRAInput.value === raValue);
+                  
+                  // Force trigger events that might be needed for mobile
+                  workingRAInput.dispatchEvent(new Event('input', { bubbles: true }));
+                  workingRAInput.dispatchEvent(new Event('change', { bubbles: true }));
+                  console.log('[MOBILE CRITICAL] RA input events dispatched');
+                  
+                  // Restore original placeholder after a delay
+                  setTimeout(() => {
+                    workingRAInput.placeholder = originalRAPlaceholder;
+                  }, 5000);
+                  
+                } else {
+                  console.error('[MOBILE CRITICAL] RA INPUT IS NULL/UNDEFINED!');
+                }
+                
+                if (workingDecInput) {
+                  console.log('[MOBILE CRITICAL] Dec input before assignment:', workingDecInput.value);
+                  
+                  // MOBILE DEBUG - Temporarily change the input placeholder to show debug info
+                  const originalDecPlaceholder = workingDecInput.placeholder;
+                  
+                  // Test different assignment methods for mobile compatibility
+                  console.log('[MOBILE CRITICAL] Testing Dec assignment methods...');
+                  
+                  // Method 1: Direct assignment
+                  workingDecInput.value = decValue;
+                  console.log('[MOBILE CRITICAL] Method 1 - Direct assignment result:', workingDecInput.value);
+                  workingDecInput.placeholder = `DEBUG: Expected ${decValue}, Got ${workingDecInput.value}`;
+                  
+                  // Method 2: setAttribute
+                  workingDecInput.setAttribute('value', decValue);
+                  console.log('[MOBILE CRITICAL] Method 2 - setAttribute result:', workingDecInput.value);
+                  
+                  // Method 3: Focus and set value
+                  workingDecInput.focus();
+                  workingDecInput.value = decValue;
+                  workingDecInput.blur();
+                  console.log('[MOBILE CRITICAL] Method 3 - Focus/blur result:', workingDecInput.value);
+                  
+                  console.log('[MOBILE CRITICAL] Dec assignment success:', workingDecInput.value === decValue);
+                  
+                  // Force trigger events that might be needed for mobile
+                  workingDecInput.dispatchEvent(new Event('input', { bubbles: true }));
+                  workingDecInput.dispatchEvent(new Event('change', { bubbles: true }));
+                  console.log('[MOBILE CRITICAL] Dec input events dispatched');
+                  
+                  // Restore original placeholder after a delay
+                  setTimeout(() => {
+                    workingDecInput.placeholder = originalDecPlaceholder;
+                  }, 5000);
+                  
+                } else {
+                  console.error('[MOBILE CRITICAL] DEC INPUT IS NULL/UNDEFINED!');
+                }
+                
+                console.log('[MOBILE CRITICAL] Universal RA value:', raValue, 'set to input:', raInput ? raInput.value : 'NO INPUT');
+                console.log('[MOBILE CRITICAL] Universal Dec value:', decValue, 'set to input:', decInput ? decInput.value : 'NO INPUT');
+              } else {
+                console.log('[MOBILE CRITICAL] Warning: Object has no RA/Dec coordinates');
+              }
             }
             popup.style.display = 'none';
+            
+            } catch (error) {
+              console.error('[MOBILE CRITICAL] ERROR in coordinate assignment:', error);
+              console.error('[MOBILE CRITICAL] Error stack:', error.stack);
+              console.log('[MOBILE CRITICAL] This error may explain why coordinates aren\'t working on mobile');
+            }
           }
           draw();
+          
+          // Universal mobile coordinate display - works for any selected object
+          try {
+            console.log('[MOBILE CRITICAL] Starting universal coordinate display logic');
+            
+            if (selectedObject && (raInput || decInput)) {
+              console.log('[SkyView] MOBILE DEBUG - Universal coordinate display for:', selectedObject.Name || selectedObject.name);
+              
+              // Get current input values (these should have been set by the branch logic above)
+              const currentRA = raInput ? raInput.value : '';
+              const currentDec = decInput ? decInput.value : '';
+              
+              console.log('[SkyView] MOBILE DEBUG - Current input values:', {ra: currentRA, dec: currentDec});
+              
+              // Create visible on-screen debug info for mobile
+              let mobileDebugInfo = document.getElementById('mobileDebugInfo');
+              if (!mobileDebugInfo) {
+                console.log('[MOBILE CRITICAL] Creating new mobile debug info element');
+                mobileDebugInfo = document.createElement('div');
+                mobileDebugInfo.id = 'mobileDebugInfo';
+                mobileDebugInfo.style.cssText = `
+                  position: fixed;
+                  top: 10px;
+                  left: 10px;
+                  right: 10px;
+                  background: rgba(255, 255, 255, 0.95);
+                  color: #000;
+                  padding: 15px;
+                  border: 3px solid #ff0000;
+                  font-size: 14px;
+                  z-index: 20000;
+                  font-family: monospace;
+                  line-height: 1.4;
+                  max-height: 200px;
+                  overflow-y: auto;
+                  box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+                `;
+                document.body.appendChild(mobileDebugInfo);
+                console.log('[MOBILE CRITICAL] Mobile debug info element created and added to body');
+              }
+              
+              // Show detailed debug information
+              const objName = selectedObject.Name || selectedObject.name || 'Unknown Object';
+              const debugText = `
+MOBILE DEBUG - Object Selected: ${objName}
+RA Input Found: ${!!raInput}
+Dec Input Found: ${!!decInput}
+RA Value: "${currentRA}"
+Dec Value: "${currentDec}"
+RA Expected Format: HH:MM:SS
+Dec Expected Format: DDD:MM:SS
+Time: ${new Date().toLocaleTimeString()}
+              `.trim();
+              
+              mobileDebugInfo.innerHTML = `<pre>${debugText}</pre>`;
+              mobileDebugInfo.style.display = 'block';
+              
+              console.log('[MOBILE CRITICAL] Mobile debug info should now be visible');
+              
+              // Auto-hide after 10 seconds
+              setTimeout(() => {
+                if (mobileDebugInfo && mobileDebugInfo.style.display === 'block') {
+                  mobileDebugInfo.style.display = 'none';
+                  console.log('[MOBILE CRITICAL] Mobile debug info auto-hidden');
+                }
+              }, 10000);
+            } else {
+              console.log('[MOBILE CRITICAL] Universal coordinate display - selectedObject or inputs missing:', {
+                selectedObject: !!selectedObject,
+                raInput: !!raInput,
+                decInput: !!decInput
+              });
+            }
+          } catch (error) {
+            console.error('[MOBILE CRITICAL] ERROR in universal coordinate display:', error);
+            console.error('[MOBILE CRITICAL] Universal display error stack:', error.stack);
+          }
         }
       }
     }
@@ -1487,6 +2033,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       panOrigY = translateY;
     }
     if(ids.length < 2) initialDist = 0;
+    
+    console.log('[MOBILE CRITICAL] Pointerup handler completed successfully');
+    } catch (error) {
+      console.error('[MOBILE CRITICAL] TOP-LEVEL ERROR in pointerup handler:', error);
+      console.error('[MOBILE CRITICAL] Top-level error stack:', error.stack);
+      console.error('[MOBILE CRITICAL] Error occurred during pointerup processing');
+    }
   });
 
   // Pan and pinch handling with adaptive throttling
