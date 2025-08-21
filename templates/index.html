@@ -3,7 +3,17 @@
 <head>
   <meta charset="utf-8">
   <title>SiPi Telescope Control</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, shrink-to-fit=no">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-touch-fullscreen" content="yes">
+
+  <!-- Apply night mode immediately to prevent flash -->
+  <script>
+    if (localStorage.getItem('nightMode') === 'enabled') {
+      document.documentElement.classList.add('night-mode');
+    }
+  </script>
 
   <!-- Modern Avalon-inspired stylesheet -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
@@ -14,7 +24,30 @@
     html, body {
       margin:0; padding:0; overflow-x:hidden;
       background:black; color:white;
+      /* Disable zoom and touch manipulation */
+      touch-action: manipulation;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
     }
+    
+    /* Additional zoom prevention for touch devices */
+    * {
+      -webkit-text-size-adjust: 100%;
+      -moz-text-size-adjust: 100%;
+      -ms-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
+    
+    /* Prevent zoom with CSS */
+    html {
+      -ms-touch-action: manipulation;
+      touch-action: manipulation;
+    }
+    
     #skyviewContainer { display: none; position: relative; min-height: 100vh; background: black; color: white; }
     #skyviewTopBar {
       position:absolute; top:0; left:0; width:100vw;
@@ -309,7 +342,8 @@
     }
 
     /* Day/Night mode styles */
-    body.night-mode {
+    body.night-mode,
+    html.night-mode body {
       background: #111 !important;
       color: #ff0000 !important;
     }
@@ -317,7 +351,8 @@
       background: #f5f5f5;
       color: #111;
     }
-    body.night-mode .status-panel {
+    body.night-mode .status-panel,
+    html.night-mode .status-panel {
       background: #222;
       color: #ff0000;
     }
@@ -326,7 +361,8 @@
       background: #000 !important;
       color: #ff0000 !important;
     }
-    body.night-mode #skyviewContainer {
+    body.night-mode #skyviewContainer,
+    html.night-mode #skyviewContainer {
       background: #000 !important;
       color: #ff0000 !important;
     }
@@ -448,7 +484,8 @@
       font-size: 1.08em;
       margin-top: 10px;
     }
-    body.night-mode .search-results__info {
+    body.night-mode .search-results__info,
+    html.night-mode .search-results__info {
       background: #222;
       color: #ff0000;
     }
@@ -462,7 +499,8 @@
       border-radius: 0 0 8px 8px;
       margin-bottom: 10px;
     }
-    body.night-mode .search-results__actions {
+    body.night-mode .search-results__actions,
+    html.night-mode .search-results__actions {
       background: #222;
     }
     .search-results__actions--horizontal {
@@ -486,12 +524,14 @@
     .search-results__actions .btn:active {
       background: #e0eaff;
     }
-    body.night-mode .search-results__actions .btn {
+    body.night-mode .search-results__actions .btn,
+    html.night-mode .search-results__actions .btn {
       background: var(--surface, #222);
       color: #ff0000;
       border: 1.5px solid #ff0000;
     }
-    body.night-mode .search-results__actions .btn:active {
+    body.night-mode .search-results__actions .btn:active,
+    html.night-mode .search-results__actions .btn:active {
       background: #333;
     }
     .search-results__none {
@@ -788,6 +828,7 @@
       <label><input type="checkbox" id="togglePlanetary"> <span style="color: rgb(127,255,0);">△</span> Planetary Nebulae</label>
       <label><input type="checkbox" id="toggleSolarSystem" checked> <span style="color: orange;">☉</span> Solar System</label>
       <label><input type="checkbox" id="toggleCalPoints" checked> <span style="color: yellow;">⊕</span> Calibration Points</label>
+      <label><input type="checkbox" id="toggleSkyViewNightMode"> <span>☾</span> True Night Mode</label>
     </div>
     <canvas id="skyviewCanvas"
             data-latitude="{{ site_latitude }}"
@@ -831,8 +872,36 @@
     function applyNight(){
       var on = localStorage.getItem('nightMode')==='enabled';
       $('body').toggleClass('night-mode', on);
+      $('html').toggleClass('night-mode', on);
       $('#toggleMode').text(on?'☀':'🌙');
+      
+      // Apply correct styling for current mode
+      setTimeout(function() {
+        forceTrayButtonNightMode();
+      }, 100);
     }
+    
+    // Function to force night mode styling on tray buttons
+    function forceTrayButtonNightMode() {
+      // Wait a bit for the CSS to apply, then force the styles
+      setTimeout(function() {
+        $('.tray-btn, #controlTrayBtn, #controlTrayCollapse').each(function() {
+          var $btn = $(this);
+          if ($('body').hasClass('night-mode')) {
+            $btn.css({
+              'background': '#222',
+              'color': '#ff0000', 
+              'border': '1.5px solid #ff0000',
+              'box-shadow': '0 2px 8px rgba(255,0,0,0.18)'
+            });
+          } else {
+            // Remove night mode styling if not in night mode
+            $btn.removeAttr('style');
+          }
+        });
+      }, 50);
+    }
+    
     applyNight();
     window.addEventListener('storage', function(e){
       if(e.key==='nightMode') applyNight();
@@ -841,6 +910,87 @@
       var on = !$('body').hasClass('night-mode');
       localStorage.setItem('nightMode', on?'enabled':'disabled');
       applyNight();
+    });
+
+    // Set up MutationObserver to watch for style changes on tray buttons
+    function setupTrayButtonWatcher() {
+      if (typeof MutationObserver !== 'undefined') {
+        var observer = new MutationObserver(function(mutations) {
+          if ($('body').hasClass('night-mode')) {
+            var needsForce = false;
+            mutations.forEach(function(mutation) {
+              if (mutation.type === 'attributes' && 
+                  (mutation.attributeName === 'style' || mutation.attributeName === 'class')) {
+                var target = $(mutation.target);
+                if (target.hasClass('tray-btn') || target.attr('id') === 'controlTrayBtn' || target.attr('id') === 'controlTrayCollapse') {
+                  needsForce = true;
+                }
+              }
+            });
+            if (needsForce) {
+              forceTrayButtonNightMode();
+            }
+          }
+        });
+        
+        // Watch for changes on tray buttons
+        $('.tray-btn, #controlTrayBtn, #controlTrayCollapse').each(function() {
+          observer.observe(this, { 
+            attributes: true, 
+            attributeFilter: ['style', 'class'] 
+          });
+        });
+      }
+    }
+    
+    // Initialize the watcher after a short delay
+    setTimeout(setupTrayButtonWatcher, 100);
+    
+    // Less frequent enforcement to avoid conflicts
+    setInterval(function() {
+      forceTrayButtonNightMode(); // This now handles both night and day modes
+    }, 5000); // Check every 5 seconds instead of 2
+    
+    // Also force on window events
+    $(window).on('load resize orientationchange', function() {
+      setTimeout(function() {
+        forceTrayButtonNightMode(); // Handles both modes
+      }, 100);
+    });
+    
+    // Prevent zooming gestures
+    document.addEventListener('gesturestart', function (e) {
+      e.preventDefault();
+    });
+    document.addEventListener('gesturechange', function (e) {
+      e.preventDefault();
+    });
+    document.addEventListener('gestureend', function (e) {
+      e.preventDefault();
+    });
+    
+    // Prevent double-tap zoom
+    var lastTouchEnd = 0;
+    document.addEventListener('touchend', function (event) {
+      var now = (new Date()).getTime();
+      if (now - lastTouchEnd <= 300) {
+        event.preventDefault();
+      }
+      lastTouchEnd = now;
+    }, false);
+    
+    // Prevent desktop zoom with Ctrl+Wheel and keyboard shortcuts
+    document.addEventListener('wheel', function(e) {
+      if (e.ctrlKey) {
+        e.preventDefault();
+      }
+    }, { passive: false });
+    
+    document.addEventListener('keydown', function(e) {
+      // Prevent Ctrl+Plus, Ctrl+Minus, Ctrl+0 (zoom shortcuts)
+      if (e.ctrlKey && (e.keyCode === 107 || e.keyCode === 109 || e.keyCode === 187 || e.keyCode === 189 || e.keyCode === 48)) {
+        e.preventDefault();
+      }
     });
 
     // Fullscreen & Settings
@@ -866,13 +1016,70 @@
               sec = Math.floor(s%60);
           return [h,m,sec].map(x => String(x).padStart(2,'0')).join(':');
         }
+        
+        // Function to format coordinates to 1 decimal place for seconds
+        function formatCoordinate(coord) {
+          if (!coord || typeof coord !== 'string') return coord;
+          var parts = coord.split(':');
+          if (parts.length === 3) {
+            var seconds = parseFloat(parts[2]);
+            if (!isNaN(seconds)) {
+              parts[2] = seconds.toFixed(1);
+            }
+            return parts.join(':');
+          }
+          return coord;
+        }
+        
+        // Function to format Alt/Az coordinates with whole minutes and whole seconds
+        function formatAltAz(coord) {
+          if (!coord || typeof coord !== 'string') return coord;
+          var parts = coord.split(':');
+          if (parts.length === 3) {
+            var minutes = parseFloat(parts[1]);
+            var seconds = parseFloat(parts[2]);
+            if (!isNaN(minutes)) {
+              parts[1] = Math.floor(minutes).toString().padStart(2, '0');
+            }
+            if (!isNaN(seconds)) {
+              parts[2] = Math.floor(seconds).toString().padStart(2, '0');
+            }
+            return parts.join(':');
+          }
+          return coord;
+        }
+        
+        // Function to format Alt specifically (HH:MM:SS format)
+        function formatAlt(coord) {
+          if (!coord || typeof coord !== 'string') return coord;
+          var parts = coord.split(':');
+          if (parts.length === 3) {
+            // For Alt, ensure hours is only 2 digits
+            var hours = parseInt(parts[0]);
+            var minutes = parseFloat(parts[1]);
+            var seconds = parseFloat(parts[2]);
+            
+            if (!isNaN(hours)) {
+              parts[0] = (hours % 100).toString().padStart(2, '0'); // Keep only 2 digits for hours
+            }
+            if (!isNaN(minutes)) {
+              parts[1] = Math.floor(minutes).toString().padStart(2, '0');
+            }
+            if (!isNaN(seconds)) {
+              parts[2] = Math.floor(seconds).toString().padStart(2, '0');
+            }
+            return parts.join(':');
+          }
+          return coord;
+        }
+        
         var haSec = hmsToSec(d.sidereal) - hmsToSec(d.ra),
             haStr = secToHms(haSec);
 
         $('#status').html(
           '<div class="status-panel__left">'+
-            '<div>DEC: '+d.dec+' | RA: '+d.ra+'</div>'+
-            '<div>Alt: '+d.alt+' | Az: '+d.az+'</div>'+
+            '<div>Dec: '+formatCoordinate(d.dec)+' | RA: '+formatCoordinate(d.ra)+'</div>'+
+            '<div>Alt: '+formatAlt(d.alt)+' | Az: '+formatAltAz(d.az)+'</div>'+
             '<div>Status: '+d.tracking+'</div>'+
           '</div>'+
           '<div class="status-panel__right">'+
@@ -1350,7 +1557,7 @@
       padding: 0 8px;
       font-size: 2.1em;
       cursor: pointer;
-      z-index: 2000;
+      z-index: 9000;
       box-shadow: -2px 2px 8px rgba(0,0,0,0.18);
       width: 38px;
       height: 56px;
@@ -1365,7 +1572,8 @@
       color: #111;
       border-color: #1a5a8a;
     }
-    body.night-mode #controlTrayBtn {
+    body.night-mode #controlTrayBtn,
+    html.night-mode #controlTrayBtn {
       background: #222;
       color: #ff0000;
       box-shadow: -2px 2px 8px rgba(255,0,0,0.18);
@@ -1389,7 +1597,7 @@
       flex-direction: column;
       gap: 12px;
       align-items: flex-end;
-      z-index: 2001;
+      z-index: 9001;
       min-width: 0;
       width: 120px;
       max-width: 140px;
@@ -1467,15 +1675,61 @@
       background: #1a5a8a;
       color: #eee;
     }
-    body.night-mode .tray-btn {
-      background: #222;
-      color: #ff0000;
-      box-shadow: 0 2px 8px rgba(255,0,0,0.18);
-      border: 1.5px solid #ff0000;
+    /* Force red color for all tray buttons in night mode */
+    body.night-mode .tray-btn,
+    html.night-mode .tray-btn {
+      background: #222 !important;
+      color: #ff0000 !important;
+      box-shadow: 0 2px 8px rgba(255,0,0,0.18) !important;
+      border: 1.5px solid #ff0000 !important;
     }
-    body.night-mode .tray-btn:active, body.night-mode .tray-btn:focus {
-      background: #ff0000;
-      color: #111;
+    body.night-mode .tray-btn:active, 
+    body.night-mode .tray-btn:focus {
+      background: #ff0000 !important;
+      color: #111 !important;
+      border: 1.5px solid #ff0000 !important;
+    }
+    body.night-mode .tray-btn:hover {
+      background: #330000 !important;
+      color: #ff0000 !important;
+      border: 1.5px solid #ff0000 !important;
+    }
+    
+    /* Specific ID overrides for extra specificity */
+    body.night-mode #controlTrayBtn,
+    body.night-mode button#editConfigBtn.tray-btn,
+    body.night-mode button#toggleFullScreen.tray-btn,
+    body.night-mode button#toggleMode.tray-btn,
+    body.night-mode a#helpBtn.tray-btn {
+      background: #222 !important;
+      color: #ff0000 !important;
+      border: 1.5px solid #ff0000 !important;
+      box-shadow: 0 2px 8px rgba(255,0,0,0.18) !important;
+    }
+    
+    body.night-mode #controlTrayBtn:active,
+    body.night-mode #controlTrayBtn:focus,
+    body.night-mode button#editConfigBtn.tray-btn:active,
+    body.night-mode button#editConfigBtn.tray-btn:focus,
+    body.night-mode button#toggleFullScreen.tray-btn:active,
+    body.night-mode button#toggleFullScreen.tray-btn:focus,
+    body.night-mode button#toggleMode.tray-btn:active,
+    body.night-mode button#toggleMode.tray-btn:focus,
+    body.night-mode a#helpBtn.tray-btn:active,
+    body.night-mode a#helpBtn.tray-btn:focus {
+      background: #ff0000 !important;
+      color: #111 !important;
+      border: 1.5px solid #ff0000 !important;
+    }
+    
+    body.night-mode #controlTrayBtn:hover,
+    body.night-mode button#editConfigBtn.tray-btn:hover,
+    body.night-mode button#toggleFullScreen.tray-btn:hover,
+    body.night-mode button#toggleMode.tray-btn:hover,
+    body.night-mode a#helpBtn.tray-btn:hover {
+      background: #330000 !important;
+      color: #ff0000 !important;
+      border: 1.5px solid #ff0000 !important;
     }
     @media (max-width: 700px) {
       #controlTray, #controlTrayBtn {
@@ -1521,8 +1775,10 @@
     flex-direction: row;
     justify-content: center;
     align-items: center;
-    gap: 5em !important; /* Force more space between START and STOP */
+    gap: 8em !important; /* Increased gap to prevent overlap */
     margin: 0.2em 0 0 0 !important; /* Move row as high as possible, just below handpad */
+    flex-wrap: wrap; /* Allow wrapping on very small screens */
+    min-height: 110px; /* Ensure minimum height to prevent cramping */
   }
   .action-btn {
     background: #f5f5f5;
@@ -1566,7 +1822,8 @@
     color: #111;
     border-color: #1a5a8a;
   }
-  body.night-mode .start-action-btn {
+  body.night-mode .start-action-btn,
+  html.night-mode .start-action-btn {
     background: #222;
     color: #ff0000;
     border: 2.5px solid #ff0000;
@@ -1664,10 +1921,20 @@
   body.night-mode .stop-octagon-text {
     fill: #ff0000;
   }
+  
+  /* SkyView STOP button should always use night mode colors (red) */
+  #stopBtn .stop-octagon-shape {
+    fill: #222 !important;
+    stroke: #ff0000 !important;
+  }
+  #stopBtn .stop-octagon-text {
+    fill: #ff0000 !important;
+  }
+  
   /* Responsive tweaks for STOP button */
   @media (max-width: 700px) {
     .handpad-action-row {
-      gap: 5em !important;
+      gap: 6em !important; /* Increased for medium screens */
       margin: 1.2em 0 0 0 !important;
     }
     .action-btn {
@@ -1696,8 +1963,9 @@
   }
   @media (max-width: 500px) {
     .handpad-action-row {
-      gap: 3em !important;
+      gap: 4em !important; /* Increased for small screens */
       margin: 1em 0 0 0 !important;
+      flex-direction: row; /* Keep side by side even on small screens */
     }
     .action-btn {
       width: 60px;
@@ -1723,7 +1991,49 @@
       letter-spacing: 0.7px;
     }
   }
+  
+  /* Only stack vertically on extremely small screens */
+  @media (max-width: 320px) {
+    .handpad-action-row {
+      flex-direction: column;
+      gap: 1em !important;
+    }
+  }
   /* End STOP octagon button styles */
+  
+  /* Additional robust night mode styles for cross-browser compatibility */
+  body.night-mode {
+    --tray-night-bg: #222;
+    --tray-night-color: #ff0000;
+    --tray-night-border: #ff0000;
+  }
+  
+  /* Ultra-specific selectors to override any browser defaults */
+  html body.night-mode div#controlTray button.tray-btn,
+  html body.night-mode div#controlTray a.tray-btn,
+  html body.night-mode div#controlTrayBtn {
+    background-color: var(--tray-night-bg) !important;
+    color: var(--tray-night-color) !important;
+    border-color: var(--tray-night-border) !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+  }
+  
+  /* Force inheritance override */
+  body.night-mode .tray-btn[style],
+  body.night-mode #controlTrayBtn[style] {
+    background: #222 !important;
+    color: #ff0000 !important;
+    border: 1.5px solid #ff0000 !important;
+  }
+  
+  /* CSS animations disabled state override */
+  body.night-mode .tray-btn:not(:active):not(:focus):not(:hover) {
+    background: #222 !important;
+    color: #ff0000 !important;
+    border: 1.5px solid #ff0000 !important;
+  }
 </style>
 <script>
   // Control Tray toggle logic
@@ -1731,9 +2041,19 @@
     var $tray = $('#controlTray');
     var $btn = $('#controlTrayBtn');
     var $collapse = $('#controlTrayCollapse');
+    
+    // Ensure tray starts closed and button shows correct arrow
+    $tray.addClass('hide').hide();
+    $btn.html('&#x25C0;'); // Left arrow to indicate "open tray"
+    
     function setArrow() {
-      $btn.html($tray.hasClass('hide') ? '&#x25C0;' : '&#x25B6;');
+      if ($tray.hasClass('hide')) {
+        $btn.html('&#x25C0;'); // Left arrow = "open tray"
+      } else {
+        $btn.html('&#x25B6;'); // Right arrow = "close tray"
+      }
     }
+    
     $btn.on('click', function(){
       $tray.toggleClass('hide');
       setArrow();
@@ -1750,10 +2070,7 @@
       $tray.hide();
       e.stopPropagation();
     });
-    // Removed auto-close tray on outside click: tray now only closes via tray button or collapse button
-    // Show tray by default
-    $tray.removeClass('hide');
-    setArrow();
+    // Tray starts closed by default as configured above
   });
   </script>
   <script>

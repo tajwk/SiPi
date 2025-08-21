@@ -1,0 +1,7 @@
+# Allow sitech user to control sitech.service without password
+sitech ALL=(ALL) NOPASSWD: /usr/bin/systemctl start sitech.service
+sitech ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop sitech.service
+sitech ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart sitech.service
+sitech ALL=(ALL) NOPASSWD: /usr/bin/systemctl status sitech.service
+sitech ALL=(ALL) NOPASSWD: /usr/bin/systemctl is-active sitech.service
+sitech ALL=(ALL) NOPASSWD: /usr/bin/systemctl kill sitech.service

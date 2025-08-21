@@ -27,7 +27,8 @@
   --transition:        background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
-body.night-mode {
+body.night-mode,
+html.night-mode body {
   --bg:                #000000;
   --fg:                #ff0000;
   --surface:           #1a1a1a;
@@ -290,6 +291,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 9999;
 }
 
 .modal.hidden {
@@ -326,13 +328,16 @@ button {
 ----------------------------------------------------------------------------*/
 /* Text selection */
 body.night-mode input::selection,
-body.night-mode textarea::selection {
+html.night-mode input::selection,
+body.night-mode textarea::selection,
+html.night-mode textarea::selection {
   background: var(--accent);
   color: var(--bg);
 }
 
 /* Placeholder text */
-body.night-mode ::placeholder {
+body.night-mode ::placeholder,
+html.night-mode ::placeholder {
   color: var(--accent);
 }
 
@@ -343,7 +348,9 @@ html, body {
 }
 
 body.night-mode,
-body.night-mode .container {
+html.night-mode body,
+body.night-mode .container,
+html.night-mode .container {
   background-color: var(--bg) !important;
 }
 
@@ -401,12 +408,14 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* Night mode slider thumb colors */
-body.night-mode input[type="range"]::-webkit-slider-thumb {
+body.night-mode input[type="range"]::-webkit-slider-thumb,
+html.night-mode input[type="range"]::-webkit-slider-thumb {
   background-color: #333333;
   border: 2px solid #ff0000;
 }
 
-body.night-mode input[type="range"]::-moz-range-thumb {
+body.night-mode input[type="range"]::-moz-range-thumb,
+html.night-mode input[type="range"]::-moz-range-thumb {
   background-color: #333333;
   border: 2px solid #ff0000;
 }
@@ -425,4 +434,38 @@ body:not(.night-mode) input[type="range"]::-moz-range-thumb {
 /* Day mode track colors */
 body:not(.night-mode) input[type="range"] {
   background: #ddd;
+}
+
+/* SkyView specific sliders - ALWAYS use night mode colors (black and red) */
+#starMagSlider::-webkit-slider-thumb,
+#galMagSlider::-webkit-slider-thumb {
+  background-color: #333333 !important;
+  border: 2px solid #ff0000 !important;
+}
+
+#starMagSlider::-moz-range-thumb,
+#galMagSlider::-moz-range-thumb {
+  background-color: #333333 !important;
+  border: 2px solid #ff0000 !important;
+}
+
+#starMagSlider,
+#galMagSlider {
+  background: #444 !important;
+}
+
+/* SkyView True Night Mode - Objects tray labels turn red */
+#skyviewContainer.skyview-true-night-mode #toggleBar label {
+  color: #ff0000 !important;
+}
+
+/* In true night mode, all text including symbols should be red */
+#skyviewContainer.skyview-true-night-mode #toggleBar label span {
+  color: #ff0000 !important;
+}
+
+/* True Night Mode - darker slider backgrounds */
+#skyviewContainer.skyview-true-night-mode #starMagSlider,
+#skyviewContainer.skyview-true-night-mode #galMagSlider {
+  background: #222 !important;
 }

@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>SiPi Telescope Control System - User Manual</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        :root {
+            --primary: #204080;
+            --secondary: #4573c3;
+            --accent: #a259e6;
+            --bg: #f8f9fb;
+            --panel: #fff;
+            --fg: #202326;
+            --surface: #fff;
+            --surface-alt: #f0f0f0;
+            --border: #ddd;
+            --radius: 10px;
+            --padding: 24px;
+            --transition: all 0.3s ease;
+            --shadow: 0 4px 24px rgba(32,64,128,0.08);
+        }
+
+        [data-theme="dark"] {
+            --primary: #ff5555;
+            --secondary: #b1001e;
+            --accent: #ff6600;
+            --bg: #18181b;
+            --panel: #232634;
+            --fg: #e9ecf1;
+            --surface: #232634;
+            --surface-alt: #18181b;
+            --border: #444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: system-ui, "Segoe UI", "SF Pro Display", Arial, sans-serif;
+            background: var(--bg);
+            color: var(--fg);
+            line-height: 1.7;
+            transition: var(--transition);
+        }
+
+        .header {
+            background: var(--primary);
+            color: white;
+            padding: 20px 0;
+            box-shadow: var(--shadow);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        .theme-toggle {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .theme-toggle:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        .nav {
+            background: var(--panel);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 0;
+            position: sticky;
+            top: 70px;
+            z-index: 99;
+        }
+
+        .nav-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 24px;
+            list-style: none;
+        }
+
+        .nav-link {
+            color: var(--fg);
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: var(--transition);
+            font-weight: 500;
+        }
+
+        .nav-link:hover {
+            background: var(--surface-alt);
+            color: var(--primary);
+        }
+
+        .content {
+            padding: 48px 0;
+        }
+
+        .section {
+            background: var(--panel);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: var(--padding);
+            margin-bottom: 48px;
+            border: 1px solid var(--border);
+        }
+
+        h1, h2, h3, h4 {
+            color: var(--primary);
+            font-weight: 700;
+            margin-bottom: 16px;
+            line-height: 1.3;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 24px;
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            margin-top: 32px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--accent);
+        }
+
+        h3 {
+            font-size: 1.4rem;
+            margin-top: 24px;
+        }
+
+        h4 {
+            font-size: 1.1rem;
+            margin-top: 20px;
+        }
+
+        p {
+            margin-bottom: 16px;
+        }
+
+        ul, ol {
+            margin: 16px 0 16px 24px;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+            margin: 32px 0;
+        }
+
+        .feature-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            transition: var(--transition);
+        }
+
+        .feature-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 12px;
+            color: var(--accent);
+        }
+
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+            border-left: 4px solid #f39c12;
+            padding: 16px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+
+        [data-theme="dark"] .warning {
+            background: #2d1b00;
+            color: #ffeaa7;
+            border-color: #f39c12;
+        }
+
+        .tip {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+            border-left: 4px solid #17a2b8;
+            padding: 16px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+
+        [data-theme="dark"] .tip {
+            background: #0a1e21;
+            color: #bee5eb;
+            border-color: #17a2b8;
+        }
+
+        .code {
+            background: var(--surface-alt);
+            color: var(--fg);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+            font-size: 0.9em;
+        }
+
+        .code-block {
+            background: var(--surface-alt);
+            color: var(--fg);
+            padding: 16px;
+            border-radius: 6px;
+            font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+            font-size: 0.9em;
+            overflow-x: auto;
+            border: 1px solid var(--border);
+            margin: 16px 0;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 16px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .button {
+            background: var(--primary);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: var(--transition);
+            display: inline-block;
+        }
+
+        .button:hover {
+            background: var(--secondary);
+            transform: translateY(-1px);
+        }
+
+        .button.secondary {
+            background: var(--surface-alt);
+            color: var(--fg);
+            border: 1px solid var(--border);
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-green { background: #28a745; }
+        .status-yellow { background: #ffc107; }
+        .status-red { background: #dc3545; }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        .table th,
+        .table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .table th {
+            background: var(--surface-alt);
+            font-weight: 600;
+        }
+
+        @media (max-width: 768px) {
+            .header-content {
+                padding: 0 16px;
+            }
+
+            .container {
+                padding: 0 16px;
+            }
+
+            .nav-list {
+                gap: 12px;
+            }
+
+            .nav-link {
+                padding: 6px 12px;
+                font-size: 0.9rem;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            h2 {
+                font-size: 1.5rem;
+            }
+
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+        }
+
+        .toc {
+            background: var(--surface-alt);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 24px 0;
+        }
+
+        .toc h3 {
+            margin-top: 0;
+            margin-bottom: 16px;
+        }
+
+        .toc ul {
+            margin: 0;
+            list-style: none;
+        }
+
+        .toc li {
+            margin-bottom: 4px;
+        }
+
+        .toc a {
+            color: var(--fg);
+            text-decoration: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: block;
+            transition: var(--transition);
+        }
+
+        .toc a:hover {
+            background: var(--panel);
+            color: var(--primary);
+        }
+    </style>
+</head>
+<body data-theme="dark">
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">📡 SiPi Telescope Control System</div>
+            <button class="theme-toggle" onclick="toggleTheme()">
+                🌙 Toggle Theme
+            </button>
+        </div>
+    </header>
+
+    <nav class="nav">
+        <div class="container">
+            <ul class="nav-list">
+                <li><a href="#overview" class="nav-link">Overview</a></li>
+                <li><a href="#getting-started" class="nav-link">Getting Started</a></li>
+                <li><a href="#main-interface" class="nav-link">Main Interface</a></li>
+                <li><a href="#skyview" class="nav-link">SkyView</a></li>
+                <li><a href="#configuration" class="nav-link">Configuration</a></li>
+                <li><a href="#calibration" class="nav-link">Calibration</a></li>
+                <li><a href="#troubleshooting" class="nav-link">Troubleshooting</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="content">
+        <div class="container">
+            <div class="toc">
+                <h3>📋 Table of Contents</h3>
+                <ul>
+                    <li><a href="#overview">1. System Overview</a></li>
+                    <li><a href="#getting-started">2. Getting Started</a></li>
+                    <li><a href="#main-interface">3. Main Interface</a></li>
+                    <li><a href="#skyview">4. SkyView Interactive Sky Map</a></li>
+                    <li><a href="#configuration">5. Configuration & Settings</a></li>
+                    <li><a href="#calibration">6. Telescope Calibration</a></li>
+                    <li><a href="#troubleshooting">7. Troubleshooting</a></li>
+                </ul>
+            </div>
+
+            <section id="overview" class="section">
+                <h1>🔭 SiPi Telescope Control System</h1>
+                <p><strong>Version 1.0.0</strong> - Professional Web-Based Telescope Control Interface</p>
+                
+                <p>SiPi is a comprehensive web-based control system for SiTech telescope mounts, providing intuitive operation through any modern web browser. The system combines professional-grade telescope control with an advanced interactive sky map (SkyView) featuring astrometric corrections and real-time astronomical data.</p>
+
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">🎯</div>
+                        <h4>Precision Control</h4>
+                        <p>Direct telescope mount control with real-time status monitoring, goto functionality, and tracking modes.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🌌</div>
+                        <h4>Interactive SkyView</h4>
+                        <p>Full-sky map with 100,000+ stars, deep-sky objects, constellation overlays, and real-time coordinate conversion.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">⚙️</div>
+                        <h4>Advanced Calibration</h4>
+                        <p>Point modeling system with calibration point management and mount configuration options.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">📱</div>
+                        <h4>Mobile Responsive</h4>
+                        <p>Optimized for tablets and smartphones with touch-friendly controls and adaptive interface.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🌙</div>
+                        <h4>Night Mode</h4>
+                        <p>Red-themed night vision mode to preserve dark adaptation during observations.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🔄</div>
+                        <h4>Auto Updates</h4>
+                        <p>Built-in update system with git integration and automatic service management.</p>
+                    </div>
+                </div>
+
+                <div class="warning">
+                    <strong>⚠️ Important:</strong> SiPi requires a properly configured SiTech controller and SiTechExe software running on the host system. Ensure all hardware connections are secure before operation.
+                </div>
+            </section>
+
+            <section id="getting-started" class="section">
+                <h2>🚀 Getting Started</h2>
+
+                <h3>System Requirements</h3>
+                <ul>
+                    <li><strong>Hardware:</strong> SiTech telescope mount controller</li>
+                    <li><strong>Software:</strong> SiTechExe running on Linux/Windows</li>
+                    <li><strong>Network:</strong> WiFi hotspot or LAN connection</li>
+                    <li><strong>Browser:</strong> Modern web browser (Chrome, Firefox, Safari, Edge)</li>
+                </ul>
+
+                <h3>Initial Setup</h3>
+                <ol>
+                    <li><strong>Connect to Network:</strong> Join the telescope's WiFi network or connect via LAN</li>
+                    <li><strong>Open Browser:</strong> Navigate to <span class="code">http://&lt;telescope-ip&gt;:5000</span></li>
+                    <li><strong>Set Time:</strong> On first boot, set the system time if prompted</li>
+                    <li><strong>Verify Connection:</strong> Check that telescope status appears in the top panel</li>
+                </ol>
+
+                <div class="tip">
+                    <strong>💡 Quick Start Tip:</strong> The default network name is usually "SiPi-Telescope" with password shown on your device. Check the configuration page for current WiFi settings.
+                </div>
+
+                <h3>First Connection Checklist</h3>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Component</th>
+                            <th>Status Indicator</th>
+                            <th>Expected Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Mount Communication</td>
+                            <td><span class="status-indicator status-green"></span></td>
+                            <td>Tracking/Stopped (not "Communication Fault")</td>
+                        </tr>
+                        <tr>
+                            <td>Coordinates Display</td>
+                            <td><span class="status-indicator status-green"></span></td>
+                            <td>RA/Dec showing actual values (not "N/A")</td>
+                        </tr>
+                        <tr>
+                            <td>Local Sidereal Time</td>
+                            <td><span class="status-indicator status-green"></span></td>
+                            <td>LST updating in real-time</td>
+                        </tr>
+                        <tr>
+                            <td>SkyView Objects</td>
+                            <td><span class="status-indicator status-green"></span></td>
+                            <td>Stars and objects visible on sky map</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <section id="main-interface" class="section">
+                <h2>🖥️ Main Interface</h2>
+
+                <h3>Status Panel</h3>
+                <p>The top status panel provides real-time telescope information:</p>
+                <ul>
+                    <li><strong>Coordinates:</strong> Current RA/Dec and Alt/Az positions</li>
+                    <li><strong>Status:</strong> Mount tracking state (Tracking, Stopped, Slewing, etc.)</li>
+                    <li><strong>Time:</strong> Current system time and Local Sidereal Time (LST)</li>
+                    <li><strong>Hour Angle:</strong> Calculated from current coordinates and LST</li>
+                </ul>
+
+                <h3>Control Buttons</h3>
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4>🔍 Search</h4>
+                        <p>Database search for celestial objects. Returns coordinates, current Alt/Az, and visibility information.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🎯 GoTo</h4>
+                        <p>Slew telescope to specified RA/Dec coordinates. Supports both manual entry and search results.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🔄 Sync</h4>
+                        <p>Synchronize mount's current position with specified coordinates for improved pointing accuracy.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🏠 Park/Unpark</h4>
+                        <p>Move telescope to park position or release from park. Essential for safe storage.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>▶️ Start/Stop</h4>
+                        <p>Enable or disable sidereal tracking. Required for long exposures and visual observation.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>⚙️ Mode Toggle</h4>
+                        <p>Switch between Auto (computer control) and Manual (hand controller) modes.</p>
+                    </div>
+                </div>
+
+                <h3>Manual Controls</h3>
+                <p>Four-directional control buttons for manual telescope movement:</p>
+                <ul>
+                    <li><strong>N/S:</strong> Altitude axis control (up/down movement)</li>
+                    <li><strong>E/W:</strong> Azimuth axis control (left/right movement)</li>
+                    <li><strong>Speed:</strong> Multiple speed settings for coarse and fine adjustments</li>
+                    <li><strong>Abort:</strong> Emergency stop for all movement</li>
+                </ul>
+
+                <div class="warning">
+                    <strong>⚠️ Safety Note:</strong> Always use the Abort button in emergency situations. Manual controls respect current speed settings and safety limits.
+                </div>
+
+                <h3>Quick Actions</h3>
+                <div class="button-group">
+                    <button class="button">🌙 Night Mode</button>
+                    <button class="button secondary">⚙️ Configuration</button>
+                    <button class="button secondary">🎯 Calibration</button>
+                    <button class="button secondary">🔄 Updates</button>
+                </div>
+            </section>
+
+            <section id="skyview" class="section">
+                <h2>🌌 SkyView Interactive Sky Map</h2>
+                
+                <p>SkyView provides a real-time, interactive representation of the night sky from your location. It features over 100,000 stars, deep-sky objects, and constellation overlays with professional astrometric corrections.</p>
+
+                <h3>Key Features</h3>
+                <ul>
+                    <li><strong>Real-time Sky:</strong> Updates automatically based on current time and location</li>
+                    <li><strong>Astrometric Corrections:</strong> Includes precession, nutation, and aberration</li>
+                    <li><strong>Multiple Catalogs:</strong> Stars, Messier objects, NGC/IC galaxies, nebulae, and clusters</li>
+                    <li><strong>Collision-Free Labels:</strong> Smart label positioning prevents overlapping text</li>
+                    <li><strong>True Night Mode:</strong> Red-themed display independent of main interface</li>
+                    <li><strong>Mobile Optimized:</strong> Touch controls and responsive design</li>
+                </ul>
+
+                <h3>Navigation Controls</h3>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Action</th>
+                            <th>Desktop</th>
+                            <th>Mobile/Touch</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Pan View</td>
+                            <td>Click and drag</td>
+                            <td>Touch and drag</td>
+                        </tr>
+                        <tr>
+                            <td>Zoom In/Out</td>
+                            <td>Mouse wheel</td>
+                            <td>Pinch gesture</td>
+                        </tr>
+                        <tr>
+                            <td>Object Info</td>
+                            <td>Click object</td>
+                            <td>Tap object</td>
+                        </tr>
+                        <tr>
+                            <td>GoTo Object</td>
+                            <td>Right-click object</td>
+                            <td>Long press object</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>Display Options</h3>
+                <p>Toggle various overlay elements using the control panel:</p>
+                <ul>
+                    <li><strong>⭐ Stars:</strong> Magnitude-based display with Hipparcos catalog</li>
+                    <li><strong>🌌 Messier Objects:</strong> Famous deep-sky objects (M1-M110)</li>
+                    <li><strong>🔗 Constellations:</strong> Traditional constellation lines and boundaries</li>
+                    <li><strong>🌊 Galaxy Catalog:</strong> NGC/IC galaxies and galaxy clusters</li>
+                    <li><strong>☁️ Nebulae:</strong> Emission, reflection, and planetary nebulae</li>
+                    <li><strong>⊙ Solar System:</strong> Real-time positions of planets and moon</li>
+                    <li><strong>⊕ Calibration Points:</strong> Current telescope calibration references</li>
+                </ul>
+
+                <h3>Object Information</h3>
+                <p>Clicking any object displays comprehensive information:</p>
+                <ul>
+                    <li><strong>Coordinates:</strong> RA/Dec (J2000 and current epoch)</li>
+                    <li><strong>Current Position:</strong> Alt/Az and visibility status</li>
+                    <li><strong>Physical Data:</strong> Magnitude, size, object type</li>
+                    <li><strong>Identification:</strong> Catalog numbers and common names</li>
+                    <li><strong>GoTo Option:</strong> Direct telescope slewing capability</li>
+                </ul>
+
+                <div class="tip">
+                    <strong>💡 Pro Tip:</strong> Use True Night Mode during observations to preserve dark adaptation. The red display maintains interface visibility while protecting night vision.
+                </div>
+
+                <h3>Performance Optimization</h3>
+                <p>SkyView automatically adjusts performance based on device capabilities:</p>
+                <ul>
+                    <li><strong>Adaptive Rendering:</strong> Object density based on zoom level</li>
+                    <li><strong>Hardware Acceleration:</strong> GPU-optimized canvas rendering</li>
+                    <li><strong>Smart Culling:</strong> Only renders visible objects</li>
+                    <li><strong>Label Management:</strong> Collision detection prevents overlap</li>
+                </ul>
+            </section>
+
+            <section id="configuration" class="section">
+                <h2>⚙️ Configuration & Settings</h2>
+
+                <p>Access the configuration page to customize telescope behavior, network settings, and system parameters.</p>
+
+                <h3>Mount Configuration</h3>
+                <ul>
+                    <li><strong>Mount Type:</strong> Select appropriate mount configuration (0=German Equatorial, 1=Fork, 3=Alt-Az)</li>
+                    <li><strong>Azimuth Mode:</strong> Choose pointing precision (Polite, Precise, Ignore, Cascade)</li>
+                    <li><strong>Altitude Mode:</strong> Configure elevation axis behavior</li>
+                    <li><strong>Drag Mode:</strong> Enable/disable axis drag compensation</li>
+                    <li><strong>Wrap Prevention:</strong> Avoid cable wrap in continuous rotation</li>
+                </ul>
+
+                <h3>Network Settings</h3>
+                <div class="warning">
+                    <strong>🔧 WiFi Configuration:</strong> Changes to WiFi settings will restart the hotspot service. Connected devices will need to reconnect.
+                </div>
+                <ul>
+                    <li><strong>SSID:</strong> Network name for telescope WiFi hotspot</li>
+                    <li><strong>Password:</strong> WiFi password (minimum 8 characters)</li>
+                    <li><strong>Controller Port:</strong> Serial port for SiTech controller communication</li>
+                </ul>
+
+                <h3>System Settings</h3>
+                <ul>
+                    <li><strong>Time Zone:</strong> Configure system time zone for accurate calculations</li>
+                    <li><strong>Vibration Feedback:</strong> Enable haptic feedback on mobile devices</li>
+                    <li><strong>Tilt Response:</strong> Respond to device orientation changes</li>
+                    <li><strong>Night Mode:</strong> Set default color theme preference</li>
+                </ul>
+
+                <h3>Update Management</h3>
+                <p>Built-in update system with Git integration:</p>
+                <ol>
+                    <li><strong>Check Updates:</strong> Compare local version with remote repository</li>
+                    <li><strong>View Changes:</strong> Review git log and status information</li>
+                    <li><strong>Apply Updates:</strong> Automatic download and service restart</li>
+                    <li><strong>Backup/Restore:</strong> Configuration backup before major changes</li>
+                </ol>
+
+                <div class="tip">
+                    <strong>💡 Update Tip:</strong> Updates are applied automatically with minimal downtime. The page will refresh automatically when the update completes.
+                </div>
+
+                <h3>Configuration Backup</h3>
+                <p>Always backup configurations before making changes:</p>
+                <div class="code-block">
+# Backup current configuration
+curl -X POST http://&lt;telescope-ip&gt;:5000/backup_config
+
+# Restore from backup if needed
+curl -X POST http://&lt;telescope-ip&gt;:5000/restore_config
+                </div>
+            </section>
+
+            <section id="calibration" class="section">
+                <h2>🎯 Telescope Calibration</h2>
+
+                <p>Accurate telescope pointing requires calibration points across the sky. SiPi provides comprehensive tools for building and managing pointing models.</p>
+
+                <h3>Calibration Process</h3>
+                <ol>
+                    <li><strong>Initial Alignment:</strong> Perform 2-star alignment on known reference stars</li>
+                    <li><strong>Add Points:</strong> Add calibration points distributed across the sky</li>
+                    <li><strong>Sync Process:</strong> Center object in eyepiece, then sync telescope position</li>
+                    <li><strong>Model Building:</strong> System automatically builds pointing model</li>
+                    <li><strong>Validation:</strong> Test pointing accuracy on new targets</li>
+                </ol>
+
+                <h3>Calibration Point Management</h3>
+                <ul>
+                    <li><strong>View Points:</strong> Display all calibration points with error values</li>
+                    <li><strong>Enable/Disable:</strong> Temporarily exclude problematic points</li>
+                    <li><strong>Remove Points:</strong> Delete inaccurate or outdated calibration data</li>
+                    <li><strong>Error Analysis:</strong> Review RMS error and individual point accuracy</li>
+                </ul>
+
+                <h3>Best Practices</h3>
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4>📍 Point Distribution</h4>
+                        <p>Distribute calibration points evenly across the sky, including points at different altitudes and azimuths.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>⭐ Reference Selection</h4>
+                        <p>Use bright, well-known stars for initial alignment. Avoid double stars and variable stars.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🎯 Centering Accuracy</h4>
+                        <p>Precisely center objects in the eyepiece before syncing. Use high magnification for accuracy.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🔄 Regular Updates</h4>
+                        <p>Refresh calibration points periodically, especially after mount adjustments or seasonal changes.</p>
+                    </div>
+                </div>
+
+                <h3>Model Quality Assessment</h3>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>RMS Error</th>
+                            <th>Quality</th>
+                            <th>Typical Performance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>&lt; 30 arcsec</td>
+                            <td><span class="status-indicator status-green"></span> Excellent</td>
+                            <td>Objects in eyepiece field</td>
+                        </tr>
+                        <tr>
+                            <td>30-60 arcsec</td>
+                            <td><span class="status-indicator status-yellow"></span> Good</td>
+                            <td>Objects in finder scope</td>
+                        </tr>
+                        <tr>
+                            <td>&gt; 60 arcsec</td>
+                            <td><span class="status-indicator status-red"></span> Needs Work</td>
+                            <td>Manual adjustment required</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="warning">
+                    <strong>⚠️ Important:</strong> Poor pointing models can result from mechanical issues, incorrect mount type settings, or insufficient calibration points. Review all settings before adding more points.
+                </div>
+            </section>
+
+            <section id="troubleshooting" class="section">
+                <h2>🔧 Troubleshooting</h2>
+
+                <h3>Common Issues</h3>
+
+                <h4>🔌 Connection Problems</h4>
+                <ul>
+                    <li><strong>No Status Data:</strong> Check SiTechExe is running and listening on correct port</li>
+                    <li><strong>WiFi Issues:</strong> Verify hotspot configuration and device connection</li>
+                    <li><strong>Page Won't Load:</strong> Confirm IP address and port 5000 accessibility</li>
+                    <li><strong>Intermittent Connection:</strong> Check USB cable and controller power</li>
+                </ul>
+
+                <h4>🎯 Pointing Accuracy</h4>
+                <ul>
+                    <li><strong>Poor GoTo Accuracy:</strong> Add more calibration points across the sky</li>
+                    <li><strong>Systematic Errors:</strong> Verify mount type and axis configuration</li>
+                    <li><strong>Time-Related Issues:</strong> Confirm system time and timezone settings</li>
+                    <li><strong>SkyView Mismatch:</strong> Check coordinate epoch and astrometric corrections</li>
+                </ul>
+
+                <h4>🌙 SkyView Issues</h4>
+                <ul>
+                    <li><strong>Objects Missing:</strong> Check display filters and magnitude limits</li>
+                    <li><strong>Wrong Sky Display:</strong> Verify location coordinates and time settings</li>
+                    <li><strong>Performance Issues:</strong> Reduce displayed object catalogs on slower devices</li>
+                    <li><strong>Label Overlap:</strong> Zoom in to reduce label density</li>
+                </ul>
+
+                <h3>Diagnostic Tools</h3>
+                <div class="code-block">
+# Test telescope connection
+curl http://&lt;telescope-ip&gt;:5000/test_connection
+
+# Check current status
+curl http://&lt;telescope-ip&gt;:5000/status
+
+# Get system version info
+curl http://&lt;telescope-ip&gt;:5000/version
+
+# Test search functionality
+curl -X POST http://&lt;telescope-ip&gt;:5000/search -d "query=Polaris"
+                </div>
+
+                <h3>Log Analysis</h3>
+                <p>Check system logs for detailed error information:</p>
+                <ul>
+                    <li><strong>Service Logs:</strong> <span class="code">journalctl -u sipi.service -f</span></li>
+                    <li><strong>SiTech Logs:</strong> <span class="code">journalctl -u sitech.service -f</span></li>
+                    <li><strong>Browser Console:</strong> F12 Developer Tools for JavaScript errors</li>
+                    <li><strong>Network Issues:</strong> Check browser Network tab for failed requests</li>
+                </ul>
+
+                <h3>Recovery Procedures</h3>
+                <ol>
+                    <li><strong>Service Restart:</strong> <span class="code">sudo systemctl restart sipi</span></li>
+                    <li><strong>Clear Browser Cache:</strong> Force refresh with Ctrl+F5</li>
+                    <li><strong>Reset Configuration:</strong> Use backup/restore functionality</li>
+                    <li><strong>Update System:</strong> Apply latest updates via configuration page</li>
+                </ol>
+
+                <div class="tip">
+                    <strong>💡 Support Tip:</strong> When reporting issues, include system logs, browser console output, and specific steps to reproduce the problem.
+                </div>
+
+                <h3>Emergency Procedures</h3>
+                <div class="warning">
+                    <strong>🚨 Emergency Stops:</strong>
+                    <ul>
+                        <li>Use the <strong>Abort</strong> button for immediate motion stop</li>
+                        <li>Emergency power disconnect if software becomes unresponsive</li>
+                        <li>Manual mode switch on controller for direct hardware control</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2>📞 Support & Resources</h2>
+                
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4>📚 Documentation</h4>
+                        <p>Complete API documentation and technical specifications available in the project repository.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🔄 Updates</h4>
+                        <p>Regular updates include new features, bug fixes, and performance improvements via built-in update system.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🛠️ Customization</h4>
+                        <p>Open-source architecture allows for custom modifications and extensions to meet specific requirements.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🌟 Community</h4>
+                        <p>Active development community providing support, feature requests, and collaborative improvements.</p>
+                    </div>
+                </div>
+
+                <p style="text-align: center; margin-top: 48px; color: var(--secondary);">
+                    <strong>SiPi Telescope Control System v1.0.0</strong><br>
+                    Professional astronomical control software for the modern astronomer
+                </p>
+            </section>
+        </div>
+    </main>
+
+    <script>
+        function toggleTheme() {
+            const body = document.body;
+            const currentTheme = body.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            body.setAttribute('data-theme', newTheme);
+            
+            // Save preference
+            localStorage.setItem('manual-theme', newTheme);
+        }
+
+        // Load saved theme
+        const savedTheme = localStorage.getItem('manual-theme') || 'dark';
+        document.body.setAttribute('data-theme', savedTheme);
+
+        // Smooth scrolling for navigation links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Update theme toggle button text
+        function updateThemeButton() {
+            const button = document.querySelector('.theme-toggle');
+            const theme = document.body.getAttribute('data-theme');
+            button.textContent = theme === 'dark' ? '☀️ Light Mode' : '🌙 Dark Mode';
+        }
+
+        updateThemeButton();
+        
+        // Update button on theme change
+        document.body.addEventListener('attributeChanged', updateThemeButton);
+    </script>
+</body>
+</html>

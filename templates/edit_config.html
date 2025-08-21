@@ -115,6 +115,73 @@
       font-size: 1.1rem;
     }
 
+    /* SiTech Controller Button Styles */
+    .sitech-btn {
+      border: 2px solid var(--accent);
+      padding: 0.6em 1.2em;
+      border-radius: var(--radius);
+      background-color: var(--surface);
+      color: var(--fg);
+      font: inherit;
+      cursor: pointer;
+      transition: var(--transition);
+      font-size: 1rem;
+      min-width: 120px;
+    }
+    .sitech-btn:hover,
+    .sitech-btn:focus {
+      background-color: var(--surface-alt);
+    }
+    .sitech-btn-small {
+      border: 1px solid var(--accent);
+      padding: 0.4em 0.8em;
+      border-radius: var(--radius);
+      background-color: var(--surface);
+      color: var(--fg);
+      font: inherit;
+      cursor: pointer;
+      transition: var(--transition);
+      font-size: 0.9rem;
+      min-width: 80px;
+    }
+    .sitech-btn-small:hover,
+    .sitech-btn-small:focus {
+      background-color: var(--surface-alt);
+    }
+    
+    /* Controller status display */
+    #controllerStatus {
+      text-align: center;
+      font-size: 0.95rem;
+    }
+    body.night-mode #controllerStatus {
+      background: #1a1a1a !important;
+      border: 1px solid red;
+    }
+    body.night-mode .sitech-btn,
+    body.night-mode .sitech-btn-small {
+      background-color: black;
+      color: red;
+      border-color: red;
+    }
+    body.night-mode .sitech-btn:hover,
+    body.night-mode .sitech-btn:focus,
+    body.night-mode .sitech-btn-small:hover,
+    body.night-mode .sitech-btn-small:focus {
+      background-color: #330000;
+    }
+
+    :root {
+      --error-color: #d32f2f;
+      --error-bg: #ffebee;
+      --warning-color: #f57c00;
+    }
+    body.night-mode {
+      --error-color: #ff6b6b;
+      --error-bg: #2a0000;
+      --warning-color: #ffb74d;
+    }
+
     .container {
       padding: var(--padding);
     }
@@ -410,11 +477,46 @@ function showConfirm(msg, cb) {
       </div>
     </div>
     <div class="grid-item">
-      <h2>SkyView Settings</h2>
+      <h2>Controller Settings</h2>
       <div style="text-align:center;">
-        <label>
-          <input type="checkbox" id="flipSkyViewCheckbox"> Flip SkyView
-        </label>
+        <div style="margin-bottom: 15px;">
+          <div style="margin-bottom: 8px;">
+            <strong>SiTechExe Service Status:</strong>
+          </div>
+          <div id="sitechServiceStatus" style="padding: 8px; background: var(--surface-alt, #f5f5f5); border-radius: 5px; margin-bottom: 10px;">
+            <span id="serviceStatusText">Checking...</span>
+            <span id="serviceStatusIndicator" style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-left: 8px; background: #ccc;"></span>
+          </div>
+          <div style="display: flex; justify-content: center; gap: 8px; margin-bottom: 15px;">
+            <button id="startSitechBtn" class="sitech-btn-small">Start Service</button>
+            <button id="stopSitechBtn" class="sitech-btn-small">Stop Service</button>
+          </div>
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label style="display: block; margin-bottom: 5px;">ComPort:</label>
+          <input type="text" id="controllerComPort" placeholder="/dev/ttyUSB0" style="width: 140px; text-align: center;">
+        </div>
+        <div style="margin-bottom: 10px;">
+          <button id="getControllerStatusBtn" class="sitech-btn">Get Status</button>
+        </div>
+        <div id="controllerStatus" style="margin: 10px 0; padding: 10px; background: var(--surface-alt, #f5f5f5); border-radius: 5px; min-height: 40px;">
+          <div id="controllerMode">Mode: Unknown</div>
+          <div id="controllerBits" style="font-size: 0.9em; color: var(--fg-dim, #666); margin-top: 5px;"></div>
+        </div>
+        <div style="display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin: 10px 0;">
+          <button id="setNormalModeBtn" class="sitech-btn-small">Normal</button>
+          <button id="setSlewTrackModeBtn" class="sitech-btn-small">Slew & Track</button>
+          <button id="setDragTrackModeBtn" class="sitech-btn-small">Drag & Track</button>
+        </div>
+        <div style="margin-top: 15px;">
+          <label style="display: block; margin-bottom: 5px;"><strong>Serial Command:</strong></label>
+          <input type="text" id="serialCommand" placeholder="Enter command (e.g., X, Xg, or press Enter for carriage return)" style="width: 300px; text-align: left; margin-bottom: 8px;">
+          <div id="serialResponse" style="margin: 8px 0; padding: 8px; background: var(--surface-alt, #f5f5f5); border-radius: 5px; min-height: 30px; font-family: monospace; font-size: 0.9em; white-space: pre-wrap; text-align: left;">
+          </div>
+        </div>
+        <div style="margin-top: 15px;">
+          <button id="restartSitechBtn" class="sitech-btn">Restart Service</button>
+        </div>
       </div>
     </div>
     <div class="grid-item">
@@ -468,19 +570,96 @@ $(function(){
     }, 500);
   }
   
-  // --- Flip SkyView Checkbox Persistence ---
-  // On page load, set checkbox state from localStorage
-  var flipSkyView = localStorage.getItem('flipSkyView');
-  if (flipSkyView === 'true') {
-    $('#flipSkyViewCheckbox').prop('checked', true);
-  } else {
-    $('#flipSkyViewCheckbox').prop('checked', false);
+  // --- Service Management Functions ---
+  function checkSitechServiceStatus() {
+    $.get('/sitech_service_status', function(data) {
+      const statusText = $('#serviceStatusText');
+      const statusIndicator = $('#serviceStatusIndicator');
+      
+      if (data.running) {
+        statusText.text('Running');
+        statusIndicator.css('background', '#28a745'); // Green
+      } else {
+        statusText.text('Stopped');
+        statusIndicator.css('background', '#dc3545'); // Red
+      }
+    }).fail(function() {
+      $('#serviceStatusText').text('Unknown');
+      $('#serviceStatusIndicator').css('background', '#ffc107'); // Yellow
+    });
   }
 
-  // On checkbox change, update localStorage
-  $('#flipSkyViewCheckbox').on('change', function() {
-    localStorage.setItem('flipSkyView', this.checked ? 'true' : 'false');
+  // Check service status on page load and every 10 seconds
+  checkSitechServiceStatus();
+  setInterval(checkSitechServiceStatus, 10000);
+
+  // Start service button
+  $('#startSitechBtn').on('click', function() {
+    const btn = $(this);
+    btn.prop('disabled', true).text('Starting...');
+    
+    $.post('/sitech_service_control', {action: 'start'}, function(data) {
+      showModal(data.message || 'Service start command sent', function() {
+        checkSitechServiceStatus();
+      });
+    }).fail(function() {
+      showModal('Failed to start service', function() {});
+    }).always(function() {
+      btn.prop('disabled', false).text('Start Service');
+    });
   });
+
+  // Stop service button
+  $('#stopSitechBtn').on('click', function() {
+    showModal('Are you sure you want to stop the SiTech service?', function() {
+      const btn = $('#stopSitechBtn');
+      btn.prop('disabled', true).text('Stopping...');
+      
+      $.post('/sitech_service_control', {action: 'stop'}, function(data) {
+        showModal(data.message || 'Service stop command sent', function() {
+          checkSitechServiceStatus();
+        });
+      }).fail(function() {
+        showModal('Failed to stop service', function() {});
+      }).always(function() {
+        btn.prop('disabled', false).text('Stop Service');
+      });
+    });
+  });
+
+  // Serial command functionality
+  $('#serialCommand').on('keypress', function(e) {
+    if (e.which === 13) { // Enter key
+      const command = $(this).val().trim();
+      sendSerialCommand(command); // Send even if empty (for carriage return)
+      $(this).val(''); // Clear input after sending
+    }
+  });
+
+  function sendSerialCommand(command) {
+    const responseDiv = $('#serialResponse');
+    
+    // Show what we're sending
+    if (command === '') {
+      responseDiv.text('Sending carriage return...');
+    } else {
+      responseDiv.text('Sending: ' + command + '...');
+    }
+    
+    $.post('/send_serial_command', {command: command}, function(data) {
+      // Show just the response, no labels
+      responseDiv.text(data.response || '(no response)');
+    }).fail(function(xhr) {
+      let errorMsg = 'Error: ';
+      if (xhr.responseJSON && xhr.responseJSON.message) {
+        errorMsg += xhr.responseJSON.message;
+      } else {
+        errorMsg += 'Failed to send command';
+      }
+      responseDiv.text(errorMsg);
+    });
+  }
+
   // --- Backup/Restore Config ---
   // Remove debug info from backup/restore popups
   function formatDiag(resp) { return ''; }
@@ -1012,6 +1191,139 @@ $(function(){
       showModal("❌ Failed to check for updates: " + error + "\n\nPlease check your connection and try again.");
     });
   });
+
+  // Controller Settings JavaScript
+  
+  // Load controller settings
+  function loadControllerSettings() {
+    $.get('/get_config', function(data) {
+      if (data.controller_com_port) {
+        $('#controllerComPort').val(data.controller_com_port);
+      } else {
+        $('#controllerComPort').val('/dev/ttyUSB0'); // Default
+      }
+    }).fail(function() {
+      $('#controllerComPort').val('/dev/ttyUSB0'); // Default on error
+    });
+  }
+  
+  // Save ComPort when it changes
+  $('#controllerComPort').on('change', function() {
+    const comPort = $(this).val().trim();
+    if (comPort) {
+      $.post('/save_config', {
+        controller_com_port: comPort
+      }, function(data) {
+        // Success - no need to show message for this
+      }).fail(function() {
+        showModal("❌ Failed to save ComPort setting");
+      });
+    }
+  });
+  
+  // Load settings on page load
+  loadControllerSettings();
+  
+  function updateControllerStatus(data) {
+    const statusDiv = $('#controllerStatus');
+    const modeDiv = $('#controllerMode');
+    const bitsDiv = $('#controllerBits');
+    
+    if (data.error) {
+      modeDiv.text('Mode: Error');
+      bitsDiv.html('<div style="color: var(--error-color, #d32f2f); word-wrap: break-word; white-space: pre-wrap;">' + data.error + '</div>');
+      statusDiv.css('background-color', 'var(--error-bg, #ffebee)');
+    } else {
+      modeDiv.text('Mode: ' + data.primary_mode);
+      if (data.modes.length > 1) {
+        modeDiv.text(modeDiv.text() + ' (' + data.modes.slice(1).join(', ') + ')');
+      }
+      bitsDiv.text('XBits: ' + data.xbits_hex + ' YBits: ' + data.ybits_hex);
+      statusDiv.css('background-color', 'var(--surface-alt, #f5f5f5)');
+      
+      // Show service restart warning if present
+      if (data.service_restart_error) {
+        bitsDiv.append('<div style="color: var(--warning-color, #f57c00); margin-top: 5px; font-size: 0.8em;">Warning: ' + data.service_restart_error + '</div>');
+      }
+    }
+  }
+
+  // Get Controller Status
+  $('#getControllerStatusBtn').click(function() {
+    const btn = $(this);
+    const originalText = btn.text();
+    
+    btn.prop('disabled', true).text('Reading...');
+    
+    $.get('/controller_status', function(data) {
+      updateControllerStatus(data);
+    }).fail(function(xhr) {
+      updateControllerStatus({
+        error: 'Failed to get status: ' + (xhr.responseJSON?.error || xhr.statusText || 'Unknown error')
+      });
+    }).always(function() {
+      btn.prop('disabled', false).text(originalText);
+    });
+  });
+
+  // Set Controller Modes
+  $('#setNormalModeBtn').click(function() {
+    setControllerMode('normal', $(this));
+  });
+  
+  $('#setSlewTrackModeBtn').click(function() {
+    setControllerMode('slew_track', $(this));
+  });
+  
+  $('#setDragTrackModeBtn').click(function() {
+    setControllerMode('drag_track', $(this));
+  });
+  
+  function setControllerMode(mode, btn) {
+    const originalText = btn.text();
+    btn.prop('disabled', true).text('Setting...');
+    
+    $.post('/controller_mode', { mode: mode }, function(data) {
+      if (data.error) {
+        showModal('❌ Failed to set mode: ' + data.error);
+      } else {
+        showModal('✅ ' + data.message);
+        // Refresh status after successful mode change
+        setTimeout(function() {
+          $('#getControllerStatusBtn').click();
+        }, 500);
+      }
+    }).fail(function(xhr) {
+      showModal('❌ Failed to set mode: ' + (xhr.responseJSON?.error || xhr.statusText || 'Unknown error'));
+    }).always(function() {
+      btn.prop('disabled', false).text(originalText);
+    });
+  }
+
+  // Restart SiTech Service
+  $('#restartSitechBtn').click(function() {
+    const btn = $(this);
+    const originalText = btn.text();
+    
+    showConfirm('Restart SiTech service? This will temporarily stop telescope control.', function(confirmed) {
+      if (confirmed) {
+        btn.prop('disabled', true).text('Restarting...');
+        
+        $.post('/restart_sitech', function(data) {
+          if (data.error) {
+            showModal('❌ Failed to restart service: ' + data.error);
+          } else {
+            showModal('✅ ' + data.message);
+          }
+        }).fail(function(xhr) {
+          showModal('❌ Failed to restart service: ' + (xhr.responseJSON?.error || xhr.statusText || 'Unknown error'));
+        }).always(function() {
+          btn.prop('disabled', false).text(originalText);
+        });
+      }
+    });
+  });
+
 });
 </script>
 </body>

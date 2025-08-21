@@ -240,6 +240,216 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Guard to prevent overlapping draws
   let isDrawing = false;
 
+  // --- Label Collision Detection System ---
+  var placedLabels = []; // Array to track all placed label bounding boxes
+  
+  // Reset collision tracking for each draw cycle
+  function resetLabelCollisions() {
+    placedLabels = [];
+  }
+  
+  // Check if a text bounding box collides with any existing labels
+  function checkLabelCollision(textX, textY, textWidth, textHeight, objectType, padding = 2) {
+    // Account for center-aligned text (drawFlippableText uses center alignment)
+    const newBox = {
+      left: textX - textWidth/2 - padding,
+      right: textX + textWidth/2 + padding,
+      top: textY - textHeight/2 - padding,
+      bottom: textY + textHeight/2 + padding
+    };
+    
+    // Define object type priority (lower number = higher priority)
+    const typePriority = {
+      'star': 1,      // Highest priority
+      'messier': 2,   // Medium priority  
+      'constellation': 3  // Lowest priority
+    };
+    
+    const currentPriority = typePriority[objectType] || 3;
+    
+    // Dynamic padding based on object type and zoom level
+    let effectivePadding;
+    if (objectType === 'constellation') {
+      // Constellations can be more aggressive about overlapping
+      effectivePadding = padding * 0.5; // 50% less padding for constellations
+    } else if (objectType === 'messier') {
+      // Moderate padding for messier objects
+      effectivePadding = padding * 0.8; // 20% less padding for messier
+    } else {
+      // Stars get full padding (highest priority)
+      effectivePadding = padding;
+    }
+    
+    for (let existing of placedLabels) {
+      // Check if boxes overlap with effective padding
+      const adjustedNewBox = {
+        left: textX - textWidth/2 - effectivePadding,
+        right: textX + textWidth/2 + effectivePadding,
+        top: textY - textHeight/2 - effectivePadding,
+        bottom: textY + textHeight/2 + effectivePadding
+      };
+      
+      if (adjustedNewBox.left < existing.right && 
+          adjustedNewBox.right > existing.left && 
+          adjustedNewBox.top < existing.bottom && 
+          adjustedNewBox.bottom > existing.top) {
+        
+        const existingPriority = typePriority[existing.objectType] || 3;
+        
+        // Fixed priority logic: Higher priority objects (lower number) can displace lower priority ones
+        // But for now, we'll try to find a different position rather than displacing
+        if (currentPriority > existingPriority) {
+          return true; // Current has lower priority - can't place here, collision detected
+        } else if (currentPriority < existingPriority) {
+          // Current has higher priority - could displace, but try other positions first
+          return true; // For now, still try other positions to avoid complexity
+        } else {
+          // Same priority - avoid collision
+          return true; // Collision detected - can't place here
+        }
+      }
+    }
+    return false; // No collision
+  }
+  
+  // Register a placed label's bounding box
+  function registerLabelPlacement(textX, textY, textWidth, textHeight, objectType) {
+    // Account for center-aligned text (drawFlippableText uses center alignment)
+    placedLabels.push({
+      left: textX - textWidth/2,
+      right: textX + textWidth/2,
+      top: textY - textHeight/2,
+      bottom: textY + textHeight/2,
+      objectType: objectType
+    });
+  }
+
+  // --- Enhanced Label Positioning with Collision Detection ---
+  function getLabelPositionWithCollisionDetection(objectX, objectY, text, objectType, canvasScale) {
+    const ctx = canvas.getContext('2d');
+    
+    // Set the correct font BEFORE measuring text
+    let fontSize;
+    if (objectType === 'messier' || objectType === 'constellation') {
+      fontSize = 12 / canvasScale;
+    } else {
+      fontSize = 10 / canvasScale; // Star font size
+    }
+    ctx.font = `${fontSize}px sans-serif`;
+    
+    const textMetrics = ctx.measureText(text);
+    const textWidth = textMetrics.width;
+    
+    // Calculate text height based on object type and current zoom
+    // Use more accurate height calculation
+    const textHeight = fontSize * 1.2; // Account for font ascent/descent
+    
+    // Define label priority and position options based on object type
+    let positions = [];
+    // Improved scaling for all zoom levels - ensure minimum separation and scale appropriately
+    const baseOffset = Math.max(textHeight * 0.8, Math.min(8, 6 / canvasScale)); // Scale with text size, but have reasonable limits
+    
+    if (objectType === 'star') {
+      // HIGHEST PRIORITY: Stars get the closest positions first
+      positions = [
+        // Ultra-close primary positions
+        { x: objectX + baseOffset, y: objectY + baseOffset, priority: 1 },
+        { x: objectX - baseOffset, y: objectY + baseOffset, priority: 1 },
+        { x: objectX + baseOffset, y: objectY - baseOffset, priority: 1 },
+        { x: objectX - baseOffset, y: objectY - baseOffset, priority: 1 },
+        // Close secondary positions
+        { x: objectX + baseOffset * 1.2, y: objectY, priority: 2 },
+        { x: objectX - baseOffset * 1.2, y: objectY, priority: 2 },
+        { x: objectX, y: objectY + baseOffset * 1.2, priority: 2 },
+        { x: objectX, y: objectY - baseOffset * 1.2, priority: 2 },
+      ];
+    } else if (objectType === 'messier') {
+      // MEDIUM PRIORITY: Messier objects get slightly more distant options
+      positions = [
+        // Primary positions
+        { x: objectX + baseOffset * 1.1, y: objectY + baseOffset * 1.1, priority: 1 },
+        { x: objectX - baseOffset * 1.1, y: objectY + baseOffset * 1.1, priority: 1 },
+        { x: objectX + baseOffset * 1.1, y: objectY - baseOffset * 1.1, priority: 1 },
+        { x: objectX - baseOffset * 1.1, y: objectY - baseOffset * 1.1, priority: 1 },
+        // Secondary positions
+        { x: objectX + baseOffset * 1.5, y: objectY, priority: 2 },
+        { x: objectX - baseOffset * 1.5, y: objectY, priority: 2 },
+        { x: objectX, y: objectY + baseOffset * 1.5, priority: 2 },
+        { x: objectX, y: objectY - baseOffset * 1.5, priority: 2 },
+        // Tertiary positions (farther out)
+        { x: objectX + baseOffset * 2, y: objectY, priority: 3 },
+        { x: objectX - baseOffset * 2, y: objectY, priority: 3 },
+      ];
+    } else if (objectType === 'constellation') {
+      // LOWEST PRIORITY: Constellations can be placed much farther away
+      // Improved positioning to reduce overlaps with more varied spacing
+      positions = [
+        // PRIMARY PREFERENCE: Centered below (most natural for constellation names)
+        { x: objectX, y: objectY + baseOffset * 1.8, priority: 1 },
+        { x: objectX, y: objectY + baseOffset * 2.5, priority: 1 },
+        { x: objectX, y: objectY + baseOffset * 3.2, priority: 1 },
+        // SECONDARY: Centered above with more spacing
+        { x: objectX, y: objectY - baseOffset * 1.8, priority: 2 },
+        { x: objectX, y: objectY - baseOffset * 2.5, priority: 2 },
+        { x: objectX, y: objectY - baseOffset * 3.2, priority: 2 },
+        // TERTIARY: Slightly off-center below/above with increased spacing
+        { x: objectX + baseOffset * 0.8, y: objectY + baseOffset * 2, priority: 3 },
+        { x: objectX - baseOffset * 0.8, y: objectY + baseOffset * 2, priority: 3 },
+        { x: objectX + baseOffset * 0.8, y: objectY - baseOffset * 2, priority: 3 },
+        { x: objectX - baseOffset * 0.8, y: objectY - baseOffset * 2, priority: 3 },
+        // FALLBACK: Traditional diagonal positions with more spacing
+        { x: objectX + baseOffset * 1.8, y: objectY + baseOffset * 1.8, priority: 4 },
+        { x: objectX - baseOffset * 1.8, y: objectY + baseOffset * 1.8, priority: 4 },
+        { x: objectX + baseOffset * 1.8, y: objectY - baseOffset * 1.8, priority: 4 },
+        { x: objectX - baseOffset * 1.8, y: objectY - baseOffset * 1.8, priority: 4 },
+        // LAST RESORT: Much farther positions if everything else is blocked
+        { x: objectX, y: objectY + baseOffset * 4, priority: 5 },
+        { x: objectX, y: objectY - baseOffset * 4, priority: 5 },
+        { x: objectX + baseOffset * 3, y: objectY, priority: 5 },
+        { x: objectX - baseOffset * 3, y: objectY, priority: 5 },
+        // EXTREME FALLBACK: Very distant positions
+        { x: objectX + baseOffset * 2.5, y: objectY + baseOffset * 2.5, priority: 6 },
+        { x: objectX - baseOffset * 2.5, y: objectY + baseOffset * 2.5, priority: 6 },
+        { x: objectX + baseOffset * 2.5, y: objectY - baseOffset * 2.5, priority: 6 },
+        { x: objectX - baseOffset * 2.5, y: objectY - baseOffset * 2.5, priority: 6 },
+      ];
+    }
+    
+    // Try each position in priority order
+    for (let pos of positions) {
+      const textX = pos.x;
+      const textY = pos.y;
+      
+      // Check for collision
+      if (!checkLabelCollision(textX, textY, textWidth, textHeight, objectType)) {
+        // No collision - use this position
+        registerLabelPlacement(textX, textY, textWidth, textHeight, objectType);
+        return { textX, textY, success: true };
+      }
+    }
+    
+    // If all positions collide, use a smarter fallback that scales with text size
+    // Still don't register to avoid affecting other collision calculations
+    const fallbackOffset = Math.max(textHeight, baseOffset * 1.5);
+    let textX, textY;
+    
+    if (objectType === 'constellation') {
+      // For constellations, try a far-below position
+      textX = objectX;
+      textY = objectY + fallbackOffset * 3;
+    } else if (objectType === 'messier') {
+      // For messier objects, offset to the right
+      textX = objectX + fallbackOffset * 1.5;
+      textY = objectY + fallbackOffset;
+    } else {
+      // For stars, offset to the left
+      textX = objectX - fallbackOffset * 1.5;
+      textY = objectY + fallbackOffset;
+    }
+    
+    return { textX, textY, success: false };
+  }
+
   // UI Toggle Elements
   const toggleCalPoints = document.getElementById('toggleCalPoints');
 
@@ -417,22 +627,44 @@ document.addEventListener('DOMContentLoaded', async () => {
   let mountPos     = { alt: null, az: null };
 
   // --- Mount position polling ---
+  function parseDMS(dmsString) {
+    // Parse formatted DMS string like "045:30:15" or "-12:30:45" to decimal degrees
+    if (typeof dmsString === 'number') return dmsString;
+    if (typeof dmsString !== 'string') return NaN;
+    
+    const match = dmsString.match(/^([+-]?)(\d+):(\d+):(\d+)$/);
+    if (!match) {
+      // Try to parse as plain number if DMS parsing fails
+      const num = parseFloat(dmsString);
+      return isNaN(num) ? NaN : num;
+    }
+    
+    const sign = match[1] === '-' ? -1 : 1;
+    const degrees = parseInt(match[2]);
+    const minutes = parseInt(match[3]);
+    const seconds = parseInt(match[4]);
+    
+    return sign * (degrees + minutes/60 + seconds/3600);
+  }
+
   async function fetchMount() {
     try {
       const resp = await fetch('/status');
       if (!resp.ok) throw new Error('Failed to fetch mount position');
       const data = await resp.json();
-      // /status returns alt and az as strings or numbers; parse as float and check for NaN
-      const alt = parseFloat(data.alt);
-      const az = parseFloat(data.az);
+      
+      // Parse DMS formatted strings to decimal degrees
+      const alt = parseDMS(data.alt);
+      const az = parseDMS(data.az);
+      
       if (!isNaN(alt) && !isNaN(az)) {
         mountPos.alt = alt;
         mountPos.az = az;
-        console.log('[SkyView] Mount position updated:', mountPos);
+        console.log('[SkyView] Mount position updated:', mountPos, 'from raw data:', {alt: data.alt, az: data.az});
       } else {
         mountPos.alt = null;
         mountPos.az = null;
-        console.warn('[SkyView] Invalid mount position data:', data);
+        console.warn('[SkyView] Invalid mount position data:', data, 'parsed as:', {alt, az});
       }
     } catch (e) {
       mountPos.alt = null;
@@ -444,8 +676,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Fetch mount position on load and every 2 seconds  
   fetchMount();
-  // Comment out the interval to stop auto-updates for debugging
-  // setInterval(fetchMount, 2000);  // --- Solar system position polling ---
+  setInterval(fetchMount, 2000);  // --- Solar system position polling ---
   async function fetchSolarSystem() {
     try {
       const resp = await fetch('/solar_system');
@@ -536,6 +767,50 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Fullscreen toggle removed: fullscreenBtn no longer exists
 
   // Astronomy utilities
+  // Server time synchronization
+  let serverTimeOffset = 0; // Difference between server and client time
+  let lastServerTimeUpdate = 0;
+  
+  function updateServerTimeOffset() {
+    // Get server time from status endpoint
+    fetch('/status')
+      .then(response => response.json())
+      .then(data => {
+        // Parse server time (assuming it's in format HH:MM:SS)
+        const serverTimeStr = data.time;
+        if (serverTimeStr && serverTimeStr.includes(':')) {
+          const now = new Date();
+          const [hours, minutes, seconds] = serverTimeStr.split(':').map(Number);
+          
+          // Create a Date object for today with server time
+          const serverTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, seconds);
+          
+          // Calculate offset (server time - client time)
+          serverTimeOffset = serverTime.getTime() - now.getTime();
+          lastServerTimeUpdate = now.getTime();
+          
+          console.log('[SkyView] Server time sync: offset =', serverTimeOffset / 1000, 'seconds');
+        }
+      })
+      .catch(e => console.warn('[SkyView] Failed to sync server time:', e));
+  }
+  
+  function getServerTime() {
+    // Return current time adjusted for server offset
+    const clientTime = new Date();
+    
+    // Update server time offset every 30 seconds
+    if (Date.now() - lastServerTimeUpdate > 30000) {
+      updateServerTimeOffset();
+    }
+    
+    return new Date(clientTime.getTime() + serverTimeOffset);
+  }
+  
+  // Initialize server time sync
+  updateServerTimeOffset();
+  setInterval(updateServerTimeOffset, 60000); // Update every minute
+
   function toJulian(d){ return d.valueOf()/86400000 + 2440587.5; }
   function computeLST(d, lonDeg){
     const D = toJulian(d) - 2451545.0;
@@ -546,6 +821,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     return LST;
   }
   function eqToAltAz(raH, decDeg, latDeg, lonDeg, date){
+    // Use server time if no date provided
+    if (!date) date = getServerTime();
+    
     const lst  = computeLST(date, lonDeg);
     const ha   = ((lst - raH)*15 + 180)%360 - 180;
     const haR  = ha*Math.PI/180,
@@ -661,18 +939,71 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
   }
 
+  // --- Night Mode Color Helper ---
+  function getNightModeColor(defaultColor, objectType = 'default') {
+    // Check for SkyView-specific night mode toggle first, then fall back to main UI toggle
+    const skyViewNightModeToggle = document.getElementById('toggleSkyViewNightMode');
+    const isSkyViewNightMode = skyViewNightModeToggle && skyViewNightModeToggle.checked;
+    
+    // If SkyView night mode is explicitly enabled, use night mode colors
+    // If SkyView night mode is explicitly disabled (unchecked), use day mode colors
+    // This overrides the main UI night mode setting
+    const isNightMode = isSkyViewNightMode;
+    
+    if (!isNightMode) {
+      return defaultColor;
+    }
+    
+    // In night mode, everything should be red or black
+    switch (objectType) {
+      case 'background':
+        return 'black';
+      case 'star':
+      case 'constellation':
+      case 'messier':
+      case 'galaxy':
+      case 'nebula':
+      case 'cluster':
+      case 'text':
+      case 'line':
+      case 'border':
+      case 'compass':
+      default:
+        return 'red';
+    }
+  }
+
   // --- Utility: Draw label with appropriate positioning (no pointer lines) ---
   function drawLabelWithPointer(text, objectX, objectY, objectType, color, canvasScale) {
-    const pos = getLabelPosition(objectX, objectY, text, objectType, canvasScale);
+    const pos = getLabelPositionWithCollisionDetection(objectX, objectY, text, objectType, canvasScale);
     
-    // Set text alignment based on object type
+    // Set text alignment based on position success and object type
     ctx.save();
-    if (objectType === 'messier') {
-      // Right side positioning: left-align text
-      ctx.textAlign = 'left';
+    if (pos.success) {
+      // For constellation labels, prefer center alignment when positioned directly above/below
+      if (objectType === 'constellation') {
+        const isVerticallyAligned = Math.abs(pos.textX - objectX) < 1; // Very close to center
+        if (isVerticallyAligned) {
+          ctx.textAlign = 'center';
+        } else {
+          // Use smart alignment for off-center positions
+          const isRight = pos.textX > objectX;
+          ctx.textAlign = isRight ? 'left' : 'right';
+        }
+      } else {
+        // Use smart positioning for stars and messier objects
+        const isRight = pos.textX > objectX;
+        ctx.textAlign = isRight ? 'left' : 'right';
+      }
     } else {
-      // Left side positioning: right-align text  
-      ctx.textAlign = 'right';
+      // Fallback to original logic
+      if (objectType === 'messier') {
+        ctx.textAlign = 'left';
+      } else if (objectType === 'constellation') {
+        ctx.textAlign = 'center'; // Default center for constellations
+      } else {
+        ctx.textAlign = 'right';
+      }
     }
     ctx.textBaseline = 'top';
     
@@ -1086,9 +1417,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 decDeg: hitObj.Declin,
                 lat: lat,
                 lon: lon,
-                date: new Date()
+                date: getServerTime() // Use server time for debug info
               });
-              const coords = eqToAltAz(raHours, hitObj.Declin, lat, lon, new Date());
+              const coords = eqToAltAz(raHours, hitObj.Declin, lat, lon); // Use server time
               console.log('[SkyView] DEBUG - eqToAltAz result:', coords);
               
               // Fix azimuth reference frame - add 180° if needed
@@ -1116,7 +1447,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               decInput.value = degToDMS(hitObj.dec);
               
               const raHours = hitObj.ra;
-              const coords = eqToAltAz(raHours, hitObj.dec, lat, lon, new Date());
+              const coords = eqToAltAz(raHours, hitObj.dec, lat, lon); // Use server time
               
               // Apply the same azimuth reference frame correction as catalog objects
               let correctedAz = coords.az;
@@ -1279,12 +1610,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Drawing helpers
   // If you need to re-render the handpad/buttons after certain actions, call renderHandpadAndActions() again.
   function drawGrid(r){
-    ctx.strokeStyle = '#888'; ctx.lineWidth = 2 / canvasScale; // gray border
+    ctx.strokeStyle = getNightModeColor('#888', 'border'); ctx.lineWidth = 2 / canvasScale; // gray border
     ctx.beginPath(); ctx.arc(cx,cy,r,0,2*Math.PI); ctx.stroke();
     
     // Add altitude lines (radial lines from center to edge) - dashed
     ctx.setLineDash([4,4]);
-    ctx.strokeStyle = '#666'; 
+    ctx.strokeStyle = getNightModeColor('#666', 'line'); 
     ctx.lineWidth = 0.5 / canvasScale;
     // Draw lines every 22.5 degrees (doubled from 45 degrees)
     for (let az = 0; az < 360; az += 22.5) {
@@ -1299,7 +1630,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     [30,60].forEach(a=>{
       const rr=(90-a)/90*r;
       ctx.lineWidth = 0.7 / canvasScale; // dashed grid lines narrower
-      ctx.strokeStyle = '#888'; // gray dashed
+      ctx.strokeStyle = getNightModeColor('#888', 'line'); // gray dashed
       ctx.beginPath(); ctx.arc(cx,cy,rr,0,2*Math.PI); ctx.stroke();
     });
     ctx.setLineDash([]);
@@ -1307,7 +1638,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Draw NSEW labels outside the projection (called before clipping)
   function drawNSEWLabels(r) {
-    ctx.fillStyle = 'white';
+    ctx.fillStyle = getNightModeColor('white', 'text');
     ctx.font = `${Math.max(14,r*0.05)}px sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     
@@ -1340,7 +1671,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function project(raH,decDeg,r){
-    const {alt,az} = eqToAltAz(raH,decDeg,lat,lon,new Date());
+    const {alt,az} = eqToAltAz(raH,decDeg,lat,lon); // Use server time
     const rr=(90-alt)/90*r;
     const ang=(az+180)*Math.PI/180;
     return { alt, az,
@@ -1382,6 +1713,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
     
+    // Reset label collision tracking for this draw cycle
+    resetLabelCollisions();
+    
     isDrawing = true;
     try {
       // Debug: log mountPos before drawing reticle
@@ -1416,7 +1750,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     drawGrid(effR);
 
-    // --- constellations ---
+    // --- PHASE 1: Draw all objects WITHOUT labels ---
+    // This allows us to establish visual positions first, then add labels with priorities
+    
+    // --- constellations (lines only) ---
     if(toggleConst.checked){
       console.log('[SkyView] Drawing constellations:', constLines.length);
       if (constLines.length > 0) {
@@ -1425,7 +1762,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       ctx.save();
       ctx.lineWidth = 1 / canvasScale; // narrower lines
-      ctx.strokeStyle='#a259e6'; // purple
+      ctx.strokeStyle = getNightModeColor('#a259e6', 'constellation'); // purple
       constLines.forEach(line=>{
         let prev=project(line[0][0]/15,line[0][1],effR);
         for(let i=1;i<line.length;i++){
@@ -1441,26 +1778,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
       ctx.restore();
     }
-    if(toggleConstLabels && toggleConstLabels.checked){
-      console.log('[SkyView] Drawing constellation labels:', constFeatures.length);
-      ctx.save();
-      ctx.fillStyle='rgba(224,195,252,0.98)'; // more opaque for labels
-      ctx.font=`${Math.max(2, 10/(canvasScale * canvasScale))}px sans-serif`;
-      ctx.textAlign='center'; ctx.textBaseline='middle';
-      constFeatures.forEach(f=>{
-        let pts=[]; const g=f.geometry;
-        if(g.type==='MultiLineString') g.coordinates.forEach(l=>pts.push(...l));
-        else if(g.type==='LineString') pts=g.coordinates;
-        const ppts=pts.map(p=>project(p[0]/15,p[1],effR)).filter(p=>p.alt>0);
-        if(!ppts.length) return;
-        const avgX=ppts.reduce((s,p)=>s+p.x,0)/ppts.length;
-        const avgY=ppts.reduce((s,p)=>s+p.y,0)/ppts.length;
-        drawFlippableText(f.id, avgX, avgY);
-      });
-      ctx.restore();
-    }
+    // Constellation labels will be drawn in PHASE 2 with priority system
 
-    // --- stars ---
+    // --- stars (visual points only) ---
     starHits=[]; if(toggleStars.checked){
       console.log('[SkyView] Drawing stars:', stars.length);
       if (stars.length > 0) {
@@ -1521,6 +1841,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             default: color = 'white';
           }
         }
+        
+        // Apply night mode color override
+        color = getNightModeColor(color, 'star');
         ctx.save();
         ctx.setTransform(1,0,0,1,0,0); // reset transform to draw icon in screen space
         
@@ -1563,99 +1886,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       
       console.log(`[PERF] Drew ${drawnStars}/${stars.length} stars (magnitude filtered, no count limits)`);
     }
+    // Star names will be drawn in PHASE 2 with priority system
 
-    // --- Named Stars ---
-    if(stars && stars.length > 0) {
-      console.log('[SkyView] Drawing named stars, canvasScale:', canvasScale);
-      ctx.save();
-      ctx.fillStyle='rgba(255,255,255,0.9)'; // White for star names (different from Messier purple)
-      // Use same scaling pattern as constellation labels - account for canvas scaling
-      ctx.font=`${Math.max(2, 8/(canvasScale * canvasScale))}px sans-serif`;
-      ctx.textAlign='right'; ctx.textBaseline='top'; // Right-align so last letter connects to line
-      
-      // Determine visibility threshold based on zoom level and magnitude
-      let magThreshold;
-      if (canvasScale < 1.5) {
-        magThreshold = 2.5; // Show only very bright named stars when zoomed out
-      } else if (canvasScale < 3.0) {
-        magThreshold = 3.5; // Show brighter named stars at medium zoom
-      } else if (canvasScale < 5.0) {
-        magThreshold = 4.5; // Show more named stars when zoomed in
-      } else {
-        magThreshold = 6.0; // Show most named stars at high zoom
-      }
-      
-      console.log('[SkyView] Star name magnitude threshold:', magThreshold);
-      let namedStarCount = 0;
-      
-      // Check if star names toggle is enabled
-      const toggleStarNames = document.getElementById('toggleStarNames');
-      if (toggleStarNames && toggleStarNames.checked) {
-        stars.forEach(s => {
-          if (s.Name && s.Name !== 'NoName' && s.Mag <= magThreshold) {
-            const p = project(s.RtAsc, s.Declin, effR);
-            if (p.alt > 0) { // Only draw if above horizon
-              // Use new positioning system
-              drawLabelWithPointer(s.Name, p.x, p.y, 'star', 'rgba(255,255,255,0.7)', canvasScale);
-              namedStarCount++;
-            }
-          }
-        });
-      }
-      
-      console.log('[SkyView] Drew', namedStarCount, 'named stars above horizon');
-      ctx.restore();
-    }
-
-    // --- Messier Objects ---
-    const toggleMessierNames = document.getElementById('toggleMessierNames');
-    if(messierObjects && messierObjects.length > 0 && toggleMessierNames && toggleMessierNames.checked) {
-      console.log('[SkyView] Drawing Messier objects:', messierObjects.length, 'canvasScale:', canvasScale);
-      ctx.save();
-      ctx.fillStyle='rgba(224,195,252,0.8)'; // Same color as constellation labels but slightly transparent
-      // Fixed base size that accounts for canvas scaling
-      ctx.font=`${Math.max(2, 10/(canvasScale * canvasScale))}px sans-serif`;
-      // Text alignment will be set in drawLabelWithPointer function
-      
-      // Determine visibility threshold based on zoom level (show labels earlier)
-      let magThreshold;
-      if (canvasScale < 1.2) {
-        magThreshold = 5.0; // Show more objects earlier when zoomed out
-      } else if (canvasScale < 2.0) {
-        magThreshold = 7.0; // Show even more objects at medium zoom
-      } else {
-        magThreshold = 9.0; // Show all objects when zoomed in
-      }
-      
-      console.log('[SkyView] Magnitude threshold:', magThreshold);
-      let visibleCount = 0;
-      
-      messierObjects.forEach(obj => {
-        if (obj.mag <= magThreshold) {
-          // Use corrected coordinates if available, otherwise parse from original strings
-          let ra, dec;
-          if (obj.ra_corrected_hours !== undefined && obj.dec_corrected_degrees !== undefined) {
-            ra = obj.ra_corrected_hours;
-            dec = obj.dec_corrected_degrees;
-          } else {
-            ra = parseRA(obj.ra);
-            dec = parseDec(obj.dec);
-          }
-          
-          const p = project(ra, dec, effR);
-          if (p.alt > 0) { // Only draw if above horizon
-            // Use new positioning system for Messier objects
-            drawLabelWithPointer(obj.name, p.x, p.y, 'messier', 'rgba(224,195,252,0.9)', canvasScale);
-            visibleCount++;
-          }
-        }
-      });
-      
-      console.log('[SkyView] Drew', visibleCount, 'Messier objects above horizon');
-      ctx.restore();
-    } else {
-      console.log('[SkyView] No Messier objects available:', messierObjects);
-    }
+    // --- Messier Objects (visual indicators only) ---
+    // Messier names will be drawn in PHASE 2 with priority system
 
     // --- galaxies ---
     galaxyHits=[]; if(toggleGal.checked){
@@ -1685,10 +1919,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         userGalMagLimit = 13 + (galSliderValue - 6) * 0.5;
       }
       
-      // For galaxies, if user sets to max position, allow all magnitudes
-      const galLimit = galSliderValue >= 18 ? Math.max(deviceGalLimit, 20) : Math.min(deviceGalLimit, userGalMagLimit);
+      // ZOOM-BASED MAGNITUDE LIMITING (independent of slider)
+      // At default zoom, only show brightest galaxies. As we zoom in, show more.
+      let zoomBasedMagLimit;
+      if (canvasScale < 1.2) {
+        zoomBasedMagLimit = 11.0; // Only show very bright galaxies when zoomed out
+      } else if (canvasScale < 2.0) {
+        zoomBasedMagLimit = 12.5; // Show more galaxies at medium zoom
+      } else if (canvasScale < 3.0) {
+        zoomBasedMagLimit = 14.0; // Show even more galaxies when zoomed in
+      } else if (canvasScale < 5.0) {
+        zoomBasedMagLimit = 15.5; // Show most galaxies at high zoom
+      } else {
+        zoomBasedMagLimit = 17.0; // Show all galaxies at very high zoom
+      }
       
-      console.log(`[PERF] Galaxy rendering - deviceLimit: ${deviceGalLimit}, sliderPos: ${galSliderValue}, userLimit: ${userGalMagLimit}, final: ${galLimit}`);
+      // Final limit is the most restrictive of: device limit, user slider, and zoom-based limit
+      const galLimit = Math.min(deviceGalLimit, userGalMagLimit, zoomBasedMagLimit);
+      
+      console.log(`[PERF] Galaxy rendering - deviceLimit: ${deviceGalLimit}, sliderPos: ${galSliderValue}, userLimit: ${userGalMagLimit}, zoomLimit: ${zoomBasedMagLimit}, final: ${galLimit}, canvasScale: ${canvasScale}`);
       
       let drawnGalaxies = 0;
       
@@ -1713,7 +1962,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const min = maj / 2;
         ctx.save();
         ctx.setTransform(1,0,0,1,0,0);
-        ctx.strokeStyle = 'rgb(255,100,150)'; // more pink but still reddish
+        ctx.strokeStyle = getNightModeColor('rgb(255,100,150)', 'galaxy'); // more pink but still reddish
         ctx.lineWidth = 1.2 + Math.min((canvasScale - 1) * 0.7, 2.2); // gentler scaling
         
         // Manually apply the same transformation sequence as the main canvas
@@ -1767,7 +2016,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       
       console.log(`[PERF] Drawing open clusters with magLimit: ${magLimit}`);
       
-      ctx.strokeStyle='rgb(100,100,255)'; // fully opaque blue
+      ctx.strokeStyle = getNightModeColor('rgb(100,100,255)', 'cluster'); // fully opaque blue
       openClusters.forEach(o=>{
         if (o.Mag >= magLimit) return;
         if (!shouldDrawObject(o.RtAsc, o.Declin, o.Mag, 'clusters', canvasScale)) return;
@@ -1828,7 +2077,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         let p = project(g.RtAsc, g.Declin, effR);
         console.log('[SkyView] Sample projected globular:', p, 'Mag:', g.Mag, 'RA:', g.RtAsc, 'Dec:', g.Declin);
       }
-      ctx.strokeStyle='rgb(0,180,80)'; // fully opaque green
+      ctx.strokeStyle = getNightModeColor('rgb(0,180,80)', 'cluster'); // fully opaque green
       globularClusters.forEach(g=>{
         const p=project(g.RtAsc,g.Declin,effR);
         if(p.alt<=0) return;
@@ -1893,7 +2142,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         let p = project(n.RtAsc, n.Declin, effR);
         console.log('[SkyView] Sample projected nebula:', p, 'Mag:', n.Mag, 'RA:', n.RtAsc, 'Dec:', n.Declin);
       }
-      ctx.strokeStyle='rgb(255,100,255)'; // fully opaque pink
+      ctx.strokeStyle = getNightModeColor('rgb(255,100,255)', 'nebula'); // fully opaque pink
       nebulae.forEach(n=>{
         const p=project(n.RtAsc,n.Declin,effR);
         if(p.alt<=0) return;
@@ -1951,7 +2200,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         let p = project(pn.RtAsc, pn.Declin, effR);
         console.log('[SkyView] Sample projected planetary:', p, 'Mag:', pn.Mag, 'RA:', pn.RtAsc, 'Dec:', pn.Declin);
       }
-      ctx.strokeStyle='rgb(127,255,0)'; // fully opaque chartreuse
+      ctx.strokeStyle = getNightModeColor('rgb(127,255,0)', 'nebula'); // fully opaque chartreuse
       planetaryNebulae.forEach(pn=>{
         const p=project(pn.RtAsc,pn.Declin,effR);
         if(p.alt<=0) return;
@@ -2077,6 +2326,9 @@ document.addEventListener('DOMContentLoaded', async () => {
               break;
           }
           
+          // Apply night mode color override
+          color = getNightModeColor(color, 'star');
+          
           // Scale size with zoom level to maintain constant visual size on screen
           const sz = baseSz / canvasScale;
           
@@ -2161,7 +2413,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- reticle ---
     if (mountPos.alt !== null && mountPos.az !== null) {
-      const azForDraw = (mountPos.az + 180) % 360;
+      // Mount azimuth needs -180° transformation to match display coordinate system
+      const azForDraw = ((mountPos.az - 180) + 360) % 360;
       const p = altAzToXY(mountPos.alt, azForDraw, effR);
       // Reticle radius fixed in screen space (like orange crosshair)
       const reticleRadius = 18; // px, visually matches orange crosshair
@@ -2190,7 +2443,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       const screenY = y;
       console.log('[SkyView] Reticle debug:', {
         mountPos,
-        azForDraw,
+        azForDraw: azForDraw,
+        azTransform: 'mountPos.az - 180°',
         effR,
         p,
         screenX,
@@ -2209,14 +2463,41 @@ document.addEventListener('DOMContentLoaded', async () => {
       
       // DEBUGGING: Compare mount coordinates with calculated coordinates for selected object
       if (selectedObject && selectedObject.ra !== undefined && selectedObject.dec !== undefined) {
-        const calcCoords = eqToAltAz(selectedObject.ra, selectedObject.dec, lat, lon, new Date());
-        console.log('COORDS: Mount Alt=' + mountPos.alt + ' Az=' + mountPos.az + ' | Calc Alt=' + calcCoords.alt.toFixed(3) + ' Az=' + calcCoords.az.toFixed(3) + ' | Diff Alt=' + (calcCoords.alt - mountPos.alt).toFixed(3) + ' Az=' + (calcCoords.az - mountPos.az).toFixed(3) + ' | Obj RA=' + selectedObject.ra + ' Dec=' + selectedObject.dec);
+        const calcCoords = eqToAltAz(selectedObject.ra, selectedObject.dec, lat, lon); // Use server time
+        
+        // Use the correct azimuth transformation (-180°)
+        const mountAzCorrected = ((mountPos.az - 180) + 360) % 360;
+        
+        const altDiff = calcCoords.alt - mountPos.alt;
+        const azDiff = calcCoords.az - mountAzCorrected;
+        
+        // Handle azimuth wraparound
+        let azDiffNormalized = azDiff;
+        if (azDiff > 180) azDiffNormalized = azDiff - 360;
+        if (azDiff < -180) azDiffNormalized = azDiff + 360;
+        
+        const totalError = Math.sqrt(altDiff*altDiff + azDiffNormalized*azDiffNormalized);
+        
+        console.log('COORDS COMPARISON:');
+        console.log('  Mount Raw    - Alt: ' + mountPos.alt.toFixed(3) + '°, Az: ' + mountPos.az.toFixed(3) + '°');
+        console.log('  Mount Corr   - Alt: ' + mountPos.alt.toFixed(3) + '°, Az: ' + mountAzCorrected.toFixed(3) + '° (az-180°)');
+        console.log('  Expected     - Alt: ' + calcCoords.alt.toFixed(3) + '°, Az: ' + calcCoords.az.toFixed(3) + '°');
+        console.log('  Difference   - Alt: ' + altDiff.toFixed(3) + '°, Az: ' + azDiffNormalized.toFixed(3) + '°');
+        console.log('  Object       - RA: ' + selectedObject.ra + 'h, Dec: ' + selectedObject.dec + '°');
+        
+        if (totalError > 1.0) {
+          console.warn('  ⚠️ Large pointing error: ' + totalError.toFixed(3) + '° total');
+        } else {
+          console.log('  ✅ Pointing error: ' + totalError.toFixed(3) + '° total');
+        }
       } else {
         console.log('COORDS: No valid selectedObject for comparison');
       }
       ctx.save();
       ctx.setTransform(1,0,0,1,0,0);
-      ctx.strokeStyle='red'; ctx.lineWidth=2;
+      ctx.strokeStyle = getNightModeColor('red', 'reticle'); 
+      ctx.lineWidth = 2;
+      
       // Crosshairs only
       ctx.beginPath();
       ctx.moveTo(screenX - reticleRadius * 1.3, screenY);
@@ -2225,9 +2506,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       ctx.lineTo(screenX, screenY + reticleRadius * 1.3);
       ctx.stroke();
       ctx.restore();
-      console.log('[SkyView] Reticle drawn at:', screenX, screenY, 'for mountPos:', mountPos);
+      console.log('[SkyView] Reticle drawn at screen coords:', screenX.toFixed(1), screenY.toFixed(1), 'for mount Alt/Az:', mountPos.alt.toFixed(3), mountPos.az.toFixed(3));
     } else {
-      console.log('[SkyView] Reticle not drawn, mountPos.alt or az is null:', mountPos);
+      console.log('[SkyView] Reticle not drawn - mount position invalid:', {
+        alt: mountPos.alt, 
+        az: mountPos.az,
+        altValid: mountPos.alt !== null && !isNaN(mountPos.alt),
+        azValid: mountPos.az !== null && !isNaN(mountPos.az)
+      });
     }
 
     // --- highlight selected object (dark orange circle only) ---
@@ -2285,12 +2571,131 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Orange circle only (no crosshair) - draw within the same transformation context as the objects
       ctx.beginPath();
       ctx.arc(p.x, p.y, selectionRadius, 0, 2 * Math.PI);
-      ctx.strokeStyle = 'rgba(255,120,30,0.75)'; // dark orange
+      ctx.strokeStyle = getNightModeColor('rgba(255,120,30,0.75)', 'selection'); // dark orange
       ctx.lineWidth = 1 / canvasScale; // Keep line width constant on screen
       ctx.stroke();
     }
 
     ctx.restore(); // restore sky circle clip before overlay
+
+    // --- PHASE 2: Draw labels in priority order ---
+    // This ensures high-priority labels (stars) get first choice of positions
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx,cy,effR,0,2*Math.PI); ctx.clip(); // Re-apply clipping for labels
+    
+    // PRIORITY 1: Star names (highest priority)
+    const toggleStarNames = document.getElementById('toggleStarNames');
+    if(stars && stars.length > 0 && toggleStarNames && toggleStarNames.checked) {
+      console.log('[SkyView] Drawing named stars with PRIORITY 1, canvasScale:', canvasScale);
+      ctx.save();
+      ctx.fillStyle=getNightModeColor('rgba(255,255,255,0.9)', 'text'); // White for star names
+      ctx.font=`${10/canvasScale}px sans-serif`; // Constant visual size
+      
+      // Determine visibility threshold based on zoom level
+      let magThreshold;
+      if (canvasScale < 1.5) {
+        magThreshold = 2.5; // Show only very bright named stars when zoomed out
+      } else if (canvasScale < 3.0) {
+        magThreshold = 3.5; // Show brighter named stars at medium zoom
+      } else if (canvasScale < 5.0) {
+        magThreshold = 4.5; // Show more named stars when zoomed in
+      } else {
+        magThreshold = 6.0; // Show most named stars at high zoom
+      }
+      
+      let namedStarCount = 0;
+      stars.forEach(s => {
+        if (s.Name && s.Name !== 'NoName' && s.Mag <= magThreshold) {
+          const p = project(s.RtAsc, s.Declin, effR);
+          if (p.alt > 0) { // Only draw if above horizon
+            const labelColor = getNightModeColor('rgba(255,255,255,0.7)', 'text');
+            drawLabelWithPointer(s.Name, p.x, p.y, 'star', labelColor, canvasScale);
+            namedStarCount++;
+          }
+        }
+      });
+      
+      console.log('[SkyView] Drew', namedStarCount, 'PRIORITY 1 star names above horizon');
+      ctx.restore();
+    }
+    
+    // PRIORITY 2: Messier object names (medium priority)
+    const toggleMessierNames = document.getElementById('toggleMessierNames');
+    if(messierObjects && messierObjects.length > 0 && toggleMessierNames && toggleMessierNames.checked) {
+      console.log('[SkyView] Drawing Messier objects with PRIORITY 2:', messierObjects.length, 'canvasScale:', canvasScale);
+      ctx.save();
+      ctx.fillStyle = getNightModeColor('rgba(224,195,252,0.8)', 'text'); // Purple for Messier
+      ctx.font=`${12/canvasScale}px sans-serif`; // Constant visual size
+      
+      // Determine visibility threshold based on zoom level - made less strict
+      let magThreshold;
+      if (canvasScale < 1.2) {
+        magThreshold = 7.0; // Show more objects when zoomed out (was 5.0)
+      } else if (canvasScale < 2.0) {
+        magThreshold = 9.5; // Show even more objects at medium zoom (was 7.0)
+      } else {
+        magThreshold = 12.0; // Show all objects when zoomed in (was 9.0)
+      }
+      
+      let visibleCount = 0;
+      let filteredByMag = 0;
+      let filteredByHorizon = 0;
+      messierObjects.forEach(obj => {
+        if (obj.mag <= magThreshold) {
+          // Use corrected coordinates if available, otherwise parse from original strings
+          let ra, dec;
+          if (obj.ra_corrected_hours !== undefined && obj.dec_corrected_degrees !== undefined) {
+            ra = obj.ra_corrected_hours;
+            dec = obj.dec_corrected_degrees;
+          } else {
+            ra = parseRA(obj.ra);
+            dec = parseDec(obj.dec);
+          }
+          
+          const p = project(ra, dec, effR);
+          if (p.alt > 0) { // Only draw if above horizon
+            const labelColor = getNightModeColor('rgba(224,195,252,0.9)', 'text');
+            drawLabelWithPointer(obj.name, p.x, p.y, 'messier', labelColor, canvasScale);
+            visibleCount++;
+          } else {
+            filteredByHorizon++;
+          }
+        } else {
+          filteredByMag++;
+        }
+      });
+      
+      console.log(`[SkyView] Drew ${visibleCount} PRIORITY 2 Messier objects above horizon. Filtered: ${filteredByMag} by magnitude (>${magThreshold}), ${filteredByHorizon} below horizon`);
+      ctx.restore();
+    }
+    
+    // PRIORITY 3: Constellation names (lowest priority)
+    if(toggleConstLabels && toggleConstLabels.checked){
+      console.log('[SkyView] Drawing constellation labels with PRIORITY 3:', constFeatures.length);
+      ctx.save();
+      ctx.fillStyle = getNightModeColor('rgba(224,195,252,0.98)', 'text'); // Same purple as Messier but more opaque
+      ctx.font=`${12/canvasScale}px sans-serif`; // Constant visual size
+      
+      constFeatures.forEach(f=>{
+        let pts=[]; const g=f.geometry;
+        if(g.type==='MultiLineString') g.coordinates.forEach(l=>pts.push(...l));
+        else if(g.type==='LineString') pts=g.coordinates;
+        const ppts=pts.map(p=>project(p[0]/15,p[1],effR)).filter(p=>p.alt>0);
+        if(!ppts.length) return;
+        const avgX=ppts.reduce((s,p)=>s+p.x,0)/ppts.length;
+        const avgY=ppts.reduce((s,p)=>s+p.y,0)/ppts.length;
+        
+        const labelColor = getNightModeColor('rgba(224,195,252,0.98)', 'text');
+        drawLabelWithPointer(f.id, avgX, avgY, 'constellation', labelColor, canvasScale);
+      });
+      
+      console.log('[SkyView] Drew PRIORITY 3 constellation labels');
+      ctx.restore();
+    }
+    
+    ctx.restore(); // restore clipping for labels
+
+    // --- Selection circle overlay ---
 
     // --- STOP button overlay (drawn on canvas, after main sky objects) ---
     // Only draw if SkyView overlay is active
@@ -2427,10 +2832,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Load Messier objects separately with error handling
   try {
     messierObjects = await (await fetch('/corrected_messier.json')).json();
-    console.log('[SkyView] Loaded Messier objects:', messierObjects.length);
+    console.log('[SkyView] Loaded corrected Messier objects:', messierObjects.length);
   } catch(e) {
-    console.error('Failed to load messier.json:', e);
-    messierObjects = [];
+    console.warn('Failed to load corrected_messier.json, falling back to regular messier.json:', e);
+    try {
+      messierObjects = await (await fetch('/static/messier.json')).json();
+      console.log('[SkyView] Loaded fallback Messier objects:', messierObjects.length);
+    } catch(e2) {
+      console.error('Failed to load messier.json:', e2);
+      messierObjects = [];
+    }
   }
 
 
@@ -2591,7 +3002,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const r = 13;
       ctx.beginPath();
       ctx.arc(finalX, finalY, r, 0, 2 * Math.PI);
-      ctx.strokeStyle = pt.enabled ? 'yellow' : 'red';
+      ctx.strokeStyle = getNightModeColor(pt.enabled ? 'yellow' : 'red', 'label');
       ctx.lineWidth = 2.5;
       ctx.stroke();
       // Crosshair
@@ -2600,7 +3011,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       ctx.lineTo(finalX + r, finalY);
       ctx.moveTo(finalX, finalY - r);
       ctx.lineTo(finalX, finalY + r);
-      ctx.strokeStyle = pt.enabled ? 'yellow' : 'red';
+      ctx.strokeStyle = getNightModeColor(pt.enabled ? 'yellow' : 'red', 'label');
       ctx.lineWidth = 1.5;
       ctx.stroke();
       ctx.restore();
@@ -2712,7 +3123,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     'toggleNebula',
     'togglePlanetary',
     'toggleCalPoints',
-    'toggleSolarSystem'
+    'toggleSolarSystem',
+    'toggleSkyViewNightMode'
   ];
   // Default state
   const defaultToggles = {
@@ -2727,7 +3139,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     toggleNebula: false,
     togglePlanetary: false,
     toggleCalPoints: false,
-    toggleSolarSystem: true
+    toggleSolarSystem: true,
+    toggleSkyViewNightMode: false
   };
   // Restore from localStorage or set defaults
   function initToggles() {
@@ -2747,6 +3160,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       // Save on change
       el.addEventListener('change', () => {
+        // Special handling for True Night Mode toggle
+        if (id === 'toggleSkyViewNightMode') {
+          const skyviewContainer = document.getElementById('skyviewContainer');
+          if (skyviewContainer) {
+            if (el.checked) {
+              skyviewContainer.classList.add('skyview-true-night-mode');
+            } else {
+              skyviewContainer.classList.remove('skyview-true-night-mode');
+            }
+          }
+        }
         saveToggles();
         draw();
       });
@@ -2756,6 +3180,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
       console.log('[SkyView] Set toggles to default:', defaultToggles);
     }
+    
+    // Apply initial CSS class state for True Night Mode
+    const toggleSkyViewNightMode = document.getElementById('toggleSkyViewNightMode');
+    const skyviewContainer = document.getElementById('skyviewContainer');
+    if (toggleSkyViewNightMode && skyviewContainer) {
+      if (toggleSkyViewNightMode.checked) {
+        skyviewContainer.classList.add('skyview-true-night-mode');
+      } else {
+        skyviewContainer.classList.remove('skyview-true-night-mode');
+      }
+    }
+    
     draw();
   }
   function saveToggles() {

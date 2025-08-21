@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 
+# SiPi Version Information
+__version__ = "0.9.8"
+__release_date__ = "2025-08-21"
+__description__ = "SiPi Telescope Control System with serial command interface"
 
 import socket
 import threading
 import time
 import subprocess
 import os
+import platform
 import datetime
 import math
 import json
@@ -21,8 +26,16 @@ from flask import (
 # Import astrometric corrections
 from astrometric_corrections import preprocess_catalogs_for_current_epoch
 
-# Initial SiPi version (bump patch for simple fixes)
-__version__ = "0.9.7"
+# Import SiTech controller communication
+from sitech_controller import get_controller_status, set_controller_mode, SiTechController
+
+# OS Detection and Platform-specific Configuration
+IS_WINDOWS = platform.system() == 'Windows'
+IS_LINUX = platform.system() == 'Linux'
+
+print(f"[SiPi PLATFORM] Detected OS: {platform.system()}")
+print(f"[SiPi PLATFORM] Windows mode: {IS_WINDOWS}")
+print(f"[SiPi PLATFORM] Linux mode: {IS_LINUX}")
 
 # Base directory for Git operations
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -43,12 +56,22 @@ corrected_catalogs = {
 }
 
 
-# Paths
+# Paths (platform-specific)
 SI_TECH_HOST    = 'localhost'
 SI_TECH_PORT    = 8078
-CONFIG_FILE     = "/usr/share/SiTech/SiTechExe/SiTech.cfg"
-CONFIG_BACKUP   = "/opt/SiTech/SiPi/SiTech.cfg.bak"
-HOSTAPD_CONF    = "/etc/hostapd/hostapd.conf"
+
+# Platform-specific file paths
+if IS_WINDOWS:
+    # Windows paths - relative to application directory
+    CONFIG_FILE     = os.path.join(os.path.dirname(__file__), "SiTech.cfg")
+    CONFIG_BACKUP   = os.path.join(os.path.dirname(__file__), "SiTech.cfg.bak")
+    HOSTAPD_CONF    = None  # Not used on Windows
+else:
+    # Linux paths - system directories
+    CONFIG_FILE     = "/usr/share/SiTech/SiTechExe/SiTech.cfg"
+    CONFIG_BACKUP   = "/opt/SiTech/SiPi/SiTech.cfg.bak"
+    HOSTAPD_CONF    = "/etc/hostapd/hostapd.conf"
+
 WEB_CONFIG_FILE = os.path.join(os.path.dirname(__file__), "web_config.json")
 # --- Config backup/restore endpoints ---
 @app.route('/favicon.ico')
@@ -59,6 +82,10 @@ def favicon():
 @app.route('/backup_config', methods=['POST'])
 def backup_config():
     try:
+        # Check if config file exists
+        if not os.path.exists(CONFIG_FILE):
+            return jsonify(success=False, error=f'Config file not found: {CONFIG_FILE}'), 404
+        
         os.makedirs(os.path.dirname(CONFIG_BACKUP), exist_ok=True)
         with open(CONFIG_FILE, 'r') as src, open(CONFIG_BACKUP, 'w') as dst:
             dst.write(src.read())
@@ -116,9 +143,18 @@ MODEL_FILE      = "AutoLoad.PXP"    # Correct filename case
 def load_web_config():
     try:
         with open(WEB_CONFIG_FILE, 'r') as f:
-            return json.load(f)
+            config = json.load(f)
+            # Ensure controller_com_port has a default
+            if 'controller_com_port' not in config:
+                config['controller_com_port'] = '/dev/ttyUSB0'
+            return config
     except:
-        return {"vibration_enabled": False, "tilt_enabled": False, "flip_skyview": False}
+        return {
+            "vibration_enabled": False, 
+            "tilt_enabled": False, 
+            "flip_skyview": False,
+            "controller_com_port": "/dev/ttyUSB0"
+        }
 
 def save_web_config(cfg):
     # Ensure flip_skyview is always present
@@ -238,6 +274,7 @@ def eq_to_alt_az(ra, dec, lst, lat):
 # Version helper for SiPi
 def get_sipi_version():
     # Return the explicit version; bump __version__ for each patch change
+    print(f"[DEBUG] get_sipi_version() returning: {__version__}")
     return __version__
 
 # --- Socket connect functions ---
@@ -407,7 +444,9 @@ def index():
         vibration_enabled=web_config['vibration_enabled'],
         tilt_enabled=web_config['tilt_enabled'],
         site_latitude=site_latitude,
-        site_longitude=site_longitude
+        site_longitude=site_longitude,
+        is_windows=IS_WINDOWS,
+        is_linux=IS_LINUX
     )
 
 @app.route('/skyview')
@@ -425,6 +464,16 @@ def messier_data():
     with open(MESSIER_FILE, 'r') as f:
         data = json.load(f)
     return jsonify(data)
+
+@app.route('/version')
+def version_info():
+    """Return version information for the application"""
+    return jsonify({
+        'version': __version__,
+        'release_date': __release_date__,
+        'description': __description__,
+        'name': 'SiPi Telescope Control System'
+    })
 
 @app.route('/stars-data')
 def stars_data():
@@ -444,6 +493,47 @@ def constellations_data():
         'constellations.json',
         mimetype='application/json'
     )
+
+@app.route('/controller_status')
+def controller_status():
+    """Get current SiTech controller status"""
+    try:
+        # Get ComPort from web_config
+        com_port = web_config.get('controller_com_port', '/dev/ttyUSB0')
+        
+        result = get_controller_status(com_port)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": f"Failed to get controller status: {str(e)}"})
+
+@app.route('/controller_mode', methods=['POST'])
+def controller_mode():
+    """Set SiTech controller mode"""
+    try:
+        mode = request.form.get('mode')
+        if not mode:
+            return jsonify({"error": "No mode specified"})
+        
+        # Get ComPort from web_config
+        com_port = web_config.get('controller_com_port', '/dev/ttyUSB0')
+        
+        result = set_controller_mode(mode, com_port)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": f"Failed to set controller mode: {str(e)}"})
+
+@app.route('/restart_sitech', methods=['POST'])
+def restart_sitech():
+    """Restart the SiTech service"""
+    try:
+        controller = SiTechController()
+        success, message = controller.restart_sitech_service()
+        if success:
+            return jsonify({"success": True, "message": message})
+        else:
+            return jsonify({"error": message})
+    except Exception as e:
+        return jsonify({"error": f"Failed to restart SiTech service: {str(e)}"})
 
 
 @app.route('/download_model')
@@ -477,12 +567,12 @@ def status():
         track = "Parked"
     elif not (bp & 1):  # Bit 00 false
         track = "Scope Not Initialized"
+    elif bp & 4:  # Bit 02
+        track = "Slewing"
     elif bp & 2:  # Bit 01
         track = "Tracking"
     elif bp & 8:  # Bit 03
         track = "Parking"
-    elif bp & 4:  # Bit 02
-        track = "Slewing"
     else:  # Bit 02 false
         track = "Stopped"
     return jsonify(
@@ -761,7 +851,14 @@ def start():
 @app.route('/toggle_mode', methods=['POST'])
 def toggle_mode():
     with status_lock:
-        fb = int(scope_status.split(';')[0] or 0)
+        try:
+            # Try to parse scope_status, handle cases where SiTechExe isn't connected
+            if scope_status and ';' in scope_status and scope_status != "No status yet":
+                fb = int(scope_status.split(';')[0] or 0)
+            else:
+                fb = 0  # Default value when no valid status available
+        except (ValueError, IndexError):
+            fb = 0  # Fallback to default if parsing fails
     if fb & 64:
         cmd  = "MotorsToAuto\n"
         mode = "Auto"
@@ -785,6 +882,9 @@ def get_model_info():
 # --- New: Set system time from ISO string (for popup) ---
 @app.route('/set_time', methods=['POST'])
 def set_time_popup():
+    if IS_WINDOWS:
+        return jsonify(success=False, error='Time setting is not supported on Windows. Please set time manually through Windows settings.'), 400
+    
     try:
         data = request.get_json(force=True)
         # Accept either 'dt_str' (preferred) or 'iso' (legacy)
@@ -834,6 +934,9 @@ def set_time_popup():
 @app.route('/fix_wifi_permissions', methods=['POST'])
 def fix_wifi_permissions():
     """Fix WiFi script permissions - can be called independently."""
+    if IS_WINDOWS:
+        return jsonify(success=False, error='WiFi hotspot functionality is not available on Windows. The application runs over LAN.'), 400
+    
     try:
         wifi_script = "/usr/local/bin/update_hostapd_conf.sh"
         messages = []
@@ -871,6 +974,9 @@ def fix_wifi_permissions():
 
 @app.route('/update_wifi', methods=['POST'])
 def update_wifi():
+    if IS_WINDOWS:
+        return jsonify(success=False, error='WiFi hotspot functionality is not available on Windows. The application runs over LAN.'), 400
+    
     # Accept from form, query, or JSON
     ssid = request.values.get('ssid', '')
     passwd = request.values.get('pass', '')
@@ -965,6 +1071,26 @@ def toggle_tilt():
     web_config['tilt_enabled'] = enabled
     save_web_config(web_config)
     return jsonify(success=True)
+
+@app.route('/get_config')
+def get_config():
+    """Get current web configuration"""
+    return jsonify(web_config)
+
+@app.route('/save_config', methods=['POST'])
+def save_config():
+    """Save configuration settings"""
+    try:
+        # Update controller_com_port if provided
+        if 'controller_com_port' in request.form:
+            com_port = request.form.get('controller_com_port', '').strip()
+            if com_port:
+                web_config['controller_com_port'] = com_port
+                save_web_config(web_config)
+        
+        return jsonify(success=True)
+    except Exception as e:
+        return jsonify(success=False, error=str(e))
 
 # ─── Git Corruption Handling ───────────────────────────────────────────────
 
@@ -1438,7 +1564,20 @@ def check_sitech_status():
 
 @app.route('/edit_config', methods=['GET','POST'])
 def edit_config():
+    if IS_WINDOWS:
+        # For Windows, just return a simple message
+        if request.method == 'POST':
+            return jsonify(success=False, message="Config editing is not available on Windows. Please edit configuration files manually."), 400
+        else:
+            return render_template('edit_config.html', 
+                                 config_content="Config editing is not available on Windows.\nPlease edit configuration files manually.", 
+                                 readonly=True,
+                                 platform_message="This feature is disabled on Windows.")
+    
     if request.method == 'POST':
+        if not os.path.exists(CONFIG_FILE):
+            return jsonify(success=False, message="Config file not found"), 404
+        
         open(CONFIG_FILE, 'w').write(request.form.get('config',''))
         # Send ReloadConfigFile command to SiTechExe after saving config
         try:
@@ -1455,7 +1594,12 @@ def edit_config():
         flash(msg, status)
         return redirect(url_for('edit_config'))
 
-    cfg = open(CONFIG_FILE).read()
+    # GET request - load config file
+    if not os.path.exists(CONFIG_FILE):
+        cfg = f"# Config file not found: {CONFIG_FILE}\n# Please ensure SiTechExe is installed correctly"
+    else:
+        cfg = open(CONFIG_FILE).read()
+    
     ob = o2 = mmode = 0
     for ln in cfg.splitlines():
         if ln.startswith('OptionBits='):
@@ -1481,12 +1625,20 @@ def edit_config():
     mount_type = str(mmode if mmode in (0,1,3) else 0)
 
     wssid = wpass = ""
-    for ln in open(HOSTAPD_CONF).read().splitlines():
-        if ln.startswith('ssid='):           wssid = ln.split('=',1)[1]
-        if ln.startswith('wpa_passphrase='): wpass = ln.split('=',1)[1]
+    if not IS_WINDOWS and HOSTAPD_CONF and os.path.exists(HOSTAPD_CONF):
+        for ln in open(HOSTAPD_CONF).read().splitlines():
+            if ln.startswith('ssid='):           wssid = ln.split('=',1)[1]
+            if ln.startswith('wpa_passphrase='): wpass = ln.split('=',1)[1]
 
     with status_lock:
-        fb = int(scope_status.split(';')[0] or 0)
+        try:
+            # Try to parse scope_status, handle cases where SiTechExe isn't connected
+            if scope_status and ';' in scope_status and scope_status != "No status yet":
+                fb = int(scope_status.split(';')[0] or 0)
+            else:
+                fb = 0  # Default value when no valid status available
+        except (ValueError, IndexError):
+            fb = 0  # Fallback to default if parsing fails
     mode = "Auto" if (fb & 64) else "Manual"
 
     sipi_version = get_sipi_version()
@@ -1494,7 +1646,7 @@ def edit_config():
 
     return render_template(
         'edit_config.html',
-        config=open(CONFIG_FILE).read(),
+        config=(open(CONFIG_FILE).read() if os.path.exists(CONFIG_FILE) else "# Config file not found"),
         az_mode=az_mode,
         alt_mode=alt_mode,
         drag_mode=drag_mode,
@@ -1506,15 +1658,25 @@ def edit_config():
         tilt_enabled=web_config['tilt_enabled'],
         mode=mode,
         sipi_version=sipi_version,
-        site_version=site_version
+        site_version=site_version,
+        is_windows=IS_WINDOWS,
+        is_linux=IS_LINUX
     )
 
 def wait_for_ip(interface='wlan0'):
+    if IS_WINDOWS:
+        # On Windows, skip IP waiting as we're running over LAN
+        print("[SiPi NETWORK] Windows detected - skipping IP wait (LAN mode)")
+        return
+    
+    print(f"[SiPi NETWORK] Waiting for IP on interface {interface}")
     for _ in range(20):
         result = subprocess.run(['ip','-4','addr','show', interface], capture_output=True, text=True)
         if 'inet ' in result.stdout:
+            print(f"[SiPi NETWORK] IP address acquired on {interface}")
             return
         time.sleep(0.5)
+    print(f"[SiPi NETWORK] Warning: No IP address found on {interface} after 10 seconds")
 
 @app.route('/quickstart')
 def quickstart():
@@ -1526,6 +1688,38 @@ def remove_last_cal_point():
     return jsonify(response=resp)
 
 # --- Astrometric Corrections ---
+def check_and_update_catalogs_for_time_change():
+    """Check if significant time change occurred and regenerate catalogs if needed."""
+    global corrected_catalogs
+    
+    try:
+        # Check if any catalog file exists to get its timestamp
+        stars_path = corrected_catalogs.get('stars')
+        if not stars_path or not os.path.exists(stars_path):
+            return  # No existing catalogs to check
+        
+        # Get current Julian Day
+        current_jd = datetime.datetime.now(datetime.timezone.utc).timestamp() / 86400.0 + 2440587.5
+        
+        # Check the cached catalog's Julian Day from filename
+        import re
+        jd_match = re.search(r'JD(\d+)', os.path.basename(stars_path))
+        if jd_match:
+            cached_jd = float(jd_match.group(1))
+            
+            # If difference is more than 0.5 days (12 hours), regenerate
+            jd_difference = abs(current_jd - cached_jd)
+            if jd_difference > 0.5:
+                print(f"[CATALOG] Significant time change detected: {jd_difference:.2f} days")
+                print(f"[CATALOG] Regenerating catalogs for current epoch...")
+                
+                # Regenerate all catalogs
+                corrected_catalogs = preprocess_catalogs_for_current_epoch(BASE_DIR)
+                print("[CATALOG] Catalogs updated for new time")
+            
+    except Exception as e:
+        print(f"[CATALOG] Error checking time change: {e}")
+
 def initialize_astrometric_corrections():
     """Initialize astrometric corrections at startup."""
     global corrected_catalogs
@@ -1556,10 +1750,52 @@ def initialize_astrometric_corrections():
             'planetary_nebula': os.path.join(BASE_DIR, 'static', 'planetary_nebula.json')
         }
 
+@app.route('/current_lst')
+def current_lst():
+    """Get current LST from SiTech hardware for SkyView synchronization."""
+    with status_lock:
+        s = scope_status
+    fields = s.split(';')
+    if len(fields) >= 8:
+        try:
+            # Return LST in decimal hours for JavaScript use
+            lst_hours = float(fields[7].strip())
+            return jsonify({
+                'lst_hours': lst_hours,
+                'lst_formatted': format_hms_no_decimals(fields[7].strip()),
+                'source': 'sitech_hardware',
+                'timestamp': time.time()
+            })
+        except (ValueError, IndexError):
+            pass
+    
+    # Fallback to calculated LST if SiTech not available
+    import datetime
+    current_time = datetime.datetime.now(datetime.timezone.utc)
+    jd = current_time.timestamp() / 86400.0 + 2440587.5
+    D = jd - 2451545.0
+    gmst = (18.697374558 + 24.06570982441908 * D) % 24
+    if gmst < 0:
+        gmst += 24
+    lst = gmst + (site_longitude or 0) / 15
+    lst = lst % 24
+    if lst < 0:
+        lst += 24
+    
+    return jsonify({
+        'lst_hours': lst,
+        'lst_formatted': format_hms_no_decimals(str(lst)),
+        'source': 'calculated_fallback',
+        'timestamp': time.time()
+    })
+
 @app.route('/corrected_stars.json')
 def corrected_stars():
     """Serve the astrometrically corrected star catalog."""
     try:
+        # Check if catalogs need regeneration due to time change
+        check_and_update_catalogs_for_time_change()
+        
         with open(corrected_catalogs['stars'], 'r') as f:
             data = json.load(f)
         return jsonify(data)
@@ -1794,28 +2030,182 @@ def astrometric_admin():
     """Admin interface for astrometric corrections."""
     return render_template('astrometric.html')
 
+@app.route('/sitech_service_status')
+def sitech_service_status():
+    """Check if SiTech service is running"""
+    if IS_WINDOWS:
+        return jsonify(running=False, message="Service management not available on Windows")
+    
+    try:
+        result = subprocess.run(['systemctl', 'is-active', 'sitech.service'], 
+                              capture_output=True, text=True, timeout=5)
+        is_running = result.stdout.strip() == 'active'
+        return jsonify(running=is_running)
+    except Exception as e:
+        print(f"[SERVICE] Error checking sitech.service status: {e}")
+        return jsonify(running=False, error=str(e))
+
+@app.route('/sitech_service_control', methods=['POST'])
+def sitech_service_control():
+    """Start or stop SiTech service"""
+    if IS_WINDOWS:
+        return jsonify(success=False, message="Service management not available on Windows"), 400
+    
+    action = request.form.get('action')
+    if action not in ['start', 'stop', 'restart']:
+        return jsonify(success=False, message="Invalid action"), 400
+    
+    try:
+        result = subprocess.run(['sudo', 'systemctl', action, 'sitech.service'], 
+                              capture_output=True, text=True, timeout=30)
+        
+        if result.returncode == 0:
+            return jsonify(success=True, message=f"SiTech service {action} completed successfully")
+        else:
+            return jsonify(success=False, message=f"Failed to {action} service: {result.stderr}")
+    except subprocess.TimeoutExpired:
+        return jsonify(success=False, message=f"Service {action} timed out"), 500
+    except Exception as e:
+        print(f"[SERVICE] Error controlling sitech.service: {e}")
+        return jsonify(success=False, message=str(e)), 500
+
+@app.route('/send_serial_command', methods=['POST'])
+def send_serial_command():
+    """Send a serial command directly to the SiTech controller (same method as Get Status)"""
+    command = request.form.get('command', '')
+    is_carriage_return = (command == '')
+    
+    if IS_WINDOWS:
+        return jsonify(success=False, message="Direct serial commands not supported on Windows"), 400
+    
+    try:
+        if is_carriage_return:
+            print(f"[SERIAL] Processing carriage return command")
+        else:
+            command = command.strip()
+            print(f"[SERIAL] Processing command: '{command}'")
+        
+        # Get ComPort from web_config (same as Get Status)
+        com_port = web_config.get('controller_com_port', '/dev/ttyUSB0')
+        
+        # Create SiTech controller instance (same as Get Status)
+        controller = SiTechController(com_port)
+        
+        # Check if port exists (same as Get Status)
+        if not os.path.exists(com_port):
+            return jsonify(success=False, message=f"Serial port {com_port} does not exist. Check connection and ComPort setting."), 400
+        
+        # Only stop service on first command - skip if already stopped for speed
+        try:
+            # Quick check if service is running
+            service_check = subprocess.run(['systemctl', 'is-active', 'sitech.service'], 
+                                         capture_output=True, text=True, timeout=2)
+            if service_check.stdout.strip() == 'active':
+                print("[SERIAL] Stopping SiTech service...")
+                success, msg = controller.stop_sitech_service()
+                if not success:
+                    return jsonify(success=False, message=f"Failed to stop SiTech service: {msg}"), 500
+                
+                # Wait briefly for port to be released
+                time.sleep(1)
+            else:
+                print("[SERIAL] Service already stopped, proceeding...")
+        except:
+            # If we can't check service status, assume it needs stopping
+            print("[SERIAL] Stopping SiTech service...")
+            success, msg = controller.stop_sitech_service()
+            if not success:
+                return jsonify(success=False, message=f"Failed to stop SiTech service: {msg}"), 500
+        
+        # Connect (same as Get Status)
+        print(f"[SERIAL] Connecting to {com_port}...")
+        success, msg = controller.connect()
+        if not success:
+            print("[SERIAL] Failed to connect - service remains stopped. Use Start Service button to restart.")
+            return jsonify(success=False, message=f"Failed to connect to serial port: {msg}"), 500
+        
+        try:
+            # Handle carriage return vs regular commands
+            if is_carriage_return:
+                print(f"[SERIAL] Sending carriage return for status")
+                # Try using the regular command method but with empty string
+                response, error = controller.send_command('')
+                
+                # If that doesn't work, try direct serial approach with longer timeout
+                if error or not response:
+                    print(f"[SERIAL] Empty command failed, trying direct carriage return")
+                    try:
+                        # Reset the serial connection timeout
+                        controller.serial_conn.timeout = 3
+                        controller.serial_conn.reset_input_buffer()
+                        
+                        # Send carriage return
+                        controller.serial_conn.write(b'\r')
+                        controller.serial_conn.flush()
+                        
+                        # Wait and try to read response
+                        time.sleep(1)
+                        response = ""
+                        if controller.serial_conn.in_waiting > 0:
+                            response = controller.serial_conn.read(controller.serial_conn.in_waiting).decode('ascii', errors='ignore')
+                        if not response:
+                            response = controller.serial_conn.readline().decode('ascii', errors='ignore')
+                        if not response:
+                            response = controller.serial_conn.read(100).decode('ascii', errors='ignore')
+                        
+                        response = response.strip()
+                        error = None  # No error even if no response - carriage return might not reply
+                        
+                    except Exception as e:
+                        response = ""
+                        error = None  # Don't treat as error - many commands have no response
+                        print(f"[SERIAL] Carriage return completed (no response is normal)")
+            else:
+                # Convert command to uppercase as required by SiTech protocol
+                command = command.upper()
+                print(f"[SERIAL] Sending command '{command}' (auto-converted to uppercase)")
+                response, error = controller.send_command(command)
+                
+                # Don't treat "no response" as an error - many commands don't reply
+                if error and "No response" in error:
+                    print(f"[SERIAL] Command completed (no response is normal for many commands)")
+                    response = ""
+                    error = None
+            
+            # Always return success unless there was a real communication error
+            if error and error not in ["No response received", "No status response received"]:
+                return jsonify(success=False, message=f"Command failed: {error}"), 500
+            
+            print(f"[SERIAL] Command completed. Response: '{response}'" if response else "[SERIAL] Command completed (no response)")
+            return jsonify(success=True, response=response or "")
+            
+        finally:
+            # Disconnect from serial but don't restart service - user will use Start Service button when ready
+            controller.disconnect()
+            print("[SERIAL] Disconnected from serial port. Service remains stopped for faster subsequent commands.")
+        
+    except Exception as e:
+        print(f"[SERIAL] Error: {e}")
+        return jsonify(success=False, message=str(e)), 500
+
 if __name__ == '__main__':
     print(f"[SiPi STARTUP] Starting SiPi v{__version__}")
+    print(f"[SiPi STARTUP] Platform: {platform.system()} {platform.release()}")
+    if IS_WINDOWS:
+        print("[SiPi STARTUP] Windows mode: LAN hosting, WiFi/time-setting disabled")
+    else:
+        print("[SiPi STARTUP] Linux mode: Full functionality including WiFi hotspot and time setting")
     print(f"[SiPi STARTUP] Attempting to connect to SiTechExe at {SI_TECH_HOST}:{SI_TECH_PORT}")
     
     get_site_location()
     connect_command_socket()
     connect_persistent_socket()
     
-    # Test basic connectivity during startup
-    try:
-        test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        test_socket.settimeout(2)
-        test_socket.connect((SI_TECH_HOST, SI_TECH_PORT))
-        test_socket.close()
-        print("[SiPi STARTUP] SUCCESS: Can connect to SiTechExe")
-    except Exception as e:
-        print(f"[SiPi STARTUP] ERROR: Cannot connect to SiTechExe - {e}")
-        print("[SiPi STARTUP] Check if SiTechExe.exe is running and listening on port 8078")
-    
     initialize_astrometric_corrections()  # Initialize corrected catalogs
     wait_for_ip()
     print("[SiPi STARTUP] Starting status update thread")
     threading.Thread(target=status_update_loop, daemon=True).start()
     print("[SiPi STARTUP] Starting Flask web server on port 5000")
+    if IS_WINDOWS:
+        print("[SiPi STARTUP] Access the application at http://localhost:5000 or http://<your-ip>:5000")
     app.run(host='0.0.0.0', port=5000, debug=False)
