@@ -1,35 +1,5 @@
 // static/js/skyview.js
 
-// IMMEDIATE MOBILE DEBUG TEST - Show this appears right when script loads
-if (typeof window !== 'undefined') {
-  setTimeout(() => {
-    const testDiv = document.createElement('div');
-    testDiv.innerHTML = 'MOBILE DEBUG: SkyView JS Loaded!';
-    testDiv.style.cssText = `
-      position: fixed;
-      top: 50px;
-      left: 10px;
-      right: 10px;
-      background: #ff0000;
-      color: #ffffff;
-      padding: 10px;
-      font-size: 16px;
-      font-weight: bold;
-      text-align: center;
-      z-index: 99999;
-      border: 3px solid #ffff00;
-    `;
-    document.body.appendChild(testDiv);
-    
-    // Auto-hide after 3 seconds
-    setTimeout(() => {
-      if (testDiv && testDiv.parentNode) {
-        testDiv.parentNode.removeChild(testDiv);
-      }
-    }, 3000);
-  }, 500);
-}
-
 // Device Performance Profiling and Adaptive Optimizations
 class DeviceProfiler {
   constructor() {
@@ -1143,12 +1113,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (hitObj) {
         selectedObject = hitObj;
         
-        // MOBILE DEBUG - Show object selection happened
-        document.title = `MOBILE: Selected ${hitObj.Name || hitObj.name || 'Object'}`;
-        setTimeout(() => {
-          document.title = 'SiPi Telescope Control';
-        }, 3000);
-        
         showSelectedAttributes(selectedObject);
         // Show popup for cal point, else normal attributes
         if (hitObj.isCalPoint) {
@@ -1209,12 +1173,6 @@ document.addEventListener('DOMContentLoaded', async () => {
               raInput.value = raValue;
               decInput.value = decValue;
               
-              // MOBILE DEBUG - Show success using page title
-              document.title = `MOBILE SIMPLE: RA/Dec assigned from RtAsc/Declin`;
-              setTimeout(() => {
-                document.title = 'SiPi Telescope Control';
-              }, 3000);
-              
             } else if (typeof hitObj.ra === 'number' && typeof hitObj.dec === 'number') {
               // Fallback to ra/dec properties
               const raValue = decimalHMStoHMS(hitObj.ra);
@@ -1223,24 +1181,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               raInput.value = raValue;
               decInput.value = decValue;
               
-              // MOBILE DEBUG - Show success using page title
-              document.title = `MOBILE SIMPLE: RA/Dec assigned from ra/dec`;
-              setTimeout(() => {
-                document.title = 'SiPi Telescope Control';
-              }, 3000);
-            } else {
-              // MOBILE DEBUG - Show what properties are available
-              document.title = `MOBILE SIMPLE: No RA/Dec coords found`;
-              setTimeout(() => {
-                document.title = 'SiPi Telescope Control';
-              }, 3000);
             }
-          } else {
-            // MOBILE DEBUG - Show input status
-            document.title = `MOBILE SIMPLE: raInput=${!!raInput} decInput=${!!decInput}`;
-            setTimeout(() => {
-              document.title = 'SiPi Telescope Control';
-            }, 3000);
           }
         }
         draw();
@@ -1420,11 +1361,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (candidates.length > 0) {
           console.log('[SkyView] Found candidates:', candidates.map(c => c.Name || c.name || 'unnamed'));
           
-          // MOBILE DEBUG - Use page title to show we got this far
-          document.title = `MOBILE: Found ${candidates.length} candidates`;
-          setTimeout(() => {
-            document.title = 'SiPi Telescope Control';
-          }, 2000);
         }
         if (toggleCalPoints && toggleCalPoints.checked && calPointHits.length) {
           for (let pt of calPointHits) {
@@ -1521,10 +1457,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             }, 0);
           } else {
             // MOBILE DEBUG - Show we entered the coordinate assignment section
-            document.title = `MOBILE: Entering coord assignment for ${hitObj.Name || hitObj.name}`;
-            setTimeout(() => {
-              document.title = 'SiPi Telescope Control';
-            }, 4000);
             
             try {
               console.log('[MOBILE CRITICAL] Starting coordinate assignment logic');
@@ -1549,12 +1481,6 @@ document.addEventListener('DOMContentLoaded', async () => {
               // Use fresh references if cached ones are null
               const workingRAInput = raInput || freshRAInput;
               const workingDecInput = decInput || freshDecInput;
-              
-              // MOBILE DEBUG - Show input element status immediately
-              document.title = `MOBILE: RA=${!!workingRAInput} Dec=${!!workingDecInput}`;
-              setTimeout(() => {
-                document.title = 'SiPi Telescope Control';
-              }, 5000);
               
               console.log('[MOBILE CRITICAL] Working input elements:', {
                 workingRAInput: !!workingRAInput,
@@ -1628,52 +1554,6 @@ document.addEventListener('DOMContentLoaded', async () => {
               console.log('  Dec Input exists:', !!decInput, 'Value set to:', decValue);
               console.log('  RA Input actual value:', raInput ? raInput.value : 'N/A');
               console.log('  Dec Input actual value:', decInput ? decInput.value : 'N/A');
-              
-              // Force input field visibility and highlighting for mobile debug
-              if (raInput) {
-                raInput.style.backgroundColor = '#333';
-                raInput.style.color = '#fff';
-                raInput.style.border = '2px solid #555';
-              }
-              if (decInput) {
-                decInput.style.backgroundColor = '#333';
-                decInput.style.color = '#fff';
-                decInput.style.border = '2px solid #555';
-              }
-              
-              // Add mobile-friendly coordinate display
-              let mobileCoordDisplay = document.getElementById('mobileCoordDisplay');
-              if (!mobileCoordDisplay) {
-                mobileCoordDisplay = document.createElement('div');
-                mobileCoordDisplay.id = 'mobileCoordDisplay';
-                mobileCoordDisplay.style.cssText = `
-                  position: fixed;
-                  bottom: 70px;
-                  left: 10px;
-                  right: 10px;
-                  background: rgba(0, 0, 0, 0.8);
-                  color: #fff;
-                  padding: 8px;
-                  border-radius: 4px;
-                  border: 1px solid #555;
-                  font-size: 14px;
-                  text-align: center;
-                  z-index: 1000;
-                  display: none;
-                `;
-                document.body.appendChild(mobileCoordDisplay);
-              }
-              
-              // Show coordinates prominently for mobile
-              mobileCoordDisplay.innerHTML = `Dec: ${decValue} | RA: ${raValue}`;
-              mobileCoordDisplay.style.display = 'block';
-              
-              // Auto-hide after 5 seconds
-              setTimeout(() => {
-                if (mobileCoordDisplay) {
-                  mobileCoordDisplay.style.display = 'none';
-                }
-              }, 5000);
               
               // Calculate Alt/Az from catalog RA/Dec
               const raHours = hitObj.RtAsc; // RA is already in decimal hours format
@@ -1935,82 +1815,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           }
           draw();
           
-          // Universal mobile coordinate display - works for any selected object
-          try {
-            console.log('[MOBILE CRITICAL] Starting universal coordinate display logic');
-            
-            if (selectedObject && (raInput || decInput)) {
-              console.log('[SkyView] MOBILE DEBUG - Universal coordinate display for:', selectedObject.Name || selectedObject.name);
-              
-              // Get current input values (these should have been set by the branch logic above)
-              const currentRA = raInput ? raInput.value : '';
-              const currentDec = decInput ? decInput.value : '';
-              
-              console.log('[SkyView] MOBILE DEBUG - Current input values:', {ra: currentRA, dec: currentDec});
-              
-              // Create visible on-screen debug info for mobile
-              let mobileDebugInfo = document.getElementById('mobileDebugInfo');
-              if (!mobileDebugInfo) {
-                console.log('[MOBILE CRITICAL] Creating new mobile debug info element');
-                mobileDebugInfo = document.createElement('div');
-                mobileDebugInfo.id = 'mobileDebugInfo';
-                mobileDebugInfo.style.cssText = `
-                  position: fixed;
-                  top: 10px;
-                  left: 10px;
-                  right: 10px;
-                  background: rgba(255, 255, 255, 0.95);
-                  color: #000;
-                  padding: 15px;
-                  border: 3px solid #ff0000;
-                  font-size: 14px;
-                  z-index: 20000;
-                  font-family: monospace;
-                  line-height: 1.4;
-                  max-height: 200px;
-                  overflow-y: auto;
-                  box-shadow: 0 4px 8px rgba(0,0,0,0.5);
-                `;
-                document.body.appendChild(mobileDebugInfo);
-                console.log('[MOBILE CRITICAL] Mobile debug info element created and added to body');
-              }
-              
-              // Show detailed debug information
-              const objName = selectedObject.Name || selectedObject.name || 'Unknown Object';
-              const debugText = `
-MOBILE DEBUG - Object Selected: ${objName}
-RA Input Found: ${!!raInput}
-Dec Input Found: ${!!decInput}
-RA Value: "${currentRA}"
-Dec Value: "${currentDec}"
-RA Expected Format: HH:MM:SS
-Dec Expected Format: DDD:MM:SS
-Time: ${new Date().toLocaleTimeString()}
-              `.trim();
-              
-              mobileDebugInfo.innerHTML = `<pre>${debugText}</pre>`;
-              mobileDebugInfo.style.display = 'block';
-              
-              console.log('[MOBILE CRITICAL] Mobile debug info should now be visible');
-              
-              // Auto-hide after 10 seconds
-              setTimeout(() => {
-                if (mobileDebugInfo && mobileDebugInfo.style.display === 'block') {
-                  mobileDebugInfo.style.display = 'none';
-                  console.log('[MOBILE CRITICAL] Mobile debug info auto-hidden');
-                }
-              }, 10000);
-            } else {
-              console.log('[MOBILE CRITICAL] Universal coordinate display - selectedObject or inputs missing:', {
-                selectedObject: !!selectedObject,
-                raInput: !!raInput,
-                decInput: !!decInput
-              });
-            }
-          } catch (error) {
-            console.error('[MOBILE CRITICAL] ERROR in universal coordinate display:', error);
-            console.error('[MOBILE CRITICAL] Universal display error stack:', error.stack);
-          }
         }
       }
     }
