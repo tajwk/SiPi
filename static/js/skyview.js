@@ -808,7 +808,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           serverTimeOffset = serverTime.getTime() - now.getTime();
           lastServerTimeUpdate = now.getTime();
           
-          console.log('[SkyView] Server time sync: offset =', serverTimeOffset / 1000, 'seconds');
         }
       })
       .catch(e => console.warn('[SkyView] Failed to sync server time:', e));
@@ -3654,3 +3653,4 @@ function showSelectedAttributes(selected) {
     }
   }
 }
+
