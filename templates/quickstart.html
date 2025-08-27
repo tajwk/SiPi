@@ -152,14 +152,14 @@
     <h2>1. System Setup</h2>
     <div class="steps">
       <ol>
-        <li>Power on your Raspberry Pi running SiPi.</li>
+        <li>Power on your SiPi by plugging in the USB power cable</li>
         <li>
           On your device (tablet, or phone, or PC), connect to the Pi's Wi-Fi network.<br>
-          <code>SSID</code> and <code>password</code> can be configured in the settings if needed.
+          <code>SSID</code> and <code>password</code> can be configured in the settings if needed. Default <code>SSID=SiPi</code> <code>password=12345678</code>
         </li>
         <li>
           Open your browser and go to:<br>
-          <code>http://192.168.11.1:5000</code>
+          <code>https://192.168.11.1:5000</code>
         </li>
       </ol>
     </div>
@@ -171,11 +171,9 @@
     <ul>
       <li><strong>Status Panel:</strong> Live RA/Dec, Alt/Az, Controller Status, Time, LST, and HA</li>
       <li><strong>Object Search:</strong> Search for stars, Messier objects, planets, and more.</li>
-      <li><strong>Model Panel:</strong> Manage mount calibration and alignment points.</li>
-      <li><strong>Handpad Controls:</strong> Slew or nudge the telescope with on-screen arrows.</li>
-      <li><strong>Settings:</strong> Gear icon for advanced mount and network configuration.</li>
-	  <li><strong>Full Screen:</strong> [ ] icon to toggle full screen.</li>
-	  <li><strong>Night Mode:</strong> * Icon to toggle between Day and Night Modes</li>
+      <li><strong>Model:</strong> Create a mount model to improve pointing and tracking</li>
+      <li><strong>Handpad Controls:</strong> Slew the telescope with on-screen arrows.</li>
+      <li><strong>Sidebar:</strong> Mount Control, Settings and Help</li>
     </ul>
 
     <h2>3. Sync on an Object</h2>
@@ -184,49 +182,66 @@
 	    <li>Slew to a known object and center it in the eyepiece</li>
         <li>Enter the object name (e.g., <code>Vega</code>, <code>M13</code>) in the search bar.</li>
         <li>Click <b>Search</b>. Select your desired object from the results if prompted.</li>
-        <li>Click <b>Model</b> and then Click <b>Sync</b> </li>
+        <li>Then Click <b>Sync</b> </li>
 		<li>The mount status should now indicated that it's Tracking
       </ol>
     </div>
 
     <h2>4. Model Building</h2>
+    <div class="tip">
+      A mount model can greatly improve your pointing and tracking accuracy.  <br></div>
+	 <div>
     <div class="steps">
       <ol>
         <li><b>Search</b> for an object and perform a <b>GoTo</b></li>
         <li>Use the handpad to center the object in the eyepiece and then press <b>+Cal Pt</b>.</li>
-        <li>Repeat with additional stars across the sky.<br></li>
+        <li>Repeat with additional objects across the sky.<br></li>
         <li>When done, click <b>Save</b> to save your pointing model.</li>
 		<li>To create a new model, click <b>Clear</b> to remove all calibration points</li>
+    <li>You can remove the last added Cal Pt by clicking <b>- Cal Pt</b> </li>
       </ol>
     </div>
     <div class="tip">
-      Do not add a calibration point on your sync star; use different objects for each step.<br></div>
+      You will start to see improvements after a few objects are added to the model. Cal Pts can be viewed & enabled/disabled
+      in SkyView<br></div>
 	 <div>
 	 <div class="tip">
-	  If the mount remains stationary between uses, the model can be reused. If the mount is transported, a new model is needed.<br>
+	  If the mount remains stationary between uses, the model can be reused. If the mount is changes location, a new model is needed.<br>
     </div>
 
     <h2>5. Handpad Control</h2>
     <div class="panel">
       <b>Use the on-screen handpad to:</b>
       <ul>
-        <li><b>Move Up/Down:</b> Secondary axis (Declination/Altitude).</li>
-        <li><b>Move Left/Right:</b> Primary axis (RA/Azimuth).</li>
+        <li><b>Up/Down:</b> Secondary axis (Declination/Altitude).</li>
+        <li><b>Left/Right:</b> Primary axis (RA/Azimuth).</li>
         <li><b>Change Speed:</b> Tap the center to toggle Slew, Pan, or Guide modes.</li>
-        <li><b>STOP</b> Halts all motion instantly. <b>START</b> begins Tracking</li>
-		<li><b>AUTO</b> is used for normal operation. <b>MANUAL</b> disengages the motors for maintenance, adjustment or after parking</li>
-      
+        <li><b>STOP</b> Halts all motion instantly. <b>START</b> begins Tracking if the mount has been initialized</li>
+      </ul>
     </div>
 
-    <h2>7. Advanced Settings & Updates</h2>
-    <div class="panel">
-      <b>Click the gear (<b>⚙</b>) icon to access the configuration:</b>
+    <h2>6. Sidebar</h2>
       <ul>
-        <li>Click the SiTechExe Config button to show/hide the SiTechExe options.
-        <li>Set your Mount Type and Scope Encoder Settings </li>
-        <li>In the textbox, enter your <b>SiteLongitude</b> and <b>SiteLatitude</b> </li><br>
+        <li><b>AUTO</b> is used for normal operation. <b>MANUAL</b> disengages the motors for maintenance, adjustment or after parking</li>
+        <li><b>PARK</b> or <b> Unpark</b> your mount. Set the park position in Settings</li>
+        <li>Click the ⚙ button to access SiPi and controller settings</li>
+		<li>Click the ⛶ button to go fullscreen. This is very helpful in Night Mode.</li>
+    <li>Click the */🌙 button to toggle day/night modes</li>
+    <li>Click the <b>Help</b> button to access this help file</li>
+      </ul>
+
+
+    <h2>7. Settings</h2>
+    <div class="panel">
+      <ul>
+        <li>Set your site location by entering your current <b>SiteLongitude</b> and <b>SiteLatitude</b> </li>
+        <li>Set your Mount Type and <span id="encoderSettingsLink" style="color:var(--accent);text-decoration:underline;cursor:pointer;">Scope Encoder Settings</span></li>
+        <li>Enabled/Disable Drag mode and Az/RA No Wrap</li>
+        <li>Click the SiTechExe Config button to show/hide the SiTechExe options.<br>
+          
+          <li> You can backup your SiTechExe configuration or restore the backed up configuration</li>
 		<span class="callout">Always click <b>Save Config</b> after making changes to SiTechExe!</span><br><br>
-		<li>System Time can be set by entering a time HH:MM and Clicking <b>Set</b>. Clicking <b>Sync</b> will enter your device. </li>
+		<li>System Time can be set by entering a time HH:MM and Clicking <b>Set</b>. Clicking <b>Sync</b> will enter your device time. </li>
         <li>Set your Wi-Fi SSID and password if desired. </li>
         <li>Hanpad tilt and vibration settings can be set here. (Note these features are not supported by all web browsers)</li>
         <li>Check for and apply SiPi updates</li>
@@ -238,7 +253,7 @@
     <div class="steps">
       <ol>
         <li>Click <b>SkyView</b> to open a live sky map</li>
-        <li>Pan/zoom to explore, click objects for info or GoTo.</li>
+        <li>Pan/zoom to explore, click objects for info or perform GoTo.</li>
 		<li>The Objects menu has checkboxes that allow you to enable/disable each type</li>
 		<li>Click the refresh button for default zoom or the back button to return to the main screen </li>
       </ol>
@@ -267,5 +282,20 @@
       <a href="https://siderealtechnology.com" style="color:var(--accent);text-decoration:none;">siderealtechnology.com</a>
     </div>
   </div>
+  <div id="encoderSettingsPopup" style="display:none; position:fixed; top:20%; left:50%; transform:translateX(-50%); background:#222; color:#fff; border-radius:10px; box-shadow:0 4px 20px #0008; padding:24px; z-index:9999; max-width:400px;">
+    <h3 style="margin-top:0;">Encoder Settings</h3>
+    <ul style="margin:0 0 10px 0; padding-left:18px;">
+      <li><b>Ignore:</b> Use this option if your mount does not have secondary encoders</li>
+      <li><b>Precise:</b> Position correction will appear as soon as there is a disagreement between the motor and secondary encoders</li>
+      <li><b>Polite:</b> Position correction will appear only during slewing. Corrections will not apply while tracking</li>
+      <li><b>Cascade:</b> High position correction, but requires high resolution (10M+ Ticks per Rev)</li>
+    </ul>
+    <button onclick="document.getElementById('encoderSettingsPopup').style.display='none'" style="margin-top:10px; padding:6px 18px; border-radius:6px; background:#FFD700; color:#222; border:none; font-weight:bold; cursor:pointer;">Close</button>
+  </div>
+  <script>
+    document.getElementById('encoderSettingsLink').onclick = function() {
+      document.getElementById('encoderSettingsPopup').style.display = 'block';
+    };
+  </script>
 </body>
 </html>
