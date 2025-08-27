@@ -449,6 +449,81 @@ def index():
         is_linux=IS_LINUX
     )
 
+# --- Captive Portal Detection Routes ---
+# These routes handle various OS captive portal detection mechanisms
+
+@app.route('/hotspot-detect.html')  # iOS captive portal detection
+@app.route('/library/test/success.html')  # iOS alternative
+@app.route('/captive.apple.com')  # iOS captive portal
+@app.route('/captive.apple.com/hotspot-detect.html')  # iOS specific
+@app.route('/gsp1.apple.com/pcc/profiles')  # iOS carrier bundle
+@app.route('/www.apple.com/library/test/success.html')  # iOS test page
+@app.route('/connectivitycheck.gstatic.com/generate_204')  # Android
+@app.route('/clients3.google.com/generate_204')  # Android alternative  
+@app.route('/play.googleapis.com/generate_204')  # Android Play Services
+@app.route('/connectivitycheck.android.com/generate_204')  # Android AOSP
+@app.route('/www.google.com/generate_204')  # Android/Chrome
+@app.route('/generate_204')  # Android short form
+@app.route('/gen_204')  # Android alternative
+@app.route('/detectportal.firefox.com/success.txt')  # Firefox
+@app.route('/nmcheck.gnome.org/check_network_status.txt')  # Linux GNOME
+@app.route('/msftconnecttest.com/connecttest.txt')  # Windows
+@app.route('/www.msftconnecttest.com/connecttest.txt')  # Windows alternative
+@app.route('/msftncsi.com/ncsi.txt')  # Windows NCSI
+@app.route('/captiveportal.com')  # Generic captive portal
+@app.route('/neverssl.com')  # Generic HTTP test site
+@app.route('/success.txt')  # Generic success check
+def captive_portal_detection():
+    """
+    Handle captive portal detection requests from various operating systems.
+    Redirect all captive portal checks to the main SiPi interface.
+    """
+    # Log the detection attempt for debugging
+    app.logger.info(f"Captive portal detection from {request.remote_addr}: {request.url}")
+    app.logger.info(f"User-Agent: {request.headers.get('User-Agent', 'Unknown')}")
+    
+    # For requests that expect specific responses (like Android's generate_204)
+    if 'generate_204' in request.path:
+        # Android expects HTTP 204 when internet is available
+        # We redirect instead to trigger captive portal with special parameter
+        return redirect(url_for('index', captive='1'), code=302)
+    
+    if 'connecttest.txt' in request.path:
+        # Windows expects specific text content
+        # We redirect instead to trigger captive portal with special parameter
+        return redirect(url_for('index', captive='1'), code=302)
+    
+    # For iOS captive portal detection
+    if any(ios_path in request.path for ios_path in ['hotspot-detect', 'library/test/success', 'captive.apple.com']):
+        return redirect(url_for('index', captive='1'), code=302)
+    
+    # For all other captive portal detection requests, redirect to main interface with captive flag
+    return redirect(url_for('index', captive='1'), code=302)
+
+@app.route('/<path:path>')
+def catch_all(path):
+    """
+    Catch-all route to redirect any unrecognized requests to the main interface.
+    This ensures that ANY web request gets redirected to SiPi, making the 
+    captive portal work even for requests we haven't explicitly handled.
+    """
+    # Skip API routes and static files to avoid breaking functionality
+    if path.startswith(('status', 'command', 'cal_points', 'static/', 'corrected_')):
+        return abort(404)
+    
+    # Skip common captive portal detection paths that should return specific responses
+    captive_paths = [
+        'captive', 'portal', 'hotspot', 'redirect', 'connectivity', 
+        'generate_204', 'connecttest', 'success.html'
+    ]
+    
+    if any(cp in path.lower() for cp in captive_paths):
+        return redirect(url_for('index'), code=302)
+    
+    # For everything else, redirect to main interface with a note
+    app.logger.info(f"Catch-all redirect from {request.remote_addr}: /{path}")
+    return redirect(url_for('index'), code=302)
+
 @app.route('/skyview')
 def skyview():
     # Refresh site location from the mount on every request

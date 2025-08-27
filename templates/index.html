@@ -827,6 +827,7 @@
       <label><input type="checkbox" id="toggleNebula"> <span style="color: rgb(255,100,255);">□</span> Nebulae</label>
       <label><input type="checkbox" id="togglePlanetary"> <span style="color: rgb(127,255,0);">△</span> Planetary Nebulae</label>
       <label><input type="checkbox" id="toggleSolarSystem" checked> <span style="color: orange;">☉</span> Solar System</label>
+      <label><input type="checkbox" id="toggleEcliptic"> <span style="color: #FFD700;">⸻</span> Ecliptic</label>
       <label><input type="checkbox" id="toggleCalPoints" checked> <span style="color: yellow;">⊕</span> Calibration Points</label>
       <label><input type="checkbox" id="toggleSkyViewNightMode"> <span>☾</span> True Night Mode</label>
     </div>
@@ -1441,75 +1442,424 @@
     });
     toggleClearBtn();
 
-    // --- System Time Popup on First Boot ---
+    // --- Browser Choice and System Time Popup on First Boot ---
     // Fetch /status to get boot/session ID
     $.getJSON('/status', function(d) {
       var bootId = d.boot_id || d.bootid || d.session_id || d.sessionid || d.boot || null;
       if (!bootId) return; // backend must provide this
       var lastBootId = localStorage.getItem('lastBootId');
       if (lastBootId !== bootId) {
-        // Show modal asking to set system time
-        var deviceTime = new Date();
-        var timeStr = deviceTime.toLocaleString();
-        var isNight = $('body').hasClass('night-mode');
-        var modalHtml = `
-          <div class="modal__body${isNight ? ' night-mode' : ''}"
-            style="${isNight ? 'color:#f33; background:#222; border-radius:8px; padding:10px 0;' : 'color:#111; background:#f5f5f5; border-radius:8px; padding:10px 0;'}">
-            <strong>Set System Time?</strong>
-            <div style="margin-top:10px;">Would you like to set the Pi's system time to your device's current time?</div>
-            <div style="margin-top:10px; font-size:1.1em;">Current device time: <span id="currentTimeDisplay" style="font-weight:bold;">${timeStr}</span></div>
-            <div style="margin-top:5px; font-style:italic; font-size:0.9em;">(The exact time will be captured when you click "Set Time")</div>
-          </div>
-          <div class="modal__footer"
-            style="${isNight ? 'background:#222; color:#f33; border-radius:0 0 8px 8px; padding:10px 0; text-align:center;' : 'background:#f5f5f5; color:#111; border-radius:0 0 8px 8px; padding:10px 0; text-align:center;'}">
-            <button class="btn btn--primary" id="setSystemTimeBtn">Set Time</button>
-            <button class="btn" id="dismissTimeBtn">Dismiss</button>
-          </div>
-        `;
-        showModal(modalHtml);
+        // Enhanced captive portal detection
+        var forceCaptiveDetection = false;
+        var currentUrl = window.location.href;
         
-        // Update the time display every second
-        const updateTimeInterval = setInterval(function() {
-          const now = new Date();
-          $('#currentTimeDisplay').text(now.toLocaleString());
-        }, 1000);
+        // Force captive portal if coming from specific URLs
+        if (document.referrer.includes('generate_204') ||
+            document.referrer.includes('connectivitycheck') ||
+            document.referrer.includes('play.googleapis.com') ||
+            document.referrer.includes('captive.apple.com') ||
+            currentUrl.includes('?captive=1')) {
+          forceCaptiveDetection = true;
+          console.log('[Captive Portal] FORCED detection due to referrer/URL');
+        }
         
-        // Make sure to clear the interval when the modal is closed
-        const originalHideModal = window.hideModal;
-        window.hideModal = function() {
-          clearInterval(updateTimeInterval);
-          originalHideModal();
-          window.hideModal = originalHideModal;
-        };
+        // Check for Android captive portal window titles
+        if (navigator.userAgent.includes('Android')) {
+          var androidCaptiveTitles = [
+            'Sign in to Wi-Fi network',
+            'Sign in to WiFi network', 
+            'Sign in to network',
+            'WiFi sign in',
+            'Wi-Fi sign in',
+            'Network sign in',
+            'Internet may not be available'
+          ];
+          
+          if (androidCaptiveTitles.some(title => document.title.includes(title))) {
+            forceCaptiveDetection = true;
+            console.log('[Captive Portal] FORCED detection due to Android title:', document.title);
+          }
+        }
         
-        $('#setSystemTimeBtn').off('click').on('click', function() {
-          // Get the current time at the moment the button is clicked
-          const currentTime = new Date();
-          // Format the current time as local dt_str (YYYY-MM-DD HH:MM:SS)
-          function pad(n) { return n.toString().padStart(2, '0'); }
-          const dt_str = currentTime.getFullYear() + '-' + pad(currentTime.getMonth()+1) + '-' + pad(currentTime.getDate()) + ' ' + 
-                         pad(currentTime.getHours()) + ':' + pad(currentTime.getMinutes()) + ':' + pad(currentTime.getSeconds());
-          $.ajax({
-            url: '/set_time',
-            method: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify({ dt_str }),
-            success: function() {
-              customAlert('System time set!');
-              localStorage.setItem('lastBootId', bootId);
-            },
-            error: function() {
-              customAlert('Failed to set system time.');
-            }
+        // Check if user is in captive portal mode before showing browser choice
+        if (forceCaptiveDetection || isCaptivePortalMode()) {
+          // Add URL parameter to help with detection on reload
+          if (!currentUrl.includes('?captive=1') && !currentUrl.includes('&captive=1')) {
+            var separator = currentUrl.includes('?') ? '&' : '?';
+            var newUrl = currentUrl + separator + 'captive=1';
+            window.history.replaceState({}, '', newUrl);
+          }
+          
+          // First show browser choice popup, then system time popup
+          showBrowserChoicePopup(function() {
+            showSystemTimePopup(bootId);
           });
-          hideModal();
-        });
-        $('#dismissTimeBtn').off('click').on('click', function() {
-          localStorage.setItem('lastBootId', bootId);
-          hideModal();
-        });
+        } else {
+          // Skip browser popup, go directly to system time popup
+          showSystemTimePopup(bootId);
+        }
       }
     });
+
+    // Function to detect if user is in captive portal mode
+    function isCaptivePortalMode() {
+      // More reliable captive portal detection
+      var userAgent = navigator.userAgent;
+      var currentUrl = window.location.href;
+      
+      // DEFINITIVE indicators: Specific captive portal user agents
+      var captivePortalUserAgents = [
+        'CaptiveNetworkSupport',  // iOS captive portal
+        'ConnectivityCheck',      // Android captive portal
+        'NetworkUtility',         // Android captive portal
+        'NCSI',                   // Windows Network Connectivity Status Indicator
+        'Microsoft NCSI'          // Windows
+      ];
+      
+      var hasCaptiveUserAgent = captivePortalUserAgents.some(indicator => 
+        userAgent.includes(indicator)
+      );
+      
+      // iOS specific detection (iOS captive portal is often just Mobile Safari with limited features)
+      var isIOSCaptive = false;
+      if (userAgent.includes('iPhone') || userAgent.includes('iPad')) {
+        isIOSCaptive = (
+          // iOS captive portal typically has these characteristics
+          window.navigator.standalone === false &&                    // Not in standalone mode
+          !window.DeviceMotionEvent &&                               // Restricted APIs
+          (window.outerHeight === 0 || window.outerWidth === 0) ||   // Hidden window chrome
+          document.title.toLowerCase().includes('wi-fi') ||          // iOS wifi title
+          document.title.toLowerCase().includes('network') ||        // Network title
+          window.location.hostname.includes('captive.apple.com') ||  // Apple captive portal
+          window.location.hostname.includes('hotspot.apple.com') ||  // Apple hotspot
+          // Additional iOS captive portal indicators
+          (window.history.length <= 1 && window.location.href.includes('192.168.')) ||
+          (window.screen && window.screen.width === 0) ||            // Screen not available
+          !window.speechSynthesis ||                                 // Speech API restricted
+          typeof window.orientation === 'undefined'                  // Orientation API restricted
+        );
+      }
+      
+      // Android specific detection (more aggressive for Android due to inconsistency)
+      var isAndroidCaptive = false;
+      if (userAgent.includes('Android')) {
+        isAndroidCaptive = (
+          // Android captive portal indicators - be more aggressive
+          document.title.includes('Sign in to') ||                   // Standard Android captive title
+          document.title.includes('WiFi') ||                         // WiFi in title (case sensitive)
+          document.title.toLowerCase().includes('wifi') ||           // WiFi in title (lowercase)
+          document.title.toLowerCase().includes('network') ||        // Network in title
+          document.title.toLowerCase().includes('internet') ||       // Internet in title
+          window.location.hostname.includes('connectivitycheck') ||  // Android connectivity check
+          window.location.hostname.includes('play.googleapis.com') ||// Google Play connectivity
+          window.location.hostname.includes('google.com') ||         // Google connectivity check
+          // Check for Android captive portal window characteristics
+          (window.outerHeight > 0 && window.innerHeight > 0 && 
+           (window.outerHeight - window.innerHeight) > 120) ||       // Large browser chrome
+          !window.chrome ||                                          // Chrome APIs not available
+          window.navigator.connection === undefined ||               // Network API restricted
+          // More aggressive Android detection
+          (window.history.length <= 2 && window.location.href.includes('192.168.')) ||
+          (window.screen && window.screen.availWidth !== window.screen.width) ||
+          typeof window.webkitRequestFileSystem === 'undefined' ||   // File system API restricted
+          typeof Android !== 'undefined'                            // Android WebView bridge
+        );
+      }
+      
+      // Check referrer for captive portal hints
+      var hasCaptiveReferrer = (
+        document.referrer.includes('captive') ||
+        document.referrer.includes('portal') ||
+        document.referrer.includes('connectivitycheck') ||
+        document.referrer.includes('play.googleapis.com') ||
+        document.referrer.includes('apple.com') ||
+        document.referrer.includes('google.com/generate_204')
+      );
+      
+      // If we have strong indicators, it's definitely captive
+      if (hasCaptiveUserAgent || isIOSCaptive || isAndroidCaptive || hasCaptiveReferrer) {
+        console.log('[Captive Portal Detection] CAPTIVE PORTAL DETECTED:', {
+          hasCaptiveUserAgent: hasCaptiveUserAgent,
+          isIOSCaptive: isIOSCaptive,
+          isAndroidCaptive: isAndroidCaptive,
+          hasCaptiveReferrer: hasCaptiveReferrer
+        });
+        return true;
+      }
+      
+      // Check for regular browser features (if present, probably not captive)
+      var isRegularBrowser = false;
+      try {
+        isRegularBrowser = (
+          window.history && window.history.length > 2 &&           // Has browsing history (increased threshold)
+          window.navigator.onLine !== undefined &&                 // Online status available
+          window.outerHeight > 0 && window.outerWidth > 0 &&      // Normal window dimensions
+          window.screen && window.screen.width > 0 &&             // Screen info available
+          (!currentUrl.includes('192.168.') && 
+           !currentUrl.includes('10.') && 
+           !currentUrl.includes('172.')) &&                        // Not direct IP access
+          (window.outerHeight - window.innerHeight) < 100 &&      // Normal browser chrome (tightened)
+          window.localStorage &&                                   // Storage available
+          window.sessionStorage &&                                // Session storage available
+          typeof window.requestAnimationFrame !== 'undefined'     // Animation API available
+        );
+      } catch(e) {
+        isRegularBrowser = false;
+      }
+      
+      // If this is clearly a regular browser, don't show captive portal popup
+      if (isRegularBrowser) {
+        console.log('[Captive Portal Detection] REGULAR BROWSER detected - not captive portal');
+        return false;
+      }
+      
+      // Final fallback: Check for very limited features + direct IP access
+      var hasVeryLimitedFeatures = false;
+      try {
+        hasVeryLimitedFeatures = (
+          window.outerHeight === 0 ||                             // Hidden window chrome
+          window.outerWidth === 0 ||
+          window.parent !== window ||                             // Running in iframe
+          !window.history ||                                      // No history object
+          !window.localStorage ||                                 // No localStorage access
+          window.history.length <= 1                             // Very limited history
+        );
+      } catch(e) {
+        hasVeryLimitedFeatures = true;
+      }
+      
+      var isDirectIPAccess = (
+        currentUrl.includes('192.168.') || 
+        currentUrl.includes('10.') || 
+        currentUrl.includes('172.')
+      );
+      
+      var isFallbackCaptive = hasVeryLimitedFeatures && isDirectIPAccess;
+      
+      // Comprehensive logging for debugging
+      console.log('[Captive Portal Detection] FULL ANALYSIS:', {
+        userAgent: userAgent,
+        platform: navigator.platform,
+        // Definitive indicators
+        hasCaptiveUserAgent: hasCaptiveUserAgent,
+        isIOSCaptive: isIOSCaptive,
+        isAndroidCaptive: isAndroidCaptive,
+        hasCaptiveReferrer: hasCaptiveReferrer,
+        // Regular browser indicators
+        isRegularBrowser: isRegularBrowser,
+        // Fallback indicators
+        hasVeryLimitedFeatures: hasVeryLimitedFeatures,
+        isDirectIPAccess: isDirectIPAccess,
+        isFallbackCaptive: isFallbackCaptive,
+        // Context
+        documentTitle: document.title,
+        referrer: document.referrer,
+        hostname: window.location.hostname,
+        // Final decision
+        finalDecision: isFallbackCaptive,
+        windowFeatures: {
+          outerHeight: window.outerHeight,
+          innerHeight: window.innerHeight,
+          outerWidth: window.outerWidth,
+          innerWidth: window.innerWidth,
+          historyLength: window.history ? window.history.length : 'undefined',
+          onLine: window.navigator.onLine,
+          standalone: window.navigator.standalone,
+          hasChrome: !!window.chrome,
+          hasDeviceMotion: !!window.DeviceMotionEvent,
+          hasLocalStorage: !!window.localStorage,
+          hasSessionStorage: !!window.sessionStorage,
+          hasRequestAnimationFrame: typeof window.requestAnimationFrame !== 'undefined',
+          hasWebkitFileSystem: typeof window.webkitRequestFileSystem !== 'undefined',
+          screenWidth: window.screen ? window.screen.width : 'undefined',
+          screenAvailWidth: window.screen ? window.screen.availWidth : 'undefined'
+        }
+      });
+      
+      // Return true only for captive portal scenarios
+      return isFallbackCaptive;
+    }
+
+    // Function to show browser choice popup
+    function showBrowserChoicePopup(callback) {
+      var isNight = $('body').hasClass('night-mode');
+      var currentUrl = window.location.href;
+      var modalHtml = `
+        <div class="modal__body${isNight ? ' night-mode' : ''}"
+          style="${isNight ? 'color:#f33; background:#222; border-radius:8px; padding:15px;' : 'color:#111; background:#f5f5f5; border-radius:8px; padding:15px;'}">
+          <strong>🌐 Open in Your Browser?</strong>
+          <div style="margin-top:15px; line-height:1.5;">
+            For the best experience with full-screen support and all features, 
+            would you like to open SiPi in your default browser?
+          </div>
+          <div style="margin-top:10px; font-size:0.9em; font-style:italic; opacity:0.8;">
+            You're currently viewing this in a captive portal window which has limited functionality.
+          </div>
+        </div>
+        <div class="modal__footer"
+          style="${isNight ? 'background:#222; color:#f33; border-radius:0 0 8px 8px; padding:15px; text-align:center;' : 'background:#f5f5f5; color:#111; border-radius:0 0 8px 8px; padding:15px; text-align:center;'}">
+          <button class="btn btn--primary" id="openInBrowserBtn" style="margin-right:10px;">🌐 Open in Browser</button>
+          <button class="btn" id="continueHereBtn">Continue Here</button>
+        </div>
+      `;
+      showModal(modalHtml);
+      
+      $('#openInBrowserBtn').off('click').on('click', function() {
+        // Better methods to escape captive portal and open in default browser
+        var currentUrl = window.location.href;
+        
+        try {
+          // Method 1: Android intent URL (most reliable for Android)
+          if (navigator.userAgent.includes('Android')) {
+            // Try multiple Android browser intents
+            var intents = [
+              // Chrome intent
+              'intent://' + window.location.host + window.location.pathname + window.location.search + '#Intent;scheme=http;package=com.android.chrome;end',
+              // Firefox intent
+              'intent://' + window.location.host + window.location.pathname + window.location.search + '#Intent;scheme=http;package=org.mozilla.firefox;end',
+              // Samsung Browser intent
+              'intent://' + window.location.host + window.location.pathname + window.location.search + '#Intent;scheme=http;package=com.sec.android.app.sbrowser;end',
+              // Generic browser intent
+              'intent://' + window.location.host + window.location.pathname + window.location.search + '#Intent;scheme=http;action=android.intent.action.VIEW;end'
+            ];
+            
+            // Try each intent with delays
+            intents.forEach(function(intent, index) {
+              setTimeout(function() {
+                window.location.href = intent;
+              }, index * 500);
+            });
+            
+          } 
+          // Method 2: iOS URL Schemes and Universal Links
+          else if (navigator.userAgent.includes('iPhone') || navigator.userAgent.includes('iPad')) {
+            // iOS captive portals are very restricted and can't open other apps
+            // Provide clear manual instructions instead
+            
+            hideModal();
+            
+            var shortUrl = currentUrl.replace('http://', '').replace('https://', '');
+            var instructions = `📱 iOS Instructions:\n\n` +
+              `Since iOS captive portals are restricted, please follow these steps:\n\n` +
+              `1️⃣ Close this captive portal window (tap "Cancel" or "Done")\n` +
+              `2️⃣ Open Safari from your home screen\n` +
+              `3️⃣ Type this address: ${shortUrl}\n` +
+              `4️⃣ Bookmark it for easy access!\n\n` +
+              `💡 The address is your WiFi router's IP address\n` +
+              `📌 Remember: ${shortUrl}\n\n` +
+              `🆘 Need more help? Go to: ${currentUrl.replace(/\/$/, '')}/ios-help`;
+            
+            // Try clipboard copy first (may work in some iOS versions)
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(currentUrl).then(function() {
+                customAlert('✅ URL copied to clipboard!\n\n' + instructions);
+              }).catch(function() {
+                customAlert(instructions);
+              });
+            } else {
+              customAlert(instructions);
+            }
+            
+            if (callback) callback();
+          }
+          // Method 3: Desktop/other platforms
+          else {
+            // Try standard window.open with specific parameters
+            var newWindow = window.open(currentUrl, '_blank', 'noopener,noreferrer,location=yes,toolbar=yes,menubar=yes');
+            
+            if (!newWindow) {
+              // Fallback: Create download link that opens in browser
+              var link = document.createElement('a');
+              link.href = currentUrl;
+              link.target = '_system';  // PhoneGap/Cordova system browser
+              link.rel = 'external';    // Some mobile browsers recognize this
+              link.download = '';       // Trigger download which may open browser
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            }
+            
+            hideModal();
+            customAlert('Opening in your default browser...\n\nIf it doesn\'t open automatically, copy this URL:\n' + currentUrl);
+            if (callback) callback();
+          }
+          
+        } catch (e) {
+          console.log('Could not open in browser:', e);
+          hideModal();
+          customAlert('Please manually open your browser and go to:\n' + currentUrl);
+          if (callback) callback();
+        }
+      });
+      
+      $('#continueHereBtn').off('click').on('click', function() {
+        hideModal();
+        if (callback) callback();
+      });
+    }
+
+    // Function to show system time popup
+    function showSystemTimePopup(bootId) {
+      var deviceTime = new Date();
+      var timeStr = deviceTime.toLocaleString();
+      var isNight = $('body').hasClass('night-mode');
+      var modalHtml = `
+        <div class="modal__body${isNight ? ' night-mode' : ''}"
+          style="${isNight ? 'color:#f33; background:#222; border-radius:8px; padding:10px 0;' : 'color:#111; background:#f5f5f5; border-radius:8px; padding:10px 0;'}">
+          <strong>Set System Time?</strong>
+          <div style="margin-top:10px;">Would you like to set the Pi's system time to your device's current time?</div>
+          <div style="margin-top:10px; font-size:1.1em;">Current device time: <span id="currentTimeDisplay" style="font-weight:bold;">${timeStr}</span></div>
+          <div style="margin-top:5px; font-style:italic; font-size:0.9em;">(The exact time will be captured when you click "Set Time")</div>
+        </div>
+        <div class="modal__footer"
+          style="${isNight ? 'background:#222; color:#f33; border-radius:0 0 8px 8px; padding:10px 0; text-align:center;' : 'background:#f5f5f5; color:#111; border-radius:0 0 8px 8px; padding:10px 0; text-align:center;'}">
+          <button class="btn btn--primary" id="setSystemTimeBtn">Set Time</button>
+          <button class="btn" id="dismissTimeBtn">Dismiss</button>
+        </div>
+      `;
+      showModal(modalHtml);
+      
+      // Update the time display every second
+      const updateTimeInterval = setInterval(function() {
+        const now = new Date();
+        $('#currentTimeDisplay').text(now.toLocaleString());
+      }, 1000);
+      
+      // Make sure to clear the interval when the modal is closed
+      const originalHideModal = window.hideModal;
+      window.hideModal = function() {
+        clearInterval(updateTimeInterval);
+        originalHideModal();
+        window.hideModal = originalHideModal;
+      };
+      
+      $('#setSystemTimeBtn').off('click').on('click', function() {
+        // Get the current time at the moment the button is clicked
+        const currentTime = new Date();
+        // Format the current time as local dt_str (YYYY-MM-DD HH:MM:SS)
+        function pad(n) { return n.toString().padStart(2, '0'); }
+        const dt_str = currentTime.getFullYear() + '-' + pad(currentTime.getMonth()+1) + '-' + pad(currentTime.getDate()) + ' ' + 
+                       pad(currentTime.getHours()) + ':' + pad(currentTime.getMinutes()) + ':' + pad(currentTime.getSeconds());
+        $.ajax({
+          url: '/set_time',
+          method: 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify({ dt_str }),
+          success: function() {
+            customAlert('System time set!');
+            localStorage.setItem('lastBootId', bootId);
+          },
+          error: function() {
+            customAlert('Failed to set system time.');
+          }
+        });
+        hideModal();
+      });
+      $('#dismissTimeBtn').off('click').on('click', function() {
+        localStorage.setItem('lastBootId', bootId);
+        hideModal();
+      });
+    }
   });
   </script>
 

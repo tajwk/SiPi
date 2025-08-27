@@ -537,6 +537,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const toggleStarNames      = document.getElementById('toggleStarNames');
   const toggleConst          = document.getElementById('toggleConst');
   const toggleConstLabels    = document.getElementById('toggleConstLabels');
+  const toggleEcliptic       = document.getElementById('toggleEcliptic');
   const toggleMessierNames   = document.getElementById('toggleMessierNames');
   const toggleGal            = document.getElementById('toggleGal');
   const toggleOpen           = document.getElementById('toggleOpen');
@@ -608,6 +609,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let planetaryNebulae = [];
   let messierObjects = [];
   let solarSystemData = {}; // Solar system objects (planets, sun, moon)
+  let eclipticLine = []; // Ecliptic line points
 
   // Hit-test buffers
   let starHits     = [];
@@ -644,6 +646,32 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Current mount pointing
   let mountPos     = { alt: null, az: null };
+
+  // Function to generate ecliptic line points
+  function generateEclipticLine() {
+    const points = [];
+    const obliquity = 23.44 * Math.PI / 180; // Obliquity of ecliptic in radians
+    
+    // Generate points every 10 degrees along the ecliptic
+    for (let eclipticLon = 0; eclipticLon < 360; eclipticLon += 10) {
+      const lon = eclipticLon * Math.PI / 180; // Convert to radians
+      
+      // Convert ecliptic coordinates to equatorial coordinates
+      const ra = Math.atan2(Math.cos(obliquity) * Math.sin(lon), Math.cos(lon));
+      const dec = Math.asin(Math.sin(obliquity) * Math.sin(lon));
+      
+      // Convert RA from radians to hours (0-24)
+      let raHours = ra * 12 / Math.PI;
+      if (raHours < 0) raHours += 24;
+      
+      // Convert Dec from radians to degrees
+      const decDegrees = dec * 180 / Math.PI;
+      
+      points.push([raHours * 15, decDegrees]); // Store as [RA in degrees, Dec in degrees] to match constellation format
+    }
+    
+    return points;
+  }
 
   // --- Mount position polling ---
   function parseDMS(dmsString) {
@@ -737,6 +765,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       { id: 'toggleStarNames', def: true },
       { id: 'toggleConst', def: true },
       { id: 'toggleConstLabels', def: false },
+      { id: 'toggleEcliptic', def: false },
       { id: 'toggleMessierNames', def: true },
       { id: 'toggleGal', def: false },
       { id: 'toggleOpen', def: false },
@@ -772,7 +801,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // --- Save toggle state on change ---
   [
-    'toggleStars','toggleStarNames','toggleConst','toggleConstLabels','toggleMessierNames','toggleGal','toggleOpen','toggleGlobular','toggleNebula','togglePlanetary','toggleCalPoints','toggleSolarSystem'
+    'toggleStars','toggleStarNames','toggleConst','toggleConstLabels','toggleEcliptic','toggleMessierNames','toggleGal','toggleOpen','toggleGlobular','toggleNebula','togglePlanetary','toggleCalPoints','toggleSolarSystem'
   ].forEach(id => {
     const el = document.getElementById(id);
     if (el) {
@@ -1327,7 +1356,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   canvas.addEventListener('pointerup', e => {
     try {
-      console.log('[MOBILE CRITICAL] Starting pointerup event handler');
       
       // Mouse: fast click selection
       if (pointerDownInfo && pointerDownInfo.pointerType === 'mouse') {
@@ -1389,25 +1417,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (hitObj) {
           selectedObject = hitObj;
           
-          // MOBILE DEBUG - Alert to ensure this code is running
-          console.log('[MOBILE CRITICAL] Object selection triggered!');
-          console.log('[MOBILE CRITICAL] User agent:', navigator.userAgent);
-          console.log('[MOBILE CRITICAL] Touch device:', 'ontouchstart' in window);
-          console.log('[MOBILE CRITICAL] Input elements exist:', {
-            raInput: !!raInput,
-            decInput: !!decInput,
-            altInput: !!altInput,
-            azInput: !!azInput
-          });
-          
           console.log('[SkyView] Object selected:', hitObj.Name || hitObj.name, 'type:', hitObj.type);
-          console.log('[SkyView] DEBUG - Full object properties:');
-          for (let key in hitObj) {
-            console.log(`[SkyView] DEBUG - ${key}:`, hitObj[key]);
-          }
-          console.log('[SkyView] DEBUG - isCalPoint:', hitObj.isCalPoint);
-          console.log('[SkyView] DEBUG - Has RA/Dec:', hitObj.ra !== undefined, hitObj.dec !== undefined);
-          console.log('[SkyView] DEBUG - Has RtAsc/Declin:', hitObj.RtAsc !== undefined, hitObj.Declin !== undefined);
+          
           showSelectedAttributes(selectedObject);
           if (hitObj.isCalPoint) {
             if (altInput && azInput) {
@@ -1455,10 +1466,8 @@ document.addEventListener('DOMContentLoaded', async () => {
               }
             }, 0);
           } else {
-            // MOBILE DEBUG - Show we entered the coordinate assignment section
             
             try {
-              console.log('[MOBILE CRITICAL] Starting coordinate assignment logic');
               
               // MOBILE DEBUG - Re-verify input elements are still accessible
               const freshRAInput = document.getElementById('gotoRA');
@@ -1466,105 +1475,31 @@ document.addEventListener('DOMContentLoaded', async () => {
               const freshAltInput = document.getElementById('gotoAlt');
               const freshAzInput = document.getElementById('gotoAz');
               
-              console.log('[MOBILE CRITICAL] Fresh input element check:', {
-                freshRAInput: !!freshRAInput,
-                freshDecInput: !!freshDecInput,
-                freshAltInput: !!freshAltInput,
-                freshAzInput: !!freshAzInput,
-                cachedRAInput: !!raInput,
-                cachedDecInput: !!decInput,
-                cachedAltInput: !!altInput,
-                cachedAzInput: !!azInput
-              });
-              
               // Use fresh references if cached ones are null
               const workingRAInput = raInput || freshRAInput;
               const workingDecInput = decInput || freshDecInput;
               
-              console.log('[MOBILE CRITICAL] Working input elements:', {
-                workingRAInput: !!workingRAInput,
-                workingDecInput: !!workingDecInput
-              });
-              
-              console.log('[MOBILE CRITICAL] Input elements found:', {
-                raInput: !!raInput,
-                decInput: !!decInput,
-                altInput: !!altInput,
-                azInput: !!azInput
-              });
-              
-              // MOBILE DEBUG - Check if inputs are actually writable
-              if (workingRAInput) {
-                console.log('[MOBILE CRITICAL] RA input details:', {
-                  id: workingRAInput.id,
-                  type: workingRAInput.type,
-                  disabled: workingRAInput.disabled,
-                  readonly: workingRAInput.readOnly,
-                  style: workingRAInput.style.cssText
-                });
-              }
-              if (workingDecInput) {
-                console.log('[MOBILE CRITICAL] Dec input details:', {
-                  id: workingDecInput.id,
-                  type: workingDecInput.type,
-                  disabled: workingDecInput.disabled,
-                  readonly: workingDecInput.readOnly,
-                  style: workingDecInput.style.cssText
-                });
-              }
               
               // Update coordinate textboxes for catalog objects (stars, galaxies, etc.)
               console.log('[SkyView] Selected object:', hitObj.Name || hitObj.name);
               
               // All catalog objects have RtAsc/Declin - use them directly
               if (hitObj.RtAsc !== undefined && hitObj.Declin !== undefined) {
-                console.log('[MOBILE CRITICAL] Entering RtAsc/Declin branch');
-                console.log('[SkyView] DEBUG - hitObj.RtAsc value:', hitObj.RtAsc, 'type:', typeof hitObj.RtAsc);
-                console.log('[SkyView] DEBUG - Expected: 9.787334 should give 09:47:14');
                 
                 // Set RA/Dec textboxes from catalog values
-                console.log('[MOBILE CRITICAL] About to call decimalHMStoHMS with:', hitObj.RtAsc);
                 const raValue = decimalHMStoHMS(hitObj.RtAsc);  // RtAsc decimal hours → HH:MM:SS
-                console.log('[MOBILE CRITICAL] decimalHMStoHMS returned:', raValue);
-                
-                console.log('[MOBILE CRITICAL] About to call degToDMS with:', hitObj.Declin);
                 const decValue = degToDMS(hitObj.Declin);       // Declin degrees → DDD:MM:SS (3 digits)
-                console.log('[MOBILE CRITICAL] degToDMS returned:', decValue);
-                
-                console.log('[MOBILE CRITICAL] About to assign coordinates - RA:', raValue, 'Dec:', decValue);
                 
                 if (raInput) {
                   raInput.value = raValue;
-                  console.log('[MOBILE CRITICAL] RA assigned, actual value:', raInput.value);
                 }
                 if (decInput) {
                   decInput.value = decValue;
-                  console.log('[MOBILE CRITICAL] Dec assigned, actual value:', decInput.value);
                 }
-                
-                // MOBILE DEBUG - Aggressive confirmation
-                console.log('[MOBILE CRITICAL] Coordinate assignment completed!');
-                console.log('[MOBILE CRITICAL] RA value:', raValue, 'set to input:', raInput ? raInput.value : 'NO INPUT');
-                console.log('[MOBILE CRITICAL] Dec value:', decValue, 'set to input:', decInput ? decInput.value : 'NO INPUT');
-              
-              // Mobile debugging - log coordinate assignment
-              console.log('[SkyView] MOBILE DEBUG - Coordinate assignment:');
-              console.log('  RA Input exists:', !!raInput, 'Value set to:', raValue);
-              console.log('  Dec Input exists:', !!decInput, 'Value set to:', decValue);
-              console.log('  RA Input actual value:', raInput ? raInput.value : 'N/A');
-              console.log('  Dec Input actual value:', decInput ? decInput.value : 'N/A');
               
               // Calculate Alt/Az from catalog RA/Dec
               const raHours = hitObj.RtAsc; // RA is already in decimal hours format
-              console.log('[SkyView] DEBUG - Converting to Alt/Az with:', {
-                raHours: raHours,
-                decDeg: hitObj.Declin,
-                lat: lat,
-                lon: lon,
-                date: getServerTime() // Use server time for debug info
-              });
               const coords = eqToAltAz(raHours, hitObj.Declin, lat, lon); // Use server time
-              console.log('[SkyView] DEBUG - eqToAltAz result:', coords);
               
               // Fix azimuth reference frame - add 180° if needed
               let correctedAz = coords.az;
@@ -1573,12 +1508,6 @@ document.addEventListener('DOMContentLoaded', async () => {
               } else {
                 correctedAz -= 180;
               }
-              
-              console.log('[SkyView] DEBUG - Azimuth correction:', {
-                originalAz: coords.az,
-                correctedAz: correctedAz,
-                objectAz: hitObj.az
-              });
               
               altInput.value = degToDMS(coords.alt);
               azInput.value = degToDMS(correctedAz); // Use corrected azimuth
@@ -1595,73 +1524,19 @@ document.addEventListener('DOMContentLoaded', async () => {
               console.log('[SkyView] Using catalog RtAsc/Declin - RA:', raInput.value, 'Dec:', decInput.value);
               console.log('[SkyView] Calculated Alt/Az - Alt:', altInput.value, 'Az:', azInput.value);
               
-              // MOBILE DEBUG - Verify values stick after a short delay
-              setTimeout(() => {
-                console.log('[MOBILE CRITICAL] Post-assignment verification (after 100ms):');
-                if (workingRAInput) {
-                  console.log('[MOBILE CRITICAL] RA input final value:', workingRAInput.value);
-                  console.log('[MOBILE CRITICAL] RA still matches expected:', workingRAInput.value === raValue);
-                }
-                if (workingDecInput) {
-                  console.log('[MOBILE CRITICAL] Dec input final value:', workingDecInput.value);
-                  console.log('[MOBILE CRITICAL] Dec still matches expected:', workingDecInput.value === decValue);
-                }
-                
-                // Use status bar or page title for mobile debugging instead of overlay
-                const raMatch = workingRAInput ? (workingRAInput.value === raValue) : false;
-                const decMatch = workingDecInput ? (workingDecInput.value === decValue) : false;
-                
-                // Try to find and update an existing status element, or use document title
-                const statusElement = document.querySelector('.status') || document.querySelector('#status');
-                if (statusElement) {
-                  const originalText = statusElement.textContent;
-                  statusElement.textContent = `DEBUG: RA=${raMatch} Dec=${decMatch}`;
-                  setTimeout(() => {
-                    statusElement.textContent = originalText;
-                  }, 3000);
-                } else {
-                  // Fallback: Use document title for debug info
-                  const originalTitle = document.title;
-                  document.title = `DEBUG: RA=${raMatch} Dec=${decMatch} | ${originalTitle}`;
-                  setTimeout(() => {
-                    document.title = originalTitle;
-                  }, 3000);
-                }
-              }, 100);
             } else if (hitObj.ra !== undefined && hitObj.dec !== undefined) {
               // Fallback for objects with ra/dec properties
-              console.log('[MOBILE CRITICAL] Entering ra/dec fallback branch');
-              console.log('[MOBILE CRITICAL] hitObj.ra:', hitObj.ra, 'hitObj.dec:', hitObj.dec);
               
-              console.log('[MOBILE CRITICAL] About to call decimalHMStoHMS with:', hitObj.ra);
               const raValue = decimalHMStoHMS(hitObj.ra);
-              console.log('[MOBILE CRITICAL] decimalHMStoHMS returned:', raValue);
-              
-              console.log('[MOBILE CRITICAL] About to call degToDMS with:', hitObj.dec);
               const decValue = degToDMS(hitObj.dec);
-              console.log('[MOBILE CRITICAL] degToDMS returned:', decValue);
               
-              console.log('[MOBILE CRITICAL] About to assign fallback values to inputs');
               if (raInput) {
-                console.log('[MOBILE CRITICAL] Fallback RA input before assignment:', raInput.value);
                 raInput.value = raValue;
-                console.log('[MOBILE CRITICAL] Fallback RA input after assignment:', raInput.value);
-              } else {
-                console.error('[MOBILE CRITICAL] FALLBACK RA INPUT IS NULL!');
               }
               
               if (decInput) {
-                console.log('[MOBILE CRITICAL] Fallback Dec input before assignment:', decInput.value);
                 decInput.value = decValue;
-                console.log('[MOBILE CRITICAL] Fallback Dec input after assignment:', decInput.value);
-              } else {
-                console.error('[MOBILE CRITICAL] FALLBACK DEC INPUT IS NULL!');
               }
-              
-              // MOBILE DEBUG - Aggressive confirmation for fallback
-              console.log('[MOBILE CRITICAL] Fallback coordinate assignment completed!');
-              console.log('[MOBILE CRITICAL] RA value:', raValue, 'set to input:', raInput ? raInput.value : 'NO INPUT');
-              console.log('[MOBILE CRITICAL] Dec value:', decValue, 'set to input:', decInput ? decInput.value : 'NO INPUT');
               
               const raHours = hitObj.ra;
               const coords = eqToAltAz(raHours, hitObj.dec, lat, lon); // Use server time
@@ -1677,9 +1552,6 @@ document.addEventListener('DOMContentLoaded', async () => {
               altInput.value = degToDMS(coords.alt);
               azInput.value = degToDMS(correctedAz);
             } else {
-              console.log('[MOBILE CRITICAL] No RA/Dec coordinates found!');
-              console.log('[MOBILE CRITICAL] Object properties available:', Object.keys(hitObj));
-              console.log('[MOBILE CRITICAL] Checking for any coordinate-like properties...');
               
               // Try to find any coordinate data in the object
               let foundRA = null;
@@ -2135,6 +2007,43 @@ document.addEventListener('DOMContentLoaded', async () => {
       ctx.restore();
     }
     // Constellation labels will be drawn in PHASE 2 with priority system
+
+    // --- ecliptic line ---
+    if(toggleEcliptic && toggleEcliptic.checked && eclipticLine.length > 0){
+      console.log('[SkyView] Drawing ecliptic line:', eclipticLine.length, 'points');
+      ctx.save();
+      ctx.lineWidth = 1 / canvasScale; // Thinner line, same as constellation lines
+      ctx.strokeStyle = getNightModeColor('#FFD700', 'ecliptic'); // Yellow/gold color
+      ctx.setLineDash([5, 5]); // Dashed line to distinguish from constellations
+      
+      // Draw the ecliptic as a connected line
+      let prev = project(eclipticLine[0][0]/15, eclipticLine[0][1], effR);
+      ctx.beginPath();
+      ctx.moveTo(prev.x, prev.y);
+      
+      for(let i = 1; i < eclipticLine.length; i++){
+        const cur = project(eclipticLine[i][0]/15, eclipticLine[i][1], effR);
+        // Only draw if both points are above horizon and not wrapping around
+        if(Math.abs(prev.az - cur.az) < 180 && (prev.alt > 0 || cur.alt > 0)){
+          ctx.lineTo(cur.x, cur.y);
+        } else {
+          // Start a new path segment if there's a wrap-around or horizon crossing
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(cur.x, cur.y);
+        }
+        prev = cur;
+      }
+      
+      // Close the ecliptic circle by connecting back to the first point
+      const first = project(eclipticLine[0][0]/15, eclipticLine[0][1], effR);
+      if(Math.abs(prev.az - first.az) < 180 && (prev.alt > 0 || first.alt > 0)){
+        ctx.lineTo(first.x, first.y);
+      }
+      
+      ctx.stroke();
+      ctx.restore();
+    }
 
     // --- stars (visual points only) ---
     starHits=[]; if(toggleStars.checked){
@@ -3130,6 +3039,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  // Generate ecliptic line
+  console.log('[SkyView] Generating ecliptic line...');
+  eclipticLine = generateEclipticLine();
+  console.log('[SkyView] Generated ecliptic points:', eclipticLine.length);
+
   try {
     const resp = await fetch('/corrected_galaxies.json');
     if(!resp.ok) throw resp;
@@ -3242,6 +3156,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   if (toggleCalPoints) {
     toggleCalPoints.addEventListener('change', draw);
+  }
+
+  if (toggleEcliptic) {
+    toggleEcliptic.addEventListener('change', draw);
   }
 
   if (toggleSolarSystem) {
@@ -3472,6 +3390,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     'toggleStarNames',
     'toggleConst',
     'toggleConstLabels',
+    'toggleEcliptic',
     'toggleMessierNames',
     'toggleGal',
     'toggleOpen',
@@ -3488,6 +3407,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     toggleStarNames: true,
     toggleConst: true,
     toggleConstLabels: false,
+    toggleEcliptic: false,
     toggleMessierNames: true,
     toggleGal: false,
     toggleOpen: false,
@@ -3653,4 +3573,3 @@ function showSelectedAttributes(selected) {
     }
   }
 }
-
