@@ -257,6 +257,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   function resetLabelCollisions() {
     placedLabels = [];
   }
+
+  // Reset hit detection arrays to prevent memory leaks
+  function resetHitArrays() {
+    starHits.length = 0;
+    galaxyHits.length = 0;
+    openHits.length = 0;
+    globularHits.length = 0;
+    nebulaHits.length = 0;
+    planetaryHits.length = 0;
+    solarSystemHits.length = 0;
+  }
   
   // Object pool for bounding boxes to reduce memory allocations
   const boundingBoxPool = [];
@@ -2127,6 +2138,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Reset label collision tracking for this draw cycle
     resetLabelCollisions();
     
+    // Reset hit detection arrays to prevent memory leaks
+    resetHitArrays();
+    
     isDrawing = true;
     try {
       // Debug: log mountPos before drawing reticle
@@ -3144,12 +3158,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       let filteredByHorizon = 0;
       messierObjects.forEach(obj => {
         if (obj.mag <= magThreshold) {
-          // Use corrected coordinates if available, otherwise parse from original strings
+          // Handle different coordinate formats
           let ra, dec;
           if (obj.ra_corrected_hours !== undefined && obj.dec_corrected_degrees !== undefined) {
+            // Use corrected coordinates (legacy format)
             ra = obj.ra_corrected_hours;
             dec = obj.dec_corrected_degrees;
+          } else if (typeof obj.ra === 'number' && typeof obj.dec === 'number') {
+            // Use decimal coordinates directly (new format)
+            ra = obj.ra;   // Already in decimal hours
+            dec = obj.dec; // Already in decimal degrees
           } else {
+            // Parse string coordinates (old format)
             ra = parseRA(obj.ra);
             dec = parseDec(obj.dec);
           }
