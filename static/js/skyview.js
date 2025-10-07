@@ -1,5 +1,15 @@
 // static/js/skyview.js
 
+// Production mode - set to false to enable debug logging
+const PRODUCTION_MODE = true;
+
+// Debug logging wrapper - only logs in development mode
+function debugLog(...args) {
+  if (!PRODUCTION_MODE) {
+    console.log(...args);
+  }
+}
+
 // Device Performance Profiling and Adaptive Optimizations
 class DeviceProfiler {
   constructor() {
@@ -8,7 +18,7 @@ class DeviceProfiler {
   }
   
   async detectPerformance() {
-    console.log("[PERF] Starting device performance detection...");
+    debugLog("[PERF] Starting device performance detection...");
     
     // Create test canvas for performance measurement
     const testCanvas = document.createElement('canvas');
@@ -35,7 +45,7 @@ class DeviceProfiler {
       user_agent: navigator.userAgent
     };
     
-    console.log("[PERF] Performance test results:", {
+    debugLog("[PERF] Performance test results:", {
       renderTime: renderTime.toFixed(2) + 'ms',
       screenSize: `${deviceInfo.screen_width}x${deviceInfo.screen_height}`,
       pixelRatio: deviceInfo.pixel_ratio,
@@ -51,12 +61,12 @@ class DeviceProfiler {
       });
       
       this.profile = await response.json();
-      console.log("[PERF] Device tier:", this.profile.tier);
-      console.log("[PERF] Applied optimizations:", this.profile);
+      debugLog("[PERF] Device tier:", this.profile.tier);
+      debugLog("[PERF] Applied optimizations:", this.profile);
       
       return this.profile;
     } catch (error) {
-      console.warn("[PERF] Failed to get device profile, using defaults:", error);
+      debugLog("[PERF] Failed to get device profile, using defaults:", error);
       // Fallback profile
       this.profile = {
         tier: 'medium',
@@ -91,7 +101,7 @@ class DeviceProfiler {
   applyOptimizations() {
     if (!this.profile) return;
     
-    console.log(`[PERF] Applying ${this.profile.tier}-tier optimizations...`);
+    debugLog(`[PERF] Applying ${this.profile.tier}-tier optimizations...`);
     
     // Apply canvas optimizations
     this.optimizeCanvas();
@@ -112,7 +122,7 @@ class DeviceProfiler {
     // Apply anti-aliasing setting
     ctx.imageSmoothingEnabled = this.profile.anti_aliasing;
     
-    console.log(`[PERF] Canvas optimized: anti-aliasing=${this.profile.anti_aliasing}`);
+    debugLog(`[PERF] Canvas optimized: anti-aliasing=${this.profile.anti_aliasing}`);
   }
   
   setupEventThrottling() {
@@ -140,7 +150,7 @@ class DeviceProfiler {
       window.handlePanThrottled = throttle(window.handlePan, throttleMs);
     }
     
-    console.log(`[PERF] Event throttling set to ${throttleMs}ms`);
+    debugLog(`[PERF] Event throttling set to ${throttleMs}ms`);
   }
   
   // Adaptive magnitude limits based on device tier and zoom
@@ -201,7 +211,7 @@ class DeviceProfiler {
       'low': 'Battery Saver'
     };
     
-    console.log(`[PERF] Running in ${tierNames[this.profile.tier]} mode`);
+    debugLog(`[PERF] Running in ${tierNames[this.profile.tier]} mode`);
   }
 }
 
@@ -209,23 +219,23 @@ class DeviceProfiler {
 const deviceProfiler = new DeviceProfiler();
 
 document.addEventListener('DOMContentLoaded', async () => {
-  console.log('📡 SkyView init - Initializing adaptive performance optimizations...');
+  debugLog('📡 SkyView init - Initializing adaptive performance optimizations...');
   
   // Test basic connectivity first
   try {
-    console.log('[SkyView] Testing server connectivity...');
+    debugLog('[SkyView] Testing server connectivity...');
     const testResponse = await fetch('/status');
-    console.log('[SkyView] Connectivity test:', testResponse.status, testResponse.statusText);
+    debugLog('[SkyView] Connectivity test:', testResponse.status, testResponse.statusText);
     if (!testResponse.ok) {
-      console.warn('[SkyView] Server connectivity issue detected');
+      debugLog('[SkyView] Server connectivity issue detected');
     }
   } catch (e) {
-    console.error('[SkyView] Connectivity test failed:', e);
+    debugLog('[SkyView] Connectivity test failed:', e);
   }
   
   // Initialize device profiler first
   await deviceProfiler.initialize();
-  console.log('[PERF] Performance optimizations applied successfully!');
+  debugLog('[PERF] Performance optimizations applied successfully!');
 
   // how many extra pixels to expand every hit area by (for easier touch)
   // Increase hit area for easier touch selection
@@ -248,15 +258,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     placedLabels = [];
   }
   
+  // Object pool for bounding boxes to reduce memory allocations
+  const boundingBoxPool = [];
+  function getBoundingBox() {
+    return boundingBoxPool.pop() || { left: 0, right: 0, top: 0, bottom: 0 };
+  }
+  function returnBoundingBox(box) {
+    if (boundingBoxPool.length < 100) { // Limit pool size
+      boundingBoxPool.push(box);
+    }
+  }
+
   // Check if a text bounding box collides with any existing labels
-  function checkLabelCollision(textX, textY, textWidth, textHeight, objectType, padding = 2) {
+  function checkLabelCollision(textX, textY, textWidth, textHeight, objectType, padding = 2, objectMagnitude = null) {
     // Account for center-aligned text (drawFlippableText uses center alignment)
-    const newBox = {
-      left: textX - textWidth/2 - padding,
-      right: textX + textWidth/2 + padding,
-      top: textY - textHeight/2 - padding,
-      bottom: textY + textHeight/2 + padding
-    };
+    const newBox = getBoundingBox();
+    newBox.left = textX - textWidth/2 - padding;
+    newBox.right = textX + textWidth/2 + padding;
+    newBox.top = textY - textHeight/2 - padding;
+    newBox.bottom = textY + textHeight/2 + padding;
     
     // Define object type priority (lower number = higher priority)
     const typePriority = {
@@ -267,20 +287,39 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     const currentPriority = typePriority[objectType] || 3;
     
-    // Dynamic padding based on object type and zoom level
+    // Enhanced zoom-based padding - more conservative at default zoom
     let effectivePadding;
-    if (objectType === 'constellation') {
-      // Constellations can be more aggressive about overlapping
-      effectivePadding = padding * 0.5; // 50% less padding for constellations
-    } else if (objectType === 'messier') {
-      // Moderate padding for messier objects
-      effectivePadding = padding * 0.8; // 20% less padding for messier
+    let zoomFactor;
+    
+    // At default zoom (1.0), use larger padding. Reduce as we zoom in.
+    if (canvasScale <= 1.2) {
+      // Default zoom range - use generous padding to prevent overlaps
+      zoomFactor = 1.4;
+    } else if (canvasScale <= 2.0) {
+      // Light zoom - moderate padding
+      zoomFactor = 1.0;
     } else {
-      // Stars get full padding (highest priority)
-      effectivePadding = padding;
+      // Higher zoom - allow tighter spacing
+      zoomFactor = Math.max(0.4, 1 / canvasScale);
     }
     
-    for (let existing of placedLabels) {
+    if (objectType === 'constellation') {
+      effectivePadding = padding * 0.5 * zoomFactor; // More conservative for constellations at default zoom
+    } else if (objectType === 'messier') {
+      // Enhanced padding for Messier objects to prevent overlap with each other
+      effectivePadding = padding * 2.0 * zoomFactor; // Double padding for Messier objects to prevent overlaps
+    } else {
+      effectivePadding = padding * 1.0 * zoomFactor; // Full padding for stars, especially at default zoom
+    }
+    
+    let collidingLabels = [];
+    
+    // Limit collision detection iterations to prevent lockups
+    const maxCollisionChecks = Math.min(placedLabels.length, 5000);
+    
+    for (let i = 0; i < maxCollisionChecks; i++) {
+      const existing = placedLabels[i];
+      
       // Check if boxes overlap with effective padding
       const adjustedNewBox = {
         left: textX - textWidth/2 - effectivePadding,
@@ -296,44 +335,75 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         const existingPriority = typePriority[existing.objectType] || 3;
         
-        // Fixed priority logic: Higher priority objects (lower number) can displace lower priority ones
-        // But for now, we'll try to find a different position rather than displacing
-        if (currentPriority > existingPriority) {
-          return true; // Current has lower priority - can't place here, collision detected
-        } else if (currentPriority < existingPriority) {
-          // Current has higher priority - could displace, but try other positions first
-          return true; // For now, still try other positions to avoid complexity
+        // Enhanced priority logic with displacement and magnitude-based sub-priorities
+        if (currentPriority < existingPriority) {
+          // Current has higher type priority - can displace existing label
+          collidingLabels.push(i);
+        } else if (currentPriority > existingPriority) {
+          // Current has lower type priority - cannot place here
+          return { collision: true, canDisplace: false };
         } else {
-          // Same priority - avoid collision
-          return true; // Collision detected - can't place here
+          // Same type priority - use magnitude-based sub-priority for Messier objects
+          if (objectType === 'messier' && existing.objectType === 'messier') {
+            if (objectMagnitude !== null && existing.objectMagnitude !== null) {
+              if (objectMagnitude < existing.objectMagnitude) {
+                // Current is brighter (lower magnitude) - can displace existing
+                collidingLabels.push(i);
+              } else {
+                // Current is fainter - cannot place here
+                return { collision: true, canDisplace: false };
+              }
+            } else {
+              // No magnitude info for comparison - always avoid collision for Messier objects
+              return { collision: true, canDisplace: false };
+            }
+          } else {
+            // Same priority without magnitude info - avoid collision
+            return { collision: true, canDisplace: false };
+          }
         }
       }
     }
-    return false; // No collision
+    
+    if (collidingLabels.length > 0) {
+      // Return collision info with displacement option
+      returnBoundingBox(newBox); // Return to pool
+      return { collision: true, canDisplace: true, displacementTargets: collidingLabels };
+    }
+    
+    returnBoundingBox(newBox); // Return to pool
+    return { collision: false }; // No collision
   }
   
   // Register a placed label's bounding box
-  function registerLabelPlacement(textX, textY, textWidth, textHeight, objectType) {
+  function registerLabelPlacement(textX, textY, textWidth, textHeight, objectType, objectMagnitude = null) {
+    // Prevent unbounded memory growth - limit to 10,000 labels max
+    if (placedLabels.length >= 10000) {
+      return false; // Return false to indicate registration failed
+    }
+    
     // Account for center-aligned text (drawFlippableText uses center alignment)
     placedLabels.push({
       left: textX - textWidth/2,
       right: textX + textWidth/2,
       top: textY - textHeight/2,
       bottom: textY + textHeight/2,
-      objectType: objectType
+      objectType: objectType,
+      objectMagnitude: objectMagnitude
     });
+    return true; // Return true to indicate successful registration
   }
 
   // --- Enhanced Label Positioning with Collision Detection ---
-  function getLabelPositionWithCollisionDetection(objectX, objectY, text, objectType, canvasScale) {
+  function getLabelPositionWithCollisionDetection(objectX, objectY, text, objectType, canvasScale, objectMagnitude = null) {
     const ctx = canvas.getContext('2d');
     
     // Set the correct font BEFORE measuring text
     let fontSize;
     if (objectType === 'messier' || objectType === 'constellation') {
-      fontSize = 12 / canvasScale;
+      fontSize = 14 / canvasScale;
     } else {
-      fontSize = 10 / canvasScale; // Star font size
+      fontSize = 14 / canvasScale; // Star font size
     }
     ctx.font = `${fontSize}px sans-serif`;
     
@@ -346,39 +416,75 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Define label priority and position options based on object type
     let positions = [];
-    // Improved scaling for all zoom levels - ensure minimum separation and scale appropriately
-    const baseOffset = Math.max(textHeight * 0.8, Math.min(8, 6 / canvasScale)); // Scale with text size, but have reasonable limits
+    // Enhanced scaling with more spacing at default zoom to prevent overlaps
+    let baseOffset;
+    if (canvasScale <= 1.2) {
+      // At default zoom, use larger offsets to ensure clear separation
+      baseOffset = Math.max(textHeight * 1.2, 8);
+    } else if (canvasScale <= 2.0) {
+      // Light zoom - moderate offsets  
+      baseOffset = Math.max(textHeight * 1.0, 6);
+    } else {
+      // Higher zoom - tighter spacing is acceptable
+      baseOffset = Math.max(textHeight * 0.8, Math.min(8, 6 / canvasScale));
+    }
     
     if (objectType === 'star') {
-      // HIGHEST PRIORITY: Stars get the closest positions first
+      // HIGHEST PRIORITY: Stars get more position options for dense fields
+      // Use larger multipliers at default zoom for better separation
+      const starMultiplier = canvasScale <= 1.2 ? 1.3 : 1.0;
+      
       positions = [
-        // Ultra-close primary positions
-        { x: objectX + baseOffset, y: objectY + baseOffset, priority: 1 },
-        { x: objectX - baseOffset, y: objectY + baseOffset, priority: 1 },
-        { x: objectX + baseOffset, y: objectY - baseOffset, priority: 1 },
-        { x: objectX - baseOffset, y: objectY - baseOffset, priority: 1 },
-        // Close secondary positions
-        { x: objectX + baseOffset * 1.2, y: objectY, priority: 2 },
-        { x: objectX - baseOffset * 1.2, y: objectY, priority: 2 },
-        { x: objectX, y: objectY + baseOffset * 1.2, priority: 2 },
-        { x: objectX, y: objectY - baseOffset * 1.2, priority: 2 },
+        // Ultra-close primary positions (diagonal) - increased spacing at default zoom
+        { x: objectX + baseOffset * starMultiplier, y: objectY + baseOffset * starMultiplier, priority: 1 },
+        { x: objectX - baseOffset * starMultiplier, y: objectY + baseOffset * starMultiplier, priority: 1 },
+        { x: objectX + baseOffset * starMultiplier, y: objectY - baseOffset * starMultiplier, priority: 1 },
+        { x: objectX - baseOffset * starMultiplier, y: objectY - baseOffset * starMultiplier, priority: 1 },
+        // Close cardinal positions
+        { x: objectX + baseOffset * 1.1 * starMultiplier, y: objectY, priority: 1 },
+        { x: objectX - baseOffset * 1.1 * starMultiplier, y: objectY, priority: 1 },
+        { x: objectX, y: objectY + baseOffset * 1.1 * starMultiplier, priority: 1 },
+        { x: objectX, y: objectY - baseOffset * 1.1 * starMultiplier, priority: 1 },
+        // Medium distance positions (8-point star pattern)
+        { x: objectX + baseOffset * 1.4 * starMultiplier, y: objectY + baseOffset * 1.4 * starMultiplier, priority: 2 },
+        { x: objectX - baseOffset * 1.4 * starMultiplier, y: objectY + baseOffset * 1.4 * starMultiplier, priority: 2 },
+        { x: objectX + baseOffset * 1.4 * starMultiplier, y: objectY - baseOffset * 1.4 * starMultiplier, priority: 2 },
+        { x: objectX - baseOffset * 1.4 * starMultiplier, y: objectY - baseOffset * 1.4 * starMultiplier, priority: 2 },
+        { x: objectX + baseOffset * 1.6 * starMultiplier, y: objectY, priority: 2 },
+        { x: objectX - baseOffset * 1.6 * starMultiplier, y: objectY, priority: 2 },
+        { x: objectX, y: objectY + baseOffset * 1.6 * starMultiplier, priority: 2 },
+        { x: objectX, y: objectY - baseOffset * 1.6 * starMultiplier, priority: 2 },
       ];
     } else if (objectType === 'messier') {
-      // MEDIUM PRIORITY: Messier objects get slightly more distant options
+      // MEDIUM PRIORITY: Messier objects get comprehensive position options
+      // Use larger multipliers at default zoom for better separation
+      const messierMultiplier = canvasScale <= 1.2 ? 1.8 : 1.0;
+      
       positions = [
-        // Primary positions
-        { x: objectX + baseOffset * 1.1, y: objectY + baseOffset * 1.1, priority: 1 },
-        { x: objectX - baseOffset * 1.1, y: objectY + baseOffset * 1.1, priority: 1 },
-        { x: objectX + baseOffset * 1.1, y: objectY - baseOffset * 1.1, priority: 1 },
-        { x: objectX - baseOffset * 1.1, y: objectY - baseOffset * 1.1, priority: 1 },
-        // Secondary positions
-        { x: objectX + baseOffset * 1.5, y: objectY, priority: 2 },
-        { x: objectX - baseOffset * 1.5, y: objectY, priority: 2 },
-        { x: objectX, y: objectY + baseOffset * 1.5, priority: 2 },
-        { x: objectX, y: objectY - baseOffset * 1.5, priority: 2 },
-        // Tertiary positions (farther out)
-        { x: objectX + baseOffset * 2, y: objectY, priority: 3 },
-        { x: objectX - baseOffset * 2, y: objectY, priority: 3 },
+        // Primary diagonal positions - increased spacing at default zoom
+        { x: objectX + baseOffset * 1.2 * messierMultiplier, y: objectY + baseOffset * 1.2 * messierMultiplier, priority: 1 },
+        { x: objectX - baseOffset * 1.2 * messierMultiplier, y: objectY + baseOffset * 1.2 * messierMultiplier, priority: 1 },
+        { x: objectX + baseOffset * 1.2 * messierMultiplier, y: objectY - baseOffset * 1.2 * messierMultiplier, priority: 1 },
+        { x: objectX - baseOffset * 1.2 * messierMultiplier, y: objectY - baseOffset * 1.2 * messierMultiplier, priority: 1 },
+        // Primary cardinal positions
+        { x: objectX + baseOffset * 1.4 * messierMultiplier, y: objectY, priority: 1 },
+        { x: objectX - baseOffset * 1.4 * messierMultiplier, y: objectY, priority: 1 },
+        { x: objectX, y: objectY + baseOffset * 1.4 * messierMultiplier, priority: 1 },
+        { x: objectX, y: objectY - baseOffset * 1.4 * messierMultiplier, priority: 1 },
+        // Secondary ring (12 positions)
+        { x: objectX + baseOffset * 1.8 * messierMultiplier, y: objectY + baseOffset * 0.9 * messierMultiplier, priority: 2 },
+        { x: objectX + baseOffset * 0.9 * messierMultiplier, y: objectY + baseOffset * 1.8 * messierMultiplier, priority: 2 },
+        { x: objectX - baseOffset * 0.9 * messierMultiplier, y: objectY + baseOffset * 1.8 * messierMultiplier, priority: 2 },
+        { x: objectX - baseOffset * 1.8 * messierMultiplier, y: objectY + baseOffset * 0.9 * messierMultiplier, priority: 2 },
+        { x: objectX - baseOffset * 1.8 * messierMultiplier, y: objectY - baseOffset * 0.9 * messierMultiplier, priority: 2 },
+        { x: objectX - baseOffset * 0.9 * messierMultiplier, y: objectY - baseOffset * 1.8 * messierMultiplier, priority: 2 },
+        { x: objectX + baseOffset * 0.9 * messierMultiplier, y: objectY - baseOffset * 1.8 * messierMultiplier, priority: 2 },
+        { x: objectX + baseOffset * 1.8 * messierMultiplier, y: objectY - baseOffset * 0.9 * messierMultiplier, priority: 2 },
+        // Tertiary positions (farther out cardinal)
+        { x: objectX + baseOffset * 2.2 * messierMultiplier, y: objectY, priority: 3 },
+        { x: objectX - baseOffset * 2.2 * messierMultiplier, y: objectY, priority: 3 },
+        { x: objectX, y: objectY + baseOffset * 2.2 * messierMultiplier, priority: 3 },
+        { x: objectX, y: objectY - baseOffset * 2.2 * messierMultiplier, priority: 3 },
       ];
     } else if (objectType === 'constellation') {
       // LOWEST PRIORITY: Constellations can be placed much farther away
@@ -420,40 +526,85 @@ document.addEventListener('DOMContentLoaded', async () => {
       const textX = pos.x;
       const textY = pos.y;
       
-      // Check for collision
-      if (!checkLabelCollision(textX, textY, textWidth, textHeight, objectType)) {
+      // Check for collision with enhanced displacement
+      const collisionResult = checkLabelCollision(textX, textY, textWidth, textHeight, objectType, 2, objectMagnitude);
+      
+      if (!collisionResult.collision) {
         // No collision - use this position
-        registerLabelPlacement(textX, textY, textWidth, textHeight, objectType);
-        return { textX, textY, success: true };
+        const registered = registerLabelPlacement(textX, textY, textWidth, textHeight, objectType, objectMagnitude);
+        return { textX, textY, success: registered };
+      } else if (collisionResult.canDisplace && collisionResult.displacementTargets) {
+        // Can displace lower priority labels - remove them and use this position
+        for (let targetIndex of collisionResult.displacementTargets.reverse()) {
+          placedLabels.splice(targetIndex, 1);
+        }
+        const registered = registerLabelPlacement(textX, textY, textWidth, textHeight, objectType, objectMagnitude);
+        return { textX, textY, success: registered, displaced: collisionResult.displacementTargets.length };
       }
     }
     
-    // If all positions collide, use a smarter fallback that scales with text size
-    // Still don't register to avoid affecting other collision calculations
-    const fallbackOffset = Math.max(textHeight, baseOffset * 1.5);
-    let textX, textY;
+    // Enhanced fallback with spiral positioning to find clear space
+    const fallbackOffset = Math.max(textHeight, baseOffset * 2);
+    let bestX = objectX, bestY = objectY + fallbackOffset * 2;
+    let minCollisions = Infinity;
     
-    if (objectType === 'constellation') {
-      // For constellations, try a far-below position
-      textX = objectX;
-      textY = objectY + fallbackOffset * 3;
-    } else if (objectType === 'messier') {
-      // For messier objects, offset to the right
-      textX = objectX + fallbackOffset * 1.5;
-      textY = objectY + fallbackOffset;
-    } else {
-      // For stars, offset to the left
-      textX = objectX - fallbackOffset * 1.5;
-      textY = objectY + fallbackOffset;
+    // Try spiral pattern outward from object (limit iterations to prevent lockup)
+    let iterationCount = 0;
+    const maxIterations = 60; // Prevent infinite loops
+    
+    for (let radius = fallbackOffset * 2; radius <= fallbackOffset * 6 && iterationCount < maxIterations; radius += fallbackOffset * 0.8) {
+      for (let angle = 0; angle < 360 && iterationCount < maxIterations; angle += 30) { // 12 positions per ring
+        iterationCount++;
+        const radians = (angle * Math.PI) / 180;
+        const testX = objectX + Math.cos(radians) * radius;
+        const testY = objectY + Math.sin(radians) * radius;
+        
+        // Count how many existing labels this would overlap
+        let collisionCount = 0;
+        for (let existing of placedLabels) {
+          const testBox = {
+            left: testX - textWidth/2,
+            right: testX + textWidth/2,
+            top: testY - textHeight/2,
+            bottom: testY + textHeight/2
+          };
+          
+          if (testBox.left < existing.right && testBox.right > existing.left && 
+              testBox.top < existing.bottom && testBox.bottom > existing.top) {
+            collisionCount++;
+          }
+        }
+        
+        if (collisionCount < minCollisions) {
+          minCollisions = collisionCount;
+          bestX = testX;
+          bestY = testY;
+          
+          // If we found a completely clear spot, use it immediately
+          if (collisionCount === 0) {
+            const registered = registerLabelPlacement(bestX, bestY, textWidth, textHeight, objectType, objectMagnitude);
+            return { textX: bestX, textY: bestY, success: registered, fallback: true };
+          }
+        }
+      }
+      
+      // If we found a spot with minimal collisions, stop searching
+      if (minCollisions <= 1) break;
     }
     
-    return { textX, textY, success: false };
+    // Use best position found, but don't register if it still has collisions
+    if (minCollisions === 0) {
+      const registered = registerLabelPlacement(bestX, bestY, textWidth, textHeight, objectType, objectMagnitude);
+      return { textX: bestX, textY: bestY, success: registered, fallback: true };
+    }
+    
+    return { textX: bestX, textY: bestY, success: false, fallback: true };
   }
 
   // UI Toggle Elements
   const toggleCalPoints = document.getElementById('toggleCalPoints');
 
-  // Convert degrees → "DDD:MM:SS"
+  // Convert degrees → "DD:MM:SS"
   function degToDMS(deg) {
     const isNegative = deg < 0;
     const absDeg = Math.abs(deg);
@@ -461,7 +612,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const m = Math.floor((absDeg - d) * 60);
     const s = Math.round(((absDeg - d) * 60 - m) * 60);
     const sign = isNegative ? '-' : '';
-    return `${sign}${String(d).padStart(3, '0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    return `${sign}${String(d).padStart(2, '0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
   }
   
   // Convert RA degrees → "HH:MM:SS" (RA is in hours, so divide by 15)
@@ -475,13 +626,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // Convert decimal HMS (like 9.764188) to HH:MM:SS format  
   function decimalHMStoHMS(decimalHMS) {
-    console.log('[SkyView] DEBUG - decimalHMStoHMS input:', decimalHMS);
+    debugLog('[SkyView] DEBUG - decimalHMStoHMS input:', decimalHMS);
     const h = Math.floor(decimalHMS);
     const minutesDecimal = (decimalHMS - h) * 60;
     const m = Math.floor(minutesDecimal);
     const s = Math.round((minutesDecimal - m) * 60);
     const result = `${String(h).padStart(2, '0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-    console.log('[SkyView] DEBUG - decimalHMStoHMS output:', result, 'from h:', h, 'm:', m, 's:', s);
+    debugLog('[SkyView] DEBUG - decimalHMStoHMS output:', result, 'from h:', h, 'm:', m, 's:', s);
     return result;
   }
   // Convert “DDD:MM:SS” → degrees
@@ -514,7 +665,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const decInput      = document.getElementById('gotoDec');
   
   // Mobile debugging - check if input elements exist
-  console.log('[SkyView] MOBILE DEBUG - Input elements found:', {
+  debugLog('[SkyView] MOBILE DEBUG - Input elements found:', {
     azInput: !!azInput,
     altInput: !!altInput,
     raInput: !!raInput,
@@ -559,18 +710,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   const redrawBtn = document.getElementById('redrawBtn');
   if (redrawBtn) {
     redrawBtn.onclick = function() {
-      console.log('[SkyView] MOBILE DEBUG - Redraw button clicked');
-      canvasScale = 1;
-      translateX = 0;
-      translateY = 0;
+      debugLog('[SkyView] MOBILE DEBUG - Redraw button clicked');
+      
+      // Reset to initial view (default zoom and center)
+      setInitialCanvasTransform();
       
       // Force fresh mount position update on mobile
-      console.log('[SkyView] MOBILE DEBUG - Forcing mount position update');
+      debugLog('[SkyView] MOBILE DEBUG - Forcing mount position update');
       fetchMount().then(() => {
-        console.log('[SkyView] MOBILE DEBUG - Mount position updated, redrawing');
+        debugLog('[SkyView] MOBILE DEBUG - Mount position updated, redrawing');
         draw();
       }).catch(err => {
-        console.log('[SkyView] MOBILE DEBUG - Mount position update failed, drawing anyway:', err);
+        debugLog('[SkyView] MOBILE DEBUG - Mount position update failed, drawing anyway:', err);
         draw();
       });
     };
@@ -652,8 +803,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const points = [];
     const obliquity = 23.44 * Math.PI / 180; // Obliquity of ecliptic in radians
     
-    // Generate points every 10 degrees along the ecliptic
-    for (let eclipticLon = 0; eclipticLon < 360; eclipticLon += 10) {
+    // Start at ecliptic longitude 270° (winter solstice region) 
+    // This point is typically below horizon, so seam issues won't be visible
+    for (let i = 0; i < 72; i++) {
+      const eclipticLon = (270 + i * 5) % 360; // Start at 270°, step by 5°
       const lon = eclipticLon * Math.PI / 180; // Convert to radians
       
       // Convert ecliptic coordinates to equatorial coordinates
@@ -707,43 +860,56 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!isNaN(alt) && !isNaN(az)) {
         mountPos.alt = alt;
         mountPos.az = az;
-        console.log('[SkyView] Mount position updated:', mountPos, 'from raw data:', {alt: data.alt, az: data.az});
+        debugLog('[SkyView] Mount position updated:', mountPos, 'from raw data:', {alt: data.alt, az: data.az});
       } else {
         mountPos.alt = null;
         mountPos.az = null;
-        console.warn('[SkyView] Invalid mount position data:', data, 'parsed as:', {alt, az});
+        debugLog('[SkyView] Invalid mount position data:', data, 'parsed as:', {alt, az});
       }
     } catch (e) {
       mountPos.alt = null;
       mountPos.az = null;
-      console.error('[SkyView] Error fetching mount position:', e);
+      debugLog('[SkyView] Error fetching mount position:', e.message); // Only log message in production to avoid error object references
     }
     draw();
   }
 
   // Fetch mount position on load and every 2 seconds  
   fetchMount();
-  setInterval(fetchMount, 2000);  // --- Solar system position polling ---
+  let mountPollingInterval = setInterval(fetchMount, 2000);  // --- Solar system position polling ---
+  
+  // Cleanup on page unload
+  window.addEventListener('beforeunload', function() {
+    if (mountPollingInterval) {
+      clearInterval(mountPollingInterval);
+      mountPollingInterval = null;
+    }
+    if (timeOffsetInterval) {
+      clearInterval(timeOffsetInterval);
+      timeOffsetInterval = null;
+    }
+  });
+  
   async function fetchSolarSystem() {
     try {
       const resp = await fetch('/solar_system');
       if (!resp.ok) throw new Error('Failed to fetch solar system positions');
       const data = await resp.json();
       if (data.error) {
-        console.error('[SkyView] Solar system fetch error:', data.error);
+        debugLog('[SkyView] Solar system fetch error:', data.error);
         solarSystemData = {};
         return;
       }
       solarSystemData = data;
-      console.log('[SkyView] Solar system positions updated:', Object.keys(solarSystemData).length, 'objects');
-      console.log('[SkyView] Solar system data details:', data);
+      debugLog('[SkyView] Solar system positions updated:', Object.keys(solarSystemData).length, 'objects');
+      debugLog('[SkyView] Solar system data details:', data);
       // Log a few sample coordinates
-      if (data.sun) console.log('[SkyView] Sun coordinates:', data.sun);
-      if (data.moon) console.log('[SkyView] Moon coordinates:', data.moon);
-      if (data.mars) console.log('[SkyView] Mars coordinates:', data.mars);
+      if (data.sun) debugLog('[SkyView] Sun coordinates:', data.sun);
+      if (data.moon) debugLog('[SkyView] Moon coordinates:', data.moon);
+      if (data.mars) debugLog('[SkyView] Mars coordinates:', data.mars);
     } catch (e) {
       solarSystemData = {};
-      console.error('[SkyView] Error fetching solar system positions:', e);
+      debugLog('[SkyView] Error fetching solar system positions:', e.message);
     }
     draw();
   }
@@ -839,7 +1005,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           
         }
       })
-      .catch(e => console.warn('[SkyView] Failed to sync server time:', e));
+      .catch(e => debugLog('[SkyView] Failed to sync server time:', e.message)); // Only log message to avoid error object retention
   }
   
   function getServerTime() {
@@ -856,7 +1022,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // Initialize server time sync
   updateServerTimeOffset();
-  setInterval(updateServerTimeOffset, 60000); // Update every minute
+  let timeOffsetInterval = setInterval(updateServerTimeOffset, 60000); // Update every minute
 
   function toJulian(d){ return d.valueOf()/86400000 + 2440587.5; }
   function computeLST(d, lonDeg){
@@ -891,8 +1057,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Convert Alt/Az to RA/Dec (inverse of eqToAltAz)
   function altAzToEq(altDeg, azDeg, latDeg, lonDeg, date) {
     const lst = computeLST(date, lonDeg);
-    console.log('[SkyView] DEBUG - altAzToEq inputs:', { altDeg, azDeg, latDeg, lonDeg, date });
-    console.log('[SkyView] DEBUG - LST calculated:', lst, 'hours');
+    debugLog('[SkyView] DEBUG - altAzToEq inputs:', { altDeg, azDeg, latDeg, lonDeg, date });
+    debugLog('[SkyView] DEBUG - LST calculated:', lst, 'hours');
     
     const altR = altDeg * Math.PI / 180;
     const azR = azDeg * Math.PI / 180;
@@ -909,13 +1075,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     );
     
     const ha = haR * 180 / Math.PI;
-    console.log('[SkyView] DEBUG - Hour angle calculated:', ha, 'degrees, or', ha/15, 'hours');
+    debugLog('[SkyView] DEBUG - Hour angle calculated:', ha, 'degrees, or', ha/15, 'hours');
     
     let raH = lst - ha / 15;
     if (raH < 0) raH += 24;
     if (raH >= 24) raH -= 24;
     
-    console.log('[SkyView] DEBUG - Final RA calculation: lst(', lst, ') - ha/15(', ha/15, ') = raH(', raH, ')');
+    debugLog('[SkyView] DEBUG - Final RA calculation: lst(', lst, ') - ha/15(', ha/15, ') = raH(', raH, ')');
     
     return { 
       ra: raH * 15, // Convert back to degrees
@@ -944,6 +1110,30 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.addEventListener('resize', handleResize);
   if(window.visualViewport)
     window.visualViewport.addEventListener('resize', handleResize);
+  
+  // Store references for cleanup
+  window.skyViewEventListeners = {
+    resize: handleResize,
+    visualViewportResize: window.visualViewport ? handleResize : null
+  };
+  
+  // Add cleanup for resize events too
+  window.addEventListener('beforeunload', function() {
+    if (mountPollingInterval) {
+      clearInterval(mountPollingInterval);
+      mountPollingInterval = null;
+    }
+    if (timeOffsetInterval) {
+      clearInterval(timeOffsetInterval);
+      timeOffsetInterval = null;
+    }
+    // Clean up resize event listeners
+    window.removeEventListener('resize', window.skyViewEventListeners.resize);
+    if (window.visualViewport && window.skyViewEventListeners.visualViewportResize) {
+      window.visualViewport.removeEventListener('resize', window.skyViewEventListeners.visualViewportResize);
+    }
+  });
+  
   handleResize();
 
   // --- Ensure initial pan/zoom is centered and zoomable ---
@@ -1021,8 +1211,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // --- Utility: Draw label with appropriate positioning (no pointer lines) ---
-  function drawLabelWithPointer(text, objectX, objectY, objectType, color, canvasScale) {
-    const pos = getLabelPositionWithCollisionDetection(objectX, objectY, text, objectType, canvasScale);
+  function drawLabelWithPointer(text, objectX, objectY, objectType, color, canvasScale, objectMagnitude = null) {
+    const pos = getLabelPositionWithCollisionDetection(objectX, objectY, text, objectType, canvasScale, objectMagnitude);
     
     // Set text alignment based on position success and object type
     ctx.save();
@@ -1373,7 +1563,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
           }
         }
-        console.log(`[SkyView] Click at screen coordinates: (${upX}, ${upY})`);
+        debugLog(`[SkyView] Click at screen coordinates: (${upX}, ${upY})`);
         addHits(starHits);
         addHits(galaxyHits);
         addHits(openHits);
@@ -1381,12 +1571,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         addHits(nebulaHits);
         addHits(planetaryHits);
         addHits(solarSystemHits);
-        console.log('[SkyView] Click detection - Solar system hits:', solarSystemHits.length, 'total candidates:', candidates.length);
+        debugLog('[SkyView] Click detection - Solar system hits:', solarSystemHits.length, 'total candidates:', candidates.length);
         if (solarSystemHits.length > 0) {
-          console.log('[SkyView] Solar system objects available for click:', solarSystemHits.map(s => `${s.Name} at (${s.screenX},${s.screenY}) r=${s.r}`));
+          debugLog('[SkyView] Solar system objects available for click:', solarSystemHits.map(s => `${s.Name} at (${s.screenX},${s.screenY}) r=${s.r}`));
         }
         if (candidates.length > 0) {
-          console.log('[SkyView] Found candidates:', candidates.map(c => c.Name || c.name || 'unnamed'));
+          debugLog('[SkyView] Found candidates:', candidates.map(c => c.Name || c.name || 'unnamed'));
           
         }
         if (toggleCalPoints && toggleCalPoints.checked && calPointHits.length) {
@@ -1417,7 +1607,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (hitObj) {
           selectedObject = hitObj;
           
-          console.log('[SkyView] Object selected:', hitObj.Name || hitObj.name, 'type:', hitObj.type);
+          debugLog('[SkyView] Object selected:', hitObj.Name || hitObj.name, 'type:', hitObj.type);
           
           showSelectedAttributes(selectedObject);
           if (hitObj.isCalPoint) {
@@ -1481,7 +1671,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               
               
               // Update coordinate textboxes for catalog objects (stars, galaxies, etc.)
-              console.log('[SkyView] Selected object:', hitObj.Name || hitObj.name);
+              debugLog('[SkyView] Selected object:', hitObj.Name || hitObj.name);
               
               // All catalog objects have RtAsc/Declin - use them directly
               if (hitObj.RtAsc !== undefined && hitObj.Declin !== undefined) {
@@ -1512,17 +1702,10 @@ document.addEventListener('DOMContentLoaded', async () => {
               altInput.value = degToDMS(coords.alt);
               azInput.value = degToDMS(correctedAz); // Use corrected azimuth
               
-              // MOBILE DEBUG - Use page title to show Alt/Az success for comparison
-              const altValue = degToDMS(coords.alt);
-              const azValue = degToDMS(correctedAz);
-              const originalTitle = document.title;
-              document.title = `Alt/Az OK: ${altInput.value === altValue && azInput.value === azValue} | ${originalTitle}`;
-              setTimeout(() => {
-                document.title = originalTitle;
-              }, 5000);
+              // Mobile debugging removed - title should always stay as "SiPi Telescope Control"
               
-              console.log('[SkyView] Using catalog RtAsc/Declin - RA:', raInput.value, 'Dec:', decInput.value);
-              console.log('[SkyView] Calculated Alt/Az - Alt:', altInput.value, 'Az:', azInput.value);
+              debugLog('[SkyView] Using catalog RtAsc/Declin - RA:', raInput.value, 'Dec:', decInput.value);
+              debugLog('[SkyView] Calculated Alt/Az - Alt:', altInput.value, 'Az:', azInput.value);
               
             } else if (hitObj.ra !== undefined && hitObj.dec !== undefined) {
               // Fallback for objects with ra/dec properties
@@ -1564,7 +1747,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               for (let prop of raPossible) {
                 if (hitObj[prop] !== undefined) {
                   foundRA = hitObj[prop];
-                  console.log('[MOBILE CRITICAL] Found RA as:', prop, '=', foundRA);
+                  debugLog('[MOBILE CRITICAL] Found RA as:', prop, '=', foundRA);
                   break;
                 }
               }
@@ -1572,54 +1755,54 @@ document.addEventListener('DOMContentLoaded', async () => {
               for (let prop of decPossible) {
                 if (hitObj[prop] !== undefined) {
                   foundDec = hitObj[prop];
-                  console.log('[MOBILE CRITICAL] Found Dec as:', prop, '=', foundDec);
+                  debugLog('[MOBILE CRITICAL] Found Dec as:', prop, '=', foundDec);
                   break;
                 }
               }
               
               // If we found coordinates, assign them
               if (foundRA !== null && foundDec !== null) {
-                console.log('[MOBILE CRITICAL] Attempting universal coordinate assignment');
+                debugLog('[MOBILE CRITICAL] Attempting universal coordinate assignment');
                 
                 // Assume foundRA is in decimal hours, foundDec in decimal degrees
                 const raValue = decimalHMStoHMS(foundRA);
                 const decValue = degToDMS(foundDec);
-                console.log('[MOBILE CRITICAL] degToDMS returned:', decValue);
+                debugLog('[MOBILE CRITICAL] degToDMS returned:', decValue);
                 
-                console.log('[MOBILE CRITICAL] About to assign values to inputs');
-                console.log('[MOBILE CRITICAL] workingRAInput exists:', !!workingRAInput, 'workingDecInput exists:', !!workingDecInput);
+                debugLog('[MOBILE CRITICAL] About to assign values to inputs');
+                debugLog('[MOBILE CRITICAL] workingRAInput exists:', !!workingRAInput, 'workingDecInput exists:', !!workingDecInput);
                 
                 // MOBILE DEBUG - Try assignment with detailed logging
                 if (workingRAInput) {
-                  console.log('[MOBILE CRITICAL] RA input before assignment:', workingRAInput.value);
+                  debugLog('[MOBILE CRITICAL] RA input before assignment:', workingRAInput.value);
                   
                   // MOBILE DEBUG - Temporarily change the input placeholder to show debug info
                   const originalRAPlaceholder = workingRAInput.placeholder;
                   
                   // Test different assignment methods for mobile compatibility
-                  console.log('[MOBILE CRITICAL] Testing RA assignment methods...');
+                  debugLog('[MOBILE CRITICAL] Testing RA assignment methods...');
                   
                   // Method 1: Direct assignment
                   workingRAInput.value = raValue;
-                  console.log('[MOBILE CRITICAL] Method 1 - Direct assignment result:', workingRAInput.value);
+                  debugLog('[MOBILE CRITICAL] Method 1 - Direct assignment result:', workingRAInput.value);
                   workingRAInput.placeholder = `DEBUG: Expected ${raValue}, Got ${workingRAInput.value}`;
                   
                   // Method 2: setAttribute
                   workingRAInput.setAttribute('value', raValue);
-                  console.log('[MOBILE CRITICAL] Method 2 - setAttribute result:', workingRAInput.value);
+                  debugLog('[MOBILE CRITICAL] Method 2 - setAttribute result:', workingRAInput.value);
                   
                   // Method 3: Focus and set value
                   workingRAInput.focus();
                   workingRAInput.value = raValue;
                   workingRAInput.blur();
-                  console.log('[MOBILE CRITICAL] Method 3 - Focus/blur result:', workingRAInput.value);
+                  debugLog('[MOBILE CRITICAL] Method 3 - Focus/blur result:', workingRAInput.value);
                   
-                  console.log('[MOBILE CRITICAL] RA assignment success:', workingRAInput.value === raValue);
+                  debugLog('[MOBILE CRITICAL] RA assignment success:', workingRAInput.value === raValue);
                   
                   // Force trigger events that might be needed for mobile
                   workingRAInput.dispatchEvent(new Event('input', { bubbles: true }));
                   workingRAInput.dispatchEvent(new Event('change', { bubbles: true }));
-                  console.log('[MOBILE CRITICAL] RA input events dispatched');
+                  debugLog('[MOBILE CRITICAL] RA input events dispatched');
                   
                   // Restore original placeholder after a delay
                   setTimeout(() => {
@@ -1627,39 +1810,39 @@ document.addEventListener('DOMContentLoaded', async () => {
                   }, 5000);
                   
                 } else {
-                  console.error('[MOBILE CRITICAL] RA INPUT IS NULL/UNDEFINED!');
+                  debugLog('[MOBILE CRITICAL] RA INPUT IS NULL/UNDEFINED!');
                 }
                 
                 if (workingDecInput) {
-                  console.log('[MOBILE CRITICAL] Dec input before assignment:', workingDecInput.value);
+                  debugLog('[MOBILE CRITICAL] Dec input before assignment:', workingDecInput.value);
                   
                   // MOBILE DEBUG - Temporarily change the input placeholder to show debug info
                   const originalDecPlaceholder = workingDecInput.placeholder;
                   
                   // Test different assignment methods for mobile compatibility
-                  console.log('[MOBILE CRITICAL] Testing Dec assignment methods...');
+                  debugLog('[MOBILE CRITICAL] Testing Dec assignment methods...');
                   
                   // Method 1: Direct assignment
                   workingDecInput.value = decValue;
-                  console.log('[MOBILE CRITICAL] Method 1 - Direct assignment result:', workingDecInput.value);
+                  debugLog('[MOBILE CRITICAL] Method 1 - Direct assignment result:', workingDecInput.value);
                   workingDecInput.placeholder = `DEBUG: Expected ${decValue}, Got ${workingDecInput.value}`;
                   
                   // Method 2: setAttribute
                   workingDecInput.setAttribute('value', decValue);
-                  console.log('[MOBILE CRITICAL] Method 2 - setAttribute result:', workingDecInput.value);
+                  debugLog('[MOBILE CRITICAL] Method 2 - setAttribute result:', workingDecInput.value);
                   
                   // Method 3: Focus and set value
                   workingDecInput.focus();
                   workingDecInput.value = decValue;
                   workingDecInput.blur();
-                  console.log('[MOBILE CRITICAL] Method 3 - Focus/blur result:', workingDecInput.value);
+                  debugLog('[MOBILE CRITICAL] Method 3 - Focus/blur result:', workingDecInput.value);
                   
-                  console.log('[MOBILE CRITICAL] Dec assignment success:', workingDecInput.value === decValue);
+                  debugLog('[MOBILE CRITICAL] Dec assignment success:', workingDecInput.value === decValue);
                   
                   // Force trigger events that might be needed for mobile
                   workingDecInput.dispatchEvent(new Event('input', { bubbles: true }));
                   workingDecInput.dispatchEvent(new Event('change', { bubbles: true }));
-                  console.log('[MOBILE CRITICAL] Dec input events dispatched');
+                  debugLog('[MOBILE CRITICAL] Dec input events dispatched');
                   
                   // Restore original placeholder after a delay
                   setTimeout(() => {
@@ -1667,21 +1850,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                   }, 5000);
                   
                 } else {
-                  console.error('[MOBILE CRITICAL] DEC INPUT IS NULL/UNDEFINED!');
+                  debugLog('[MOBILE CRITICAL] DEC INPUT IS NULL/UNDEFINED!');
                 }
                 
-                console.log('[MOBILE CRITICAL] Universal RA value:', raValue, 'set to input:', raInput ? raInput.value : 'NO INPUT');
-                console.log('[MOBILE CRITICAL] Universal Dec value:', decValue, 'set to input:', decInput ? decInput.value : 'NO INPUT');
+                debugLog('[MOBILE CRITICAL] Universal RA value:', raValue, 'set to input:', raInput ? raInput.value : 'NO INPUT');
+                debugLog('[MOBILE CRITICAL] Universal Dec value:', decValue, 'set to input:', decInput ? decInput.value : 'NO INPUT');
               } else {
-                console.log('[MOBILE CRITICAL] Warning: Object has no RA/Dec coordinates');
+                debugLog('[MOBILE CRITICAL] Warning: Object has no RA/Dec coordinates');
               }
             }
             popup.style.display = 'none';
             
             } catch (error) {
-              console.error('[MOBILE CRITICAL] ERROR in coordinate assignment:', error);
-              console.error('[MOBILE CRITICAL] Error stack:', error.stack);
-              console.log('[MOBILE CRITICAL] This error may explain why coordinates aren\'t working on mobile');
+              debugLog('[MOBILE CRITICAL] ERROR in coordinate assignment:', error.message);
+              debugLog('[MOBILE CRITICAL] Error stack:', error.stack);
+              debugLog('[MOBILE CRITICAL] This error may explain why coordinates aren\'t working on mobile');
             }
           }
           draw();
@@ -1709,11 +1892,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     if(ids.length < 2) initialDist = 0;
     
-    console.log('[MOBILE CRITICAL] Pointerup handler completed successfully');
+    debugLog('[MOBILE CRITICAL] Pointerup handler completed successfully');
     } catch (error) {
-      console.error('[MOBILE CRITICAL] TOP-LEVEL ERROR in pointerup handler:', error);
-      console.error('[MOBILE CRITICAL] Top-level error stack:', error.stack);
-      console.error('[MOBILE CRITICAL] Error occurred during pointerup processing');
+      debugLog('[MOBILE CRITICAL] TOP-LEVEL ERROR in pointerup handler:', error.message);
+      debugLog('[MOBILE CRITICAL] Top-level error stack:', error.stack);
+      debugLog('[MOBILE CRITICAL] Error occurred during pointerup processing');
     }
   });
 
@@ -1866,7 +2049,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Draw NSEW labels outside the projection (called before clipping)
   function drawNSEWLabels(r) {
-    ctx.fillStyle = getNightModeColor('white', 'text');
+    ctx.fillStyle = getNightModeColor('red', 'compass');
     ctx.font = `${Math.max(14,r*0.05)}px sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     
@@ -1937,7 +2120,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function draw(){
     if (isDrawing) {
-      console.log('[SkyView] Draw already in progress, skipping...');
+      debugLog('[SkyView] Draw already in progress, skipping...');
       return;
     }
     
@@ -1947,9 +2130,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     isDrawing = true;
     try {
       // Debug: log mountPos before drawing reticle
-      console.log('[SkyView] draw() called, mountPos:', mountPos);
-      console.log('[SkyView] draw() called');
-      console.log('[SkyView] Canvas size:', canvas.width, 'x', canvas.height, 'CSS:', canvas.style.width, 'x', canvas.style.height, 'dpr:', dpr, 'canvasScale:', canvasScale, 'translateX:', translateX, 'translateY:', translateY, 'currentVpScale:', currentVpScale);
+      debugLog('[SkyView] draw() called, mountPos:', mountPos);
+      debugLog('[SkyView] draw() called');
+      debugLog('[SkyView] Canvas size:', canvas.width, 'x', canvas.height, 'CSS:', canvas.style.width, 'x', canvas.style.height, 'dpr:', dpr, 'canvasScale:', canvasScale, 'translateX:', translateX, 'translateY:', translateY, 'currentVpScale:', currentVpScale);
       // clear canvas with proper coordinate system
       ctx.save();
       ctx.resetTransform(); // Ensure we clear in untransformed space
@@ -1983,18 +2166,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // --- constellations (lines only) ---
     if(toggleConst.checked){
-      console.log('[SkyView] Drawing constellations:', constLines.length);
+      debugLog('[SkyView] Drawing constellations:', constLines.length);
       if (constLines.length > 0) {
-        let sample = constLines[0].slice(0, 3).map(pt => project(pt[0]/15, pt[1], effR));
-        console.log('[SkyView] Sample projected constellation points:', sample);
+        let sample = constLines[0].slice(0, 2).map(pt => project(pt[0], pt[1], effR));
+        debugLog('[SkyView] Sample projected constellation points:', sample);
       }
       ctx.save();
       ctx.lineWidth = 1 / canvasScale; // narrower lines
       ctx.strokeStyle = getNightModeColor('#a259e6', 'constellation'); // purple
       constLines.forEach(line=>{
-        let prev=project(line[0][0]/15,line[0][1],effR);
+        let prev=project(line[0][0], line[0][1], effR); // RA already in hours, no division needed
         for(let i=1;i<line.length;i++){
-          const cur=project(line[i][0]/15,line[i][1],effR);
+          const cur=project(line[i][0], line[i][1], effR); // RA already in hours, no division needed
           if(Math.abs(prev.az-cur.az)<180&&(prev.alt>0||cur.alt>0)){
             ctx.beginPath();
             ctx.moveTo(prev.x,prev.y);
@@ -2010,35 +2193,53 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- ecliptic line ---
     if(toggleEcliptic && toggleEcliptic.checked && eclipticLine.length > 0){
-      console.log('[SkyView] Drawing ecliptic line:', eclipticLine.length, 'points');
+      debugLog('[SkyView] Drawing ecliptic line:', eclipticLine.length, 'points');
       ctx.save();
       ctx.lineWidth = 1 / canvasScale; // Thinner line, same as constellation lines
       ctx.strokeStyle = getNightModeColor('#FFD700', 'ecliptic'); // Yellow/gold color
       ctx.setLineDash([5, 5]); // Dashed line to distinguish from constellations
       
       // Draw the ecliptic as a connected line
-      let prev = project(eclipticLine[0][0]/15, eclipticLine[0][1], effR);
-      ctx.beginPath();
-      ctx.moveTo(prev.x, prev.y);
+      // Split into above-horizon and below-horizon segments to avoid drawing lines across the view
+      let currentSegment = [];
       
-      for(let i = 1; i < eclipticLine.length; i++){
-        const cur = project(eclipticLine[i][0]/15, eclipticLine[i][1], effR);
-        // Only draw if both points are above horizon and not wrapping around
-        if(Math.abs(prev.az - cur.az) < 180 && (prev.alt > 0 || cur.alt > 0)){
-          ctx.lineTo(cur.x, cur.y);
+      for(let i = 0; i < eclipticLine.length; i++){
+        const point = project(eclipticLine[i][0]/15, eclipticLine[i][1], effR);
+        
+        if(point.alt > -5) { // Include points slightly below horizon for smoother transitions
+          currentSegment.push(point);
         } else {
-          // Start a new path segment if there's a wrap-around or horizon crossing
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.moveTo(cur.x, cur.y);
+          // Draw current segment if it has enough points
+          if(currentSegment.length > 1) {
+            ctx.beginPath();
+            ctx.moveTo(currentSegment[0].x, currentSegment[0].y);
+            for(let j = 1; j < currentSegment.length; j++) {
+              ctx.lineTo(currentSegment[j].x, currentSegment[j].y);
+            }
+            ctx.stroke();
+          }
+          currentSegment = [];
         }
-        prev = cur;
       }
       
-      // Close the ecliptic circle by connecting back to the first point
-      const first = project(eclipticLine[0][0]/15, eclipticLine[0][1], effR);
-      if(Math.abs(prev.az - first.az) < 180 && (prev.alt > 0 || first.alt > 0)){
-        ctx.lineTo(first.x, first.y);
+      // Draw final segment
+      if(currentSegment.length > 1) {
+        ctx.beginPath();
+        ctx.moveTo(currentSegment[0].x, currentSegment[0].y);
+        for(let j = 1; j < currentSegment.length; j++) {
+          ctx.lineTo(currentSegment[j].x, currentSegment[j].y);
+        }
+        ctx.stroke();
+      }
+      
+      // Try to close the circle by connecting the first and last above-horizon points
+      const firstPoint = project(eclipticLine[0][0]/15, eclipticLine[0][1], effR);
+      const lastPoint = project(eclipticLine[eclipticLine.length-1][0]/15, eclipticLine[eclipticLine.length-1][1], effR);
+      if(firstPoint.alt > -5 && lastPoint.alt > -5) {
+        ctx.beginPath();
+        ctx.moveTo(lastPoint.x, lastPoint.y);
+        ctx.lineTo(firstPoint.x, firstPoint.y);
+        ctx.stroke();
       }
       
       ctx.stroke();
@@ -2047,11 +2248,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- stars (visual points only) ---
     starHits=[]; if(toggleStars.checked){
-      console.log('[SkyView] Drawing stars:', stars.length);
+      debugLog('[SkyView] Drawing stars:', stars.length);
       if (stars.length > 0) {
         let s = stars[0];
         let p = project(s.RtAsc, s.Declin, effR);
-        console.log('[SkyView] Sample projected star:', p, 'Mag:', s.Mag, 'RA:', s.RtAsc, 'Dec:', s.Declin);
+        debugLog('[SkyView] Sample projected star:', p, 'Mag:', s.Mag, 'RA:', s.RtAsc, 'Dec:', s.Declin);
       }
       
       // Adaptive magnitude limit based on device performance (preserves original zoom progression)
@@ -2064,7 +2265,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const userStarMagLimit = sliderValue * 0.5;
       const magLimit = Math.min(deviceMagLimit, userStarMagLimit);
       
-      console.log(`[PERF] Star rendering - deviceLimit: ${deviceMagLimit}, sliderPos: ${sliderValue}, userLimit: ${userStarMagLimit}, final: ${magLimit}, canvasScale: ${canvasScale}`);
+      debugLog(`[PERF] Star rendering - deviceLimit: ${deviceMagLimit}, sliderPos: ${sliderValue}, userLimit: ${userStarMagLimit}, final: ${magLimit}, canvasScale: ${canvasScale}`);
       
       // Filter stars using magnitude and viewport culling only (no count limiting)
       let drawnStars = 0;
@@ -2077,7 +2278,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         // Debug: log first few star coordinates for comparison
         if (drawnStars < 3) {
-          console.log(`[SkyView] Star ${drawnStars}: RA=${s.RtAsc} Dec=${s.Declin} Mag=${s.Mag}`);
+          debugLog(`[SkyView] Star ${drawnStars}: RA=${s.RtAsc} Dec=${s.Declin} Mag=${s.Mag}`);
         }
         
         const p=project(s.RtAsc,s.Declin,effR);
@@ -2149,7 +2350,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
       ctx.restore();
       
-      console.log(`[PERF] Drew ${drawnStars}/${stars.length} stars (magnitude filtered, no count limits)`);
+      debugLog(`[PERF] Drew ${drawnStars}/${stars.length} stars (magnitude filtered, no count limits)`);
     }
     // Star names will be drawn in PHASE 2 with priority system
 
@@ -2158,11 +2359,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- galaxies ---
     galaxyHits=[]; if(toggleGal.checked){
-      console.log('[SkyView] Drawing galaxies:', galaxies.length);
+      debugLog('[SkyView] Drawing galaxies:', galaxies.length);
       if (galaxies.length > 0) {
         let g = galaxies[0];
         let p = project(g.RtAsc, g.Declin, effR);
-        console.log('[SkyView] Sample projected galaxy:', p, 'Mag:', g.mag, 'RA:', g.RtAsc, 'Dec:', g.Declin);
+        debugLog('[SkyView] Sample projected galaxy:', p, 'Mag:', g.mag, 'RA:', g.RtAsc, 'Dec:', g.Declin);
       }
       
       // Adaptive magnitude limit based on device performance (preserves zoom progression)
@@ -2202,7 +2403,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Final limit is the most restrictive of: device limit, user slider, and zoom-based limit
       const galLimit = Math.min(deviceGalLimit, userGalMagLimit, zoomBasedMagLimit);
       
-      console.log(`[PERF] Galaxy rendering - deviceLimit: ${deviceGalLimit}, sliderPos: ${galSliderValue}, userLimit: ${userGalMagLimit}, zoomLimit: ${zoomBasedMagLimit}, final: ${galLimit}, canvasScale: ${canvasScale}`);
+      debugLog(`[PERF] Galaxy rendering - deviceLimit: ${deviceGalLimit}, sliderPos: ${galSliderValue}, userLimit: ${userGalMagLimit}, zoomLimit: ${zoomBasedMagLimit}, final: ${galLimit}, canvasScale: ${canvasScale}`);
       
       let drawnGalaxies = 0;
       
@@ -2263,23 +2464,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
       });
       
-      console.log(`[PERF] Drew ${drawnGalaxies}/${galaxies.length} galaxies (magnitude filtered, no count limits)`);
+      debugLog(`[PERF] Drew ${drawnGalaxies}/${galaxies.length} galaxies (magnitude filtered, no count limits)`);
     }
 
     // --- open clusters ---
     openHits=[]; if(toggleOpen.checked){
-      console.log('[SkyView] Drawing open clusters:', openClusters.length);
+      debugLog('[SkyView] Drawing open clusters:', openClusters.length);
       if (openClusters.length > 0) {
         let o = openClusters[0];
         let p = project(o.RtAsc, o.Declin, effR);
-        console.log('[SkyView] Sample projected open cluster:', p, 'Mag:', o.Mag, 'RA:', o.RtAsc, 'Dec:', o.Declin);
+        debugLog('[SkyView] Sample projected open cluster:', p, 'Mag:', o.Mag, 'RA:', o.RtAsc, 'Dec:', o.Declin);
       }
       
       // Adaptive magnitude limit based on device performance (preserves zoom progression)
       const magLimit = deviceProfiler.getMagnitudeLimit('clusters', canvasScale);
       let drawnClusters = 0;
       
-      console.log(`[PERF] Drawing open clusters with magLimit: ${magLimit}`);
+      debugLog(`[PERF] Drawing open clusters with magLimit: ${magLimit}`);
       
       ctx.strokeStyle = getNightModeColor('rgb(100,100,255)', 'cluster'); // fully opaque blue
       openClusters.forEach(o=>{
@@ -2331,16 +2532,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
       });
       
-      console.log(`[PERF] Drew ${drawnClusters}/${openClusters.length} open clusters (magnitude filtered, no count limits)`);
+      debugLog(`[PERF] Drew ${drawnClusters}/${openClusters.length} open clusters (magnitude filtered, no count limits)`);
     }
 
     // --- globular clusters ---
     globularHits=[]; if(toggleGlobular.checked){
-      console.log('[SkyView] Drawing globular clusters:', globularClusters.length);
+      debugLog('[SkyView] Drawing globular clusters:', globularClusters.length);
       if (globularClusters.length > 0) {
         let g = globularClusters[0];
         let p = project(g.RtAsc, g.Declin, effR);
-        console.log('[SkyView] Sample projected globular:', p, 'Mag:', g.Mag, 'RA:', g.RtAsc, 'Dec:', g.Declin);
+        debugLog('[SkyView] Sample projected globular:', p, 'Mag:', g.Mag, 'RA:', g.RtAsc, 'Dec:', g.Declin);
       }
       ctx.strokeStyle = getNightModeColor('rgb(0,180,80)', 'cluster'); // fully opaque green
       globularClusters.forEach(g=>{
@@ -2401,11 +2602,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- nebulae ---
     nebulaHits=[]; if(toggleNebula.checked){
-      console.log('[SkyView] Drawing nebulae:', nebulae.length);
+      debugLog('[SkyView] Drawing nebulae:', nebulae.length);
       if (nebulae.length > 0) {
         let n = nebulae[0];
         let p = project(n.RtAsc, n.Declin, effR);
-        console.log('[SkyView] Sample projected nebula:', p, 'Mag:', n.Mag, 'RA:', n.RtAsc, 'Dec:', n.Declin);
+        debugLog('[SkyView] Sample projected nebula:', p, 'Mag:', n.Mag, 'RA:', n.RtAsc, 'Dec:', n.Declin);
       }
       ctx.strokeStyle = getNightModeColor('rgb(255,100,255)', 'nebula'); // fully opaque pink
       nebulae.forEach(n=>{
@@ -2459,11 +2660,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- planetary nebulae ---
     planetaryHits=[]; if(togglePlanetary.checked){
-      console.log('[SkyView] Drawing planetary nebulae:', planetaryNebulae.length);
+      debugLog('[SkyView] Drawing planetary nebulae:', planetaryNebulae.length);
       if (planetaryNebulae.length > 0) {
         let pn = planetaryNebulae[0];
         let p = project(pn.RtAsc, pn.Declin, effR);
-        console.log('[SkyView] Sample projected planetary:', p, 'Mag:', pn.Mag, 'RA:', pn.RtAsc, 'Dec:', pn.Declin);
+        debugLog('[SkyView] Sample projected planetary:', p, 'Mag:', pn.Mag, 'RA:', pn.RtAsc, 'Dec:', pn.Declin);
       }
       ctx.strokeStyle = getNightModeColor('rgb(127,255,0)', 'nebula'); // fully opaque chartreuse
       planetaryNebulae.forEach(pn=>{
@@ -2523,18 +2724,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- solar system objects ---
     solarSystemHits = []; // Clear previous hits
     if (solarSystemData && toggleSolarSystem && toggleSolarSystem.checked) {
-      console.log('[SkyView] Drawing solar system objects, data:', solarSystemData);
+      debugLog('[SkyView] Drawing solar system objects, data:', solarSystemData);
       ['mercury', 'venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'pluto', 'sun', 'moon'].forEach(objName => {
         const obj = solarSystemData[objName];
         if (!obj || obj.ra === null || obj.dec === null) {
           return;
         }
         
-        console.log(`[SkyView] ${objName}: RA=${obj.ra}° Dec=${obj.dec}°`);
+        debugLog(`[SkyView] ${objName}: RA=${obj.ra}° Dec=${obj.dec}°`);
         const p = project(obj.ra, obj.dec, effR);
-        console.log(`[SkyView] ${objName}: Alt=${p.alt}° Az=${p.az}° Screen=(${p.x}, ${p.y})`);
+        debugLog(`[SkyView] ${objName}: Alt=${p.alt}° Az=${p.az}° Screen=(${p.x}, ${p.y})`);
         if (p.alt <= 0) {
-          console.log(`[SkyView] ${objName}: Below horizon, skipping`);
+          debugLog(`[SkyView] ${objName}: Below horizon, skipping`);
           return;
         }
         
@@ -2670,10 +2871,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             screenY: screenY
           };
           solarSystemHits.push(hitObj);
-          console.log(`[SkyView] Added ${objName} to solarSystemHits:`, hitObj);
+          debugLog(`[SkyView] Added ${objName} to solarSystemHits:`, hitObj);
         }
       });
-      console.log(`[SkyView] Solar system drawing complete. Total objects in solarSystemHits: ${solarSystemHits.length}`);
+      debugLog(`[SkyView] Solar system drawing complete. Total objects in solarSystemHits: ${solarSystemHits.length}`);
     }
 
     // --- reticle ---
@@ -2706,7 +2907,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       
       const screenX = x;
       const screenY = y;
-      console.log('[SkyView] Reticle debug:', {
+      debugLog('[SkyView] Reticle debug:', {
         mountPos,
         azForDraw: azForDraw,
         azTransform: 'mountPos.az - 180°',
@@ -2723,8 +2924,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         currentVpScale
       });
       
-      console.log('[SkyView] Reticle debug - selectedObject:', selectedObject);
-      console.log('[SkyView] selectedObject has ra/dec?', selectedObject ? (selectedObject.ra !== undefined && selectedObject.dec !== undefined) : 'no selectedObject');
+      debugLog('[SkyView] Reticle debug - selectedObject:', selectedObject);
+      debugLog('[SkyView] selectedObject has ra/dec?', selectedObject ? (selectedObject.ra !== undefined && selectedObject.dec !== undefined) : 'no selectedObject');
       
       // DEBUGGING: Compare mount coordinates with calculated coordinates for selected object
       if (selectedObject && selectedObject.ra !== undefined && selectedObject.dec !== undefined) {
@@ -2743,37 +2944,73 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         const totalError = Math.sqrt(altDiff*altDiff + azDiffNormalized*azDiffNormalized);
         
-        console.log('COORDS COMPARISON:');
-        console.log('  Mount Raw    - Alt: ' + mountPos.alt.toFixed(3) + '°, Az: ' + mountPos.az.toFixed(3) + '°');
-        console.log('  Mount Corr   - Alt: ' + mountPos.alt.toFixed(3) + '°, Az: ' + mountAzCorrected.toFixed(3) + '° (az-180°)');
-        console.log('  Expected     - Alt: ' + calcCoords.alt.toFixed(3) + '°, Az: ' + calcCoords.az.toFixed(3) + '°');
-        console.log('  Difference   - Alt: ' + altDiff.toFixed(3) + '°, Az: ' + azDiffNormalized.toFixed(3) + '°');
-        console.log('  Object       - RA: ' + selectedObject.ra + 'h, Dec: ' + selectedObject.dec + '°');
+        debugLog('COORDS COMPARISON:');
+        debugLog('  Mount Raw    - Alt: ' + mountPos.alt.toFixed(3) + '°, Az: ' + mountPos.az.toFixed(3) + '°');
+        debugLog('  Mount Corr   - Alt: ' + mountPos.alt.toFixed(3) + '°, Az: ' + mountAzCorrected.toFixed(3) + '° (az-180°)');
+        debugLog('  Expected     - Alt: ' + calcCoords.alt.toFixed(3) + '°, Az: ' + calcCoords.az.toFixed(3) + '°');
+        debugLog('  Difference   - Alt: ' + altDiff.toFixed(3) + '°, Az: ' + azDiffNormalized.toFixed(3) + '°');
+        debugLog('  Object       - RA: ' + selectedObject.ra + 'h, Dec: ' + selectedObject.dec + '°');
         
         if (totalError > 1.0) {
-          console.warn('  ⚠️ Large pointing error: ' + totalError.toFixed(3) + '° total');
+          debugLog('  ⚠️ Large pointing error: ' + totalError.toFixed(3) + '° total');
         } else {
-          console.log('  ✅ Pointing error: ' + totalError.toFixed(3) + '° total');
+          debugLog('  ✅ Pointing error: ' + totalError.toFixed(3) + '° total');
         }
       } else {
-        console.log('COORDS: No valid selectedObject for comparison');
+        debugLog('COORDS: No valid selectedObject for comparison');
       }
       ctx.save();
       ctx.setTransform(1,0,0,1,0,0);
       ctx.strokeStyle = getNightModeColor('red', 'reticle'); 
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 1.5;
       
-      // Crosshairs only
+      // Telrad-style reticle with three concentric circles (equal spacing)
+      // Use fixed equal spacing between rings regardless of angular scale - 60% of previous size
+      const baseRadius = 7;   // Base radius for inner ring (was 12, now 7)
+      const ringSpacing = 5;  // Equal spacing between rings (was 9, now 5)
+      
+      const finalRadius1 = baseRadius;                    // Inner circle
+      const finalRadius2 = baseRadius + ringSpacing;     // Middle circle  
+      const finalRadius3 = baseRadius + (ringSpacing * 2); // Outer circle
+      
+      // Gap size at cardinal directions (in radians)
+      const gapSize = Math.PI / 24; // 7.5 degrees gap at each cardinal direction
+      
+      // Function to draw a circle as 4 arcs with gaps at cardinal directions
+      function drawBrokenCircle(radius) {
+        // Four arcs: NE, SE, SW, NW quadrants with gaps at N, E, S, W
+        const arcs = [
+          { start: gapSize, end: Math.PI/2 - gapSize },           // NE quadrant
+          { start: Math.PI/2 + gapSize, end: Math.PI - gapSize }, // SE quadrant  
+          { start: Math.PI + gapSize, end: 3*Math.PI/2 - gapSize }, // SW quadrant
+          { start: 3*Math.PI/2 + gapSize, end: 2*Math.PI - gapSize } // NW quadrant
+        ];
+        
+        arcs.forEach(arc => {
+          ctx.beginPath();
+          ctx.arc(screenX, screenY, radius, arc.start, arc.end);
+          ctx.stroke();
+        });
+      }
+      
+      // Draw the three rings with equal spacing
+      // Inner ring - complete circle (no gaps)
       ctx.beginPath();
-      ctx.moveTo(screenX - reticleRadius * 1.3, screenY);
-      ctx.lineTo(screenX + reticleRadius * 1.3, screenY);
-      ctx.moveTo(screenX, screenY - reticleRadius * 1.3);
-      ctx.lineTo(screenX, screenY + reticleRadius * 1.3);
+      ctx.arc(screenX, screenY, finalRadius1, 0, 2 * Math.PI);
       ctx.stroke();
+      
+      // Middle and outer rings - broken circles with gaps
+      drawBrokenCircle(finalRadius2); // Middle ring  
+      drawBrokenCircle(finalRadius3); // Outer ring
+      
+      // Center dot for precise targeting
+      ctx.beginPath();
+      ctx.arc(screenX, screenY, 2, 0, 2 * Math.PI);
+      ctx.fill();
       ctx.restore();
-      console.log('[SkyView] Reticle drawn at screen coords:', screenX.toFixed(1), screenY.toFixed(1), 'for mount Alt/Az:', mountPos.alt.toFixed(3), mountPos.az.toFixed(3));
+      debugLog('[SkyView] Reticle drawn at screen coords:', screenX.toFixed(1), screenY.toFixed(1), 'for mount Alt/Az:', mountPos.alt.toFixed(3), mountPos.az.toFixed(3));
     } else {
-      console.log('[SkyView] Reticle not drawn - mount position invalid:', {
+      debugLog('[SkyView] Reticle not drawn - mount position invalid:', {
         alt: mountPos.alt, 
         az: mountPos.az,
         altValid: mountPos.alt !== null && !isNaN(mountPos.alt),
@@ -2851,10 +3088,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     // PRIORITY 1: Star names (highest priority)
     const toggleStarNames = document.getElementById('toggleStarNames');
     if(stars && stars.length > 0 && toggleStarNames && toggleStarNames.checked) {
-      console.log('[SkyView] Drawing named stars with PRIORITY 1, canvasScale:', canvasScale);
+      debugLog('[SkyView] Drawing named stars with PRIORITY 1, canvasScale:', canvasScale);
       ctx.save();
       ctx.fillStyle=getNightModeColor('rgba(255,255,255,0.9)', 'text'); // White for star names
-      ctx.font=`${10/canvasScale}px sans-serif`; // Constant visual size
+      ctx.font=`${14/canvasScale}px sans-serif`; // Constant visual size
       
       // Determine visibility threshold based on zoom level
       let magThreshold;
@@ -2874,23 +3111,23 @@ document.addEventListener('DOMContentLoaded', async () => {
           const p = project(s.RtAsc, s.Declin, effR);
           if (p.alt > 0) { // Only draw if above horizon
             const labelColor = getNightModeColor('rgba(255,255,255,0.7)', 'text');
-            drawLabelWithPointer(s.Name, p.x, p.y, 'star', labelColor, canvasScale);
+            drawLabelWithPointer(s.Name, p.x, p.y, 'star', labelColor, canvasScale, s.Mag);
             namedStarCount++;
           }
         }
       });
       
-      console.log('[SkyView] Drew', namedStarCount, 'PRIORITY 1 star names above horizon');
+      debugLog('[SkyView] Drew', namedStarCount, 'PRIORITY 1 star names above horizon');
       ctx.restore();
     }
     
     // PRIORITY 2: Messier object names (medium priority)
     const toggleMessierNames = document.getElementById('toggleMessierNames');
     if(messierObjects && messierObjects.length > 0 && toggleMessierNames && toggleMessierNames.checked) {
-      console.log('[SkyView] Drawing Messier objects with PRIORITY 2:', messierObjects.length, 'canvasScale:', canvasScale);
+      debugLog('[SkyView] Drawing Messier objects with PRIORITY 2:', messierObjects.length, 'canvasScale:', canvasScale);
       ctx.save();
       ctx.fillStyle = getNightModeColor('rgba(224,195,252,0.8)', 'text'); // Purple for Messier
-      ctx.font=`${12/canvasScale}px sans-serif`; // Constant visual size
+      ctx.font=`${14/canvasScale}px sans-serif`; // Constant visual size
       
       // Determine visibility threshold based on zoom level - made less strict
       let magThreshold;
@@ -2920,7 +3157,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           const p = project(ra, dec, effR);
           if (p.alt > 0) { // Only draw if above horizon
             const labelColor = getNightModeColor('rgba(224,195,252,0.9)', 'text');
-            drawLabelWithPointer(obj.name, p.x, p.y, 'messier', labelColor, canvasScale);
+            drawLabelWithPointer(obj.name, p.x, p.y, 'messier', labelColor, canvasScale, obj.mag);
             visibleCount++;
           } else {
             filteredByHorizon++;
@@ -2930,16 +3167,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       });
       
-      console.log(`[SkyView] Drew ${visibleCount} PRIORITY 2 Messier objects above horizon. Filtered: ${filteredByMag} by magnitude (>${magThreshold}), ${filteredByHorizon} below horizon`);
+      debugLog(`[SkyView] Drew ${visibleCount} PRIORITY 2 Messier objects above horizon. Filtered: ${filteredByMag} by magnitude (>${magThreshold}), ${filteredByHorizon} below horizon`);
       ctx.restore();
     }
     
     // PRIORITY 3: Constellation names (lowest priority)
     if(toggleConstLabels && toggleConstLabels.checked){
-      console.log('[SkyView] Drawing constellation labels with PRIORITY 3:', constFeatures.length);
+      debugLog('[SkyView] Drawing constellation labels with PRIORITY 3:', constFeatures.length);
       ctx.save();
       ctx.fillStyle = getNightModeColor('rgba(224,195,252,0.98)', 'text'); // Same purple as Messier but more opaque
-      ctx.font=`${12/canvasScale}px sans-serif`; // Constant visual size
+      ctx.font=`${14/canvasScale}px sans-serif`; // Constant visual size
       
       constFeatures.forEach(f=>{
         let pts=[]; const g=f.geometry;
@@ -2954,7 +3191,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         drawLabelWithPointer(f.id, avgX, avgY, 'constellation', labelColor, canvasScale);
       });
       
-      console.log('[SkyView] Drew PRIORITY 3 constellation labels');
+      debugLog('[SkyView] Drew PRIORITY 3 constellation labels');
       ctx.restore();
     }
     
@@ -2976,22 +3213,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // === Data loading ===
-  console.log('[SkyView] Starting catalog data loading...');
+  debugLog('[SkyView] Starting catalog data loading...');
   
   // Load stars first
   try {
-    console.log('[SkyView] Fetching stars data...');
+    debugLog('[SkyView] Fetching stars data...');
     const starsResponse = await fetch('/corrected_stars.json');
-    console.log('[SkyView] Stars response status:', starsResponse.status, starsResponse.statusText);
+    debugLog('[SkyView] Stars response status:', starsResponse.status, starsResponse.statusText);
     
     if (!starsResponse.ok) {
       throw new Error(`HTTP ${starsResponse.status}: ${starsResponse.statusText}`);
     }
     
     stars = await starsResponse.json();
-    console.log('[SkyView] Loaded stars:', stars.length);
+    debugLog('[SkyView] Loaded stars:', stars.length);
   } catch(e) {
-    console.error('[SkyView] Stars load error:', e);
+    debugLog('[SkyView] Stars load error:', e.message);
     console.error('[SkyView] Error details:', {
       name: e.name,
       message: e.message,
@@ -3015,21 +3252,41 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   try {
     console.log('[SkyView] Fetching constellations data...');
-    const constResponse = await fetch('/corrected_constellations.json');
+    const constResponse = await fetch('/static/constellations.json');
     console.log('[SkyView] Constellations response status:', constResponse.status, constResponse.statusText);
     
     if (!constResponse.ok) {
       throw new Error(`HTTP ${constResponse.status}: ${constResponse.statusText}`);
     }
     
-    const geo = await constResponse.json();
-    constFeatures = geo.features;
-    geo.features.forEach(f=>{
-      const g=f.geometry;
-      if(g.type==='MultiLineString') g.coordinates.forEach(l=>constLines.push(l));
-      else if(g.type==='LineString')    constLines.push(g.coordinates);
+    // Get the response as text first to see what we're actually receiving
+    const responseText = await constResponse.text();
+    console.log('[SkyView] Response text (first 200 chars):', responseText.substring(0, 200));
+    
+    let constData;
+    try {
+      constData = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('[SkyView] JSON parse error:', parseError);
+      console.error('[SkyView] Full response text:', responseText);
+      throw parseError;
+    }
+    
+    // New format: Array of objects with RtAsc1, Declin1, RtAsc2, Declin2 (RA in hours, Dec in degrees)
+    // Convert to the format expected by the drawing code: array of line segments with [RA_hours, Dec_degrees] pairs
+    constData.forEach(segment => {
+      if (segment.RtAsc1 !== undefined && segment.Declin1 !== undefined && 
+          segment.RtAsc2 !== undefined && segment.Declin2 !== undefined) {
+        // Each segment becomes a line with two points: start and end
+        const lineSegment = [
+          [segment.RtAsc1, segment.Declin1],  // RA already in hours, Dec in degrees
+          [segment.RtAsc2, segment.Declin2]   // RA already in hours, Dec in degrees
+        ];
+        constLines.push(lineSegment);
+      }
     });
-    console.log('[SkyView] Loaded constellations:', constFeatures.length, 'lines:', constLines.length);
+    
+    console.log('[SkyView] Loaded constellations:', constData.length, 'segments, converted to', constLines.length, 'lines');
   } catch(e) {
     console.error('[SkyView] Constellations load error:', e);
     console.error('[SkyView] Constellations error details:', {
@@ -3320,6 +3577,111 @@ document.addEventListener('DOMContentLoaded', async () => {
       body:JSON.stringify({alt:altDeg,az:azDeg})
     }).then(fetchMount);
   });
+
+  // Search Button
+  const searchBtn = document.getElementById('searchBtn');
+  const searchPopup = document.getElementById('searchPopup');
+  const searchOverlay = document.getElementById('searchOverlay');
+  const searchInput = document.getElementById('searchInput');
+  const searchExecuteBtn = document.getElementById('searchExecuteBtn');
+  const searchCancelBtn = document.getElementById('searchCancelBtn');
+
+  if (searchBtn && searchPopup && searchOverlay) {
+    searchBtn.addEventListener('click', () => {
+      debugLog('Search button clicked');
+      searchPopup.style.display = 'block';
+      searchOverlay.style.display = 'block';
+      searchInput.focus();
+    });
+
+    searchCancelBtn.addEventListener('click', () => {
+      debugLog('Search cancelled');
+      searchPopup.style.display = 'none';
+      searchOverlay.style.display = 'none';
+      searchInput.value = '';
+    });
+
+    searchOverlay.addEventListener('click', () => {
+      debugLog('Search overlay clicked');
+      searchPopup.style.display = 'none';
+      searchOverlay.style.display = 'none';
+      searchInput.value = '';
+    });
+
+    searchExecuteBtn.addEventListener('click', () => {
+      const searchTerm = searchInput.value.trim();
+      debugLog('Search execute clicked with term:', searchTerm);
+      if (searchTerm) {
+        // TODO: Implement search functionality with backend
+        alert(`Search functionality will be implemented later.\nSearching for: ${searchTerm}`);
+      }
+      searchPopup.style.display = 'none';
+      searchOverlay.style.display = 'none';
+      searchInput.value = '';
+    });
+
+    // Handle Enter key in search input
+    searchInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        searchExecuteBtn.click();
+      }
+    });
+
+    // Handle Escape key to close popup
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && searchPopup.style.display === 'block') {
+        searchCancelBtn.click();
+      }
+    });
+  }
+
+  // Sync Button
+  const syncBtn = document.getElementById('syncBtn');
+  if (syncBtn) {
+    syncBtn.addEventListener('click', () => {
+      debugLog('Sync button clicked');
+      
+      if (!selectedObject) {
+        alert('Please select an object first by clicking on it in the skyview.');
+        return;
+      }
+      
+      // Get RA/Dec coordinates from selected object
+      let ra, dec;
+      if (selectedObject.RtAsc !== undefined && selectedObject.Declin !== undefined) {
+        // Catalog objects (stars, galaxies, etc.) use RtAsc/Declin
+        ra = selectedObject.RtAsc;   // Already in decimal hours
+        dec = selectedObject.Declin; // Already in decimal degrees
+      } else if (selectedObject.ra !== undefined && selectedObject.dec !== undefined) {
+        // Other objects may use ra/dec
+        ra = selectedObject.ra;
+        dec = selectedObject.dec;
+      } else {
+        alert('Selected object does not have valid coordinates for syncing.');
+        return;
+      }
+      
+      debugLog(`Syncing to selected object: RA=${ra} Dec=${dec}`);
+      
+      // Send sync command to backend (same as main UI sync)
+      fetch('/sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `ra=${encodeURIComponent(ra)}&dec=${encodeURIComponent(dec)}`
+      })
+      .then(response => response.json())
+      .then(data => {
+        debugLog('Sync response:', data);
+        // Sync complete - no popup needed
+      })
+      .catch(error => {
+        debugLog('Sync error:', error);
+        alert(`Sync failed: ${error.message}`);
+      });
+    });
+  }
 
   // Move and update redraw button
   // (moved to top for immediate creation)

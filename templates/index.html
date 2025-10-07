@@ -32,6 +32,8 @@
       user-select: none;
       -webkit-touch-callout: none;
       -webkit-tap-highlight-color: transparent;
+      /* Responsive scaling based on viewport */
+      font-size: clamp(14px, 2.5vw, 18px);
     }
     
     /* Additional zoom prevention for touch devices */
@@ -49,10 +51,45 @@
     }
     
     #skyviewContainer { display: none; position: relative; min-height: 100vh; background: black; color: white; }
+    /* Coordinates display - centered horizontally above buttons */
     #skyviewTopBar {
-      position:absolute; top:0; left:0; width:100vw;
-      padding:10px; background:rgba(0,0,0,0.8);
+      position:fixed; bottom:70px; left:50%; transform:translateX(-50%); width:auto;
+      padding:10px; background:rgba(0,0,0,0.85);
+      border:1px solid #555;
+      border-radius:8px;
       display:flex; gap:8px; align-items:center; z-index:20;
+    }
+    
+    /* Horizontal button row at bottom */
+    #skyviewBottomButtons {
+      position: fixed;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 8px;
+      z-index: 25;
+    }
+    
+    /* Uniform button styling - all buttons same size */
+    .skyview-btn--uniform {
+      width: 40px !important;
+      height: 40px !important;
+      min-width: 40px !important;
+      min-height: 40px !important;
+      max-width: 40px !important;
+      max-height: 40px !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      border: 1px solid #555 !important;
+      border-radius: 8px !important;
+      background: #28a !important;
+      color: white !important;
+      cursor: pointer !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      box-sizing: border-box !important;
     }
     #skyviewTopBar input {
       width:6em; background:#222; color:#fff;
@@ -62,9 +99,10 @@
       background:#28a; color:#fff; border:none;
       padding:4px 8px; cursor:pointer;
     }
-    #fullscreenBtn, #refreshBtn {
+    #refreshBtn {
       position: absolute;
       top: 12px;
+      right: 90px;
       z-index: 30;
       background: #28a;
       color: white;
@@ -73,11 +111,12 @@
       border-radius: 3px;
       cursor: pointer;
     }
-    #refreshBtn { right: 90px; }
     #starAttributes {
-      position:absolute; top:60px; left:10px; z-index:20;
+      position:absolute; top:10px; left:10px; z-index:25;
       background:rgba(0,0,0,0.7); padding:8px; border-radius:4px;
       font-size:0.9em; line-height:1.4;
+      max-width: calc(80vw - 40px);
+      width: auto;
     }
     #starAttributes > div {
       display: none;
@@ -85,39 +124,53 @@
     #starAttributes > div.active {
       display: block;
     }
+    
+    /* Mobile: Make star info panel wider and prevent overlap */
+    @media (max-width: 600px) {
+      #starAttributes {
+        max-width: calc(100vw - 20px) !important;
+        width: auto;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    }
+    
+    /* Objects drawer - moved to upper right */
     #toggleMenuBtn {
-      position: fixed;
-      left: 50%;
-      bottom: 0;
-      transform: translateX(-50%);
+      position: fixed !important;
+      top: 10px !important;
+      right: 10px !important;
+      left: auto !important;
+      width: auto !important;
+      max-width: 120px !important;
       z-index: 31;
       background: #28a;
       color: white;
       border: none;
-      padding: 8px 18px;
-      border-radius: 8px 8px 0 0;
-      font-size: 1.1em;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 1.0em;
       cursor: pointer;
-      margin-bottom: 0;
-      transition: bottom 0.25s;
+      transition: all 0.25s;
     }
     #toggleBar {
       position: fixed;
-      left: 50%;
-      bottom: 48px;
-      transform: translateX(-50%);
+      top: 60px;
+      right: 10px;
+      width: auto;
+      max-width: 540px;
       z-index: 30;
+      transform: none;
       background: rgba(0,0,0,0.92);
       padding: 14px 18px 14px 18px;
-      border-radius: 12px 12px 0 0;
+      border-radius: 12px;
       display: flex;
       flex-wrap: wrap;
       gap: 18px 24px;
       font-size: 1em;
       align-items: flex-start;
       box-sizing: border-box;
-      width: 98vw;
-      max-width: 600px;
       transition: transform 0.25s, opacity 0.25s;
       opacity: 1;
       pointer-events: auto;
@@ -145,17 +198,19 @@
       #toggleBar {
         flex-direction: column;
         align-items: flex-start;
-        width: 98vw;
-        left: 1vw;
-        transform: none;
-        max-width: none;
+        width: auto;
+        max-width: 405px;
+        right: 5px;
+        top: 50px;
       }
       #toggleBar label {
         min-width: unset;
         width: 100%;
       }
       #toggleMenuBtn {
-        left: 1vw;
+        right: 5px !important;
+        left: auto !important;
+        top: 10px !important;
         transform: none;
       }
     }
@@ -164,13 +219,14 @@
       position: fixed;
       left: 50%;
       transform: translateX(-50%);
-      /* Place as low as possible above the Objects tray, with minimal gap */
-      bottom: 18px;
+      /* Place above the button row (buttons are 40px high + 10px margin = 60px from bottom) */
+      bottom: 60px;
       background: black;
       box-sizing: border-box;
-      /* Maximize size: use all available width and height above tray, but always a circle */
-      width: min(calc(100vw - 12px), calc(100vh - 110px));
-      height: min(calc(100vw - 12px), calc(100vh - 110px));
+      z-index: 10; /* Below controls (z-index:20) but above background */
+      /* Maximize size: use all available width and height above buttons, but always a circle */
+      width: min(calc(100vw - 12px), calc(100vh - 140px));
+      height: min(calc(100vw - 12px), calc(100vh - 140px));
       min-width: 200px;
       min-height: 200px;
       aspect-ratio: 1 / 1;
@@ -331,7 +387,6 @@
     }
     /* Remove hover effect for handpad arcs and center: only activate on press */
     /* .handpad-arc:hover, .handpad-center:hover { fill: var(--accent) !important; fill-opacity: 0.4; } */
-    }
 
     /* Speed label styling (larger & bold) */
     .speed-label {
@@ -390,8 +445,9 @@
       box-sizing: border-box;
     }
     #skyviewContainer button#toggleMenuBtn {
-      width: auto;
-      min-width: 90px;
+      width: auto !important;
+      min-width: 90px !important;
+      max-width: 200px !important;
       height: 38px;
       border-radius: 8px 8px 0 0 !important;
       margin-bottom: 0;
@@ -450,7 +506,8 @@
       color: #ff0000 !important;
     }
     #skyviewTopBar {
-      background: rgba(0,0,0,0.85) !important;
+      background: transparent !important;
+      border: 1px solid #ff0000 !important;
     }
     #starAttributes {
       background: rgba(0,0,0,0.7) !important;
@@ -677,9 +734,9 @@
       <div class="handpad-action-row">
         <button id="startButton" class="action-btn start-action-btn">START</button>
         <button id="trackToggleButton" title="Stop" aria-label="Stop" class="action-btn stop-octagon-btn stop-octagon-btn--xlarge">
-          <svg class="stop-octagon-svg stop-octagon-svg--xlarge" width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <svg class="stop-octagon-svg stop-octagon-svg--xlarge" width="75" height="75" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
             <polygon class="stop-octagon-shape" points="30.18,5 69.82,5 95,30.18 95,69.82 69.82,95 30.18,95 5,69.82 5,30.18"/>
-            <text class="stop-octagon-text stop-octagon-text--xlarge" x="50" y="56" text-anchor="middle" font-size="40" font-family="'Arial Black', Arial, sans-serif" font-weight="900" letter-spacing="1.2" fill="#111" dominant-baseline="middle">STOP</text>
+            <text class="stop-octagon-text stop-octagon-text--xlarge" x="50" y="56" text-anchor="middle" font-size="30" font-family="'Arial Black', Arial, sans-serif" font-weight="900" letter-spacing="1.0" fill="#111" dominant-baseline="middle">STOP</text>
           </svg>
         </button>
       </div>
@@ -698,39 +755,101 @@
 
   <!-- SKYVIEW CONTAINER (hidden by default) -->
   <div id="skyviewContainer" style="display:none;">
+    <!-- Coordinates display - bottom left above buttons -->
     <div id="skyviewTopBar">
-      <div style="display: flex; flex-direction: column; gap: 3px; align-items: flex-start;">
+      <div style="display: flex; flex-direction: column; gap: 3px;">
         <div style="display: flex; gap: 10px;">
-          <label style="display: flex; align-items: center; min-width: 120px;">
-            Alt: <input id="gotoAlt" type="text" placeholder="DDD:MM:SS" style="margin-left: 12px; width: 80px;">
+          <label style="display: flex; align-items: center; min-width: 115px;">
+            <span style="display: inline-block; width: 35px;">Alt:</span>
+            <input id="gotoAlt" type="text" placeholder="DD:MM:SS" style="width: 75px;">
           </label>
-          <label style="display: flex; align-items: center; min-width: 120px;">
-            Az: <input id="gotoAz" type="text" placeholder="DDD:MM:SS" style="margin-left: 12px; width: 80px;">
+          <label style="display: flex; align-items: center; min-width: 105px;">
+            <span style="display: inline-block; width: 25px;">Az:</span>
+            <input id="gotoAz" type="text" placeholder="DDD:MM:SS" style="width: 75px;">
           </label>
         </div>
         <div style="display: flex; gap: 10px;">
-          <label style="display: flex; align-items: center; min-width: 120px;">
-            Dec: <input id="gotoDec" type="text" placeholder="DDD:MM:SS" style="margin-left: 9px; width: 80px;">
+          <label style="display: flex; align-items: center; min-width: 115px;">
+            <span style="display: inline-block; width: 35px;">Dec:</span>
+            <input id="gotoDec" type="text" placeholder="DD:MM:SS" style="width: 75px;">
           </label>
-          <label style="display: flex; align-items: center; min-width: 120px;">
-            RA: <input id="gotoRA" type="text" placeholder="HH:MM:SS" style="margin-left: 12px; width: 80px;">
+          <label style="display: flex; align-items: center; min-width: 105px;">
+            <span style="display: inline-block; width: 25px;">RA:</span>
+            <input id="gotoRA" type="text" placeholder="HH:MM:SS" style="width: 75px;">
           </label>
         </div>
       </div>
-      <button id="gotoCoordsBtn">GoTo</button>
     </div>
-    <div class="skyview-bottom-btns">
-      <div class="skyview-btn-vertical">
-        <button id="stopBtn" title="Stop" aria-label="Stop" class="skyview-btn skyview-btn--stop">
-          <svg class="stop-octagon-svg" width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-            <polygon class="stop-octagon-shape" points="12.07,2 27.93,2 38,12.07 38,27.93 27.93,38 12.07,38 2,27.93 2,12.07" style="stroke-width:1;"/>
-            <text class="stop-octagon-text" x="20" y="21.5" text-anchor="middle" font-size="5" font-family="'Arial Black', Arial, sans-serif" font-weight="900" letter-spacing="0.5" fill="#111" dominant-baseline="middle">STOP</text>
-          </svg>
-        </button>
-        <button id="backBtn" title="Back" aria-label="Back" class="skyview-btn skyview-btn--icon"><span style="width:40px;height:40px;line-height:40px;display:inline-block;text-align:center;font-size:1.2em;">&#8592;</span></button>
-        <button id="redrawBtn" title="Redraw" aria-label="Redraw" class="skyview-btn skyview-btn--icon"><span style="width:40px;height:40px;line-height:40px;display:inline-block;text-align:center;font-size:1.2em;">&#8635;</span></button>
-        <button id="flipBtn" title="Flip E/W (Temporary)" aria-label="Flip E/W" class="skyview-btn skyview-btn--icon"><span style="width:40px;height:40px;line-height:40px;display:inline-block;text-align:center;font-size:1.2em;">&#8596;</span></button>
-      </div>
+    
+    <!-- Horizontal row of 8 buttons at bottom -->
+    <div id="skyviewBottomButtons">
+      <!-- Back button -->
+      <button id="backBtn" aria-label="Back" class="skyview-btn skyview-btn--uniform">
+        <span style="width:40px;height:40px;line-height:40px;display:inline-block;text-align:center;font-size:1.2em;">&#8592;</span>
+      </button>
+      
+      <!-- Fullscreen button -->
+      <button id="fullscreenBtn" aria-label="Fullscreen" class="skyview-btn skyview-btn--uniform">
+        <span style="width:40px;height:40px;line-height:40px;display:inline-block;text-align:center;font-size:1.2em;">⛶</span>
+      </button>
+      
+      <!-- Flip button -->
+      <button id="flipBtn" aria-label="Flip E/W" class="skyview-btn skyview-btn--uniform">
+        <span style="width:40px;height:40px;line-height:40px;display:inline-block;text-align:center;font-size:1.2em;">&#8596;</span>
+      </button>
+      
+      <!-- Redraw button -->
+      <button id="redrawBtn" aria-label="Redraw" class="skyview-btn skyview-btn--uniform">
+        <span style="width:40px;height:40px;line-height:40px;display:inline-block;text-align:center;font-size:1.2em;">&#8635;</span>
+      </button>
+      
+      <!-- Sync button (telrad reticle exactly matching skyview canvas) -->
+      <button id="syncBtn" aria-label="Sync" class="skyview-btn skyview-btn--uniform">
+        <svg width="40" height="40" viewBox="0 0 40 40">
+          <g transform="translate(20,20) scale(0.75)" fill="none" stroke="currentColor" stroke-width="1.5">
+            <!-- Inner complete circle (r=7) -->
+            <circle cx="0" cy="0" r="7"/>
+            
+            <!-- Middle broken circle (r=12) - exact JavaScript arc angles -->
+            <!-- NE: 7.5° to 82.5° -->
+            <path d="M 11.946,1.567 A 12,12 0 0,1 1.567,11.946"/>
+            <!-- SE: 97.5° to 172.5° -->
+            <path d="M -1.567,11.946 A 12,12 0 0,1 -11.946,1.567"/>
+            <!-- SW: 187.5° to 262.5° -->
+            <path d="M -11.946,-1.567 A 12,12 0 0,1 -1.567,-11.946"/>
+            <!-- NW: 277.5° to 352.5° -->
+            <path d="M 1.567,-11.946 A 12,12 0 0,1 11.946,-1.567"/>
+            
+            <!-- Outer broken circle (r=17) - exact JavaScript arc angles -->
+            <!-- NE: 7.5° to 82.5° -->
+            <path d="M 16.929,2.220 A 17,17 0 0,1 2.220,16.929"/>
+            <!-- SE: 97.5° to 172.5° -->
+            <path d="M -2.220,16.929 A 17,17 0 0,1 -16.929,2.220"/>
+            <!-- SW: 187.5° to 262.5° -->
+            <path d="M -16.929,-2.220 A 17,17 0 0,1 -2.220,-16.929"/>
+            <!-- NW: 277.5° to 352.5° -->
+            <path d="M 2.220,-16.929 A 17,17 0 0,1 16.929,-2.220"/>
+          </g>
+        </svg>
+      </button>
+      
+      <!-- Search button -->
+      <button id="searchBtn" aria-label="Search Objects" class="skyview-btn skyview-btn--uniform">
+        <span style="width:40px;height:40px;line-height:40px;display:inline-block;text-align:center;font-size:1.4em;">⌕</span>
+      </button>
+      
+      <!-- Go button -->
+      <button id="gotoCoordsBtn" aria-label="Go" class="skyview-btn skyview-btn--uniform">
+        <span style="width:40px;height:40px;line-height:40px;display:inline-block;text-align:center;font-size:1.0em;font-weight:bold;">GO</span>
+      </button>
+      
+      <!-- STOP button (rightmost) -->
+      <button id="stopBtn" aria-label="Stop" class="skyview-btn skyview-btn--uniform">
+        <svg class="stop-octagon-svg" width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+          <polygon class="stop-octagon-shape" points="12.07,2 27.93,2 38,12.07 38,27.93 27.93,38 12.07,38 2,27.93 2,12.07" style="stroke-width:1;"/>
+          <text class="stop-octagon-text" x="20" y="21.5" text-anchor="middle" font-size="5" font-family="'Arial Black', Arial, sans-serif" font-weight="900" letter-spacing="0.5" fill="#111" dominant-baseline="middle">STOP</text>
+        </svg>
+      </button>
     </div>
   <style>
     .skyview-bottom-btns {
@@ -802,6 +921,186 @@
         font-size: 1em !important;
       }
     }
+    
+    /* Search and Sync Button Styles */
+    .skyview-btn--search {
+      background: #28a;
+      color: #fff;
+      width: 40px;
+      height: 40px;
+      border: none;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s, color 0.15s;
+    }
+    
+    .skyview-btn--search span {
+      color: inherit;
+      filter: none;
+    }
+    
+    /* Night mode for search button icon */
+    body.night-mode .skyview-btn--search,
+    html.night-mode .skyview-btn--search {
+      background: #661100;
+      color: #ff0000;
+    }
+    
+    body.night-mode .skyview-btn--search span,
+    html.night-mode .skyview-btn--search span {
+      color: #ff0000;
+    }
+    
+    /* All skyview buttons now same size (40x40) - inherit container styling */
+    #skyviewContainer #syncBtn,
+    #skyviewContainer #gotoCoordsBtn {
+      width: 40px !important;
+      height: 40px !important;
+      min-width: 40px !important;
+      min-height: 40px !important;
+      padding: 0 !important;
+      cursor: pointer !important;
+      box-sizing: border-box !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+    }
+    
+    /* Sync and Go button specific styles - let them inherit container colors */
+    .skyview-btn--sync,
+    .skyview-btn--go {
+      width: 40px !important;
+      height: 40px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+    }
+    
+    /* Night mode for sync and go button icons - inherit container background */
+    body.night-mode .skyview-btn--sync span,
+    body.night-mode .skyview-btn--go span,
+    html.night-mode .skyview-btn--sync span,
+    html.night-mode .skyview-btn--go span {
+      color: #ff0000 !important;
+    }
+    
+    /* Ensure TARGET text is always red */
+    .skyview-btn--sync span {
+      color: #ff0000 !important;
+    }
+    
+    /* Search Popup Styles - Day Mode */
+    #searchPopup {
+      background: #1a1a1a !important;
+      color: #ffffff !important;
+      border: 2px solid #444 !important;
+    }
+    
+    #searchPopup h3 {
+      color: #ffffff !important;
+    }
+    
+    #searchInput {
+      background: #2a2a2a !important;
+      color: #ffffff !important;
+      border: 1px solid #666 !important;
+      outline: none !important;
+      box-shadow: none !important;
+    }
+    
+    #searchInput:focus {
+      background: #2a2a2a !important;
+      color: #ffffff !important;
+      border: 1px solid #888 !important;
+      outline: none !important;
+      box-shadow: none !important;
+    }
+    
+    #searchInput::placeholder {
+      color: #888 !important;
+    }
+    
+    #searchExecuteBtn, #searchCancelBtn {
+      background: #28a !important;
+      color: #fff !important;
+      border: none !important;
+      border-radius: 4px !important;
+      padding: 8px 16px !important;
+      cursor: pointer !important;
+    }
+    
+    /* Search Popup Night Mode Styles */
+    body.night-mode #searchPopup,
+    html.night-mode #searchPopup {
+      background: #0a0a0a !important;
+      color: #ff0000 !important;
+      border: 2px solid #330000 !important;
+    }
+    
+    body.night-mode #searchPopup h3,
+    html.night-mode #searchPopup h3 {
+      color: #ff0000 !important;
+    }
+    
+    body.night-mode #searchInput,
+    html.night-mode #searchInput {
+      background: #1a0000 !important;
+      color: #ff0000 !important;
+      border: 1px solid #330000 !important;
+      outline: none !important;
+      box-shadow: none !important;
+    }
+    
+    body.night-mode #searchInput:focus,
+    html.night-mode #searchInput:focus {
+      background: #1a0000 !important;
+      color: #ff0000 !important;
+      border: 1px solid #660000 !important;
+      outline: none !important;
+      box-shadow: none !important;
+    }
+    
+    body.night-mode #searchInput::placeholder,
+    html.night-mode #searchInput::placeholder {
+      color: #660000 !important;
+    }
+    
+    body.night-mode #searchExecuteBtn,
+    body.night-mode #searchCancelBtn,
+    html.night-mode #searchExecuteBtn,
+    html.night-mode #searchCancelBtn {
+      background: #661100 !important;
+      color: #ff0000 !important;
+    }
+    
+    body.night-mode #searchOverlay,
+    html.night-mode #searchOverlay {
+      background: rgba(0,0,0,0.8) !important;
+    }
+    
+    /* Mobile responsiveness for new buttons */
+    @media (max-width: 600px) {
+      .skyview-btn--search {
+        width: 32px;
+        height: 32px;
+      }
+      #skyviewContainer #syncBtn, #skyviewContainer #gotoCoordsBtn {
+        width: 32px !important;
+        height: 32px !important;
+        padding: 0 !important;
+        font-size: 0.8em !important;
+      }
+      #searchPopup {
+        min-width: 280px;
+        padding: 15px;
+      }
+    }
+    
+
+
+    
     /* Remove duplicate STOP/Back/Redraw button rules to prevent hidden/extra buttons */
   </style>
     <div id="starAttributes">
@@ -837,6 +1136,21 @@
     </canvas>
     <div id="popup"></div>
   </div>
+
+  <!-- Search Popup -->
+  <div id="searchPopup" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1000; background: var(--bg-color, #1a1a1a); border: 2px solid var(--border-color, #444); border-radius: 8px; padding: 20px; min-width: 300px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+    <h3 style="margin: 0 0 15px 0; color: var(--text-color, #ffffff); text-align: center;">Search Objects</h3>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <input id="searchInput" type="text" placeholder="Enter object name (e.g., M31, Vega, Polaris)" style="padding: 8px; border: 1px solid var(--border-color, #666); border-radius: 4px; background: var(--input-bg, #2a2a2a); color: var(--text-color, #ffffff); font-size: 14px;">
+      <div style="display: flex; gap: 10px; justify-content: center;">
+        <button id="searchExecuteBtn" class="skyview-btn" style="flex: 1;">Search</button>
+        <button id="searchCancelBtn" class="skyview-btn" style="flex: 1;">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search Popup Overlay -->
+  <div id="searchOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999;"></div>
 
   <script>
   $(function(){
@@ -911,6 +1225,14 @@
       var on = !$('body').hasClass('night-mode');
       localStorage.setItem('nightMode', on?'enabled':'disabled');
       applyNight();
+    });
+
+    // Auto-blur buttons after click to remove persistent highlighting
+    $('.tray-btn, #controlTrayBtn').on('click', function() {
+      var $btn = $(this);
+      setTimeout(function() {
+        $btn.blur();
+      }, 100);
     });
 
     // Set up MutationObserver to watch for style changes on tray buttons
@@ -995,7 +1317,7 @@
     });
 
     // Fullscreen & Settings
-    $('#toggleFullScreen').click(function(){
+    $('#toggleFullScreen, #fullscreenBtn').click(function(){
       if (!document.fullscreenElement) document.documentElement.requestFullscreen();
       else document.exitFullscreen();
     });
@@ -1050,18 +1372,18 @@
           return coord;
         }
         
-        // Function to format Alt specifically (HH:MM:SS format)
+        // Function to format Alt specifically (DD:MM:SS format)
         function formatAlt(coord) {
           if (!coord || typeof coord !== 'string') return coord;
           var parts = coord.split(':');
           if (parts.length === 3) {
-            // For Alt, ensure hours is only 2 digits
-            var hours = parseInt(parts[0]);
+            // For Alt, ensure degrees is only 2 digits
+            var degrees = parseInt(parts[0]);
             var minutes = parseFloat(parts[1]);
             var seconds = parseFloat(parts[2]);
             
-            if (!isNaN(hours)) {
-              parts[0] = (hours % 100).toString().padStart(2, '0'); // Keep only 2 digits for hours
+            if (!isNaN(degrees)) {
+              parts[0] = (degrees % 100).toString().padStart(2, '0'); // Keep only 2 digits for degrees
             }
             if (!isNaN(minutes)) {
               parts[1] = Math.floor(minutes).toString().padStart(2, '0');
@@ -1070,6 +1392,32 @@
               parts[2] = Math.floor(seconds).toString().padStart(2, '0');
             }
             return parts.join(':');
+          }
+          return coord;
+        }
+
+        // Function to format Dec specifically (DD:MM:SS format, can be negative)
+        function formatDec(coord) {
+          if (!coord || typeof coord !== 'string') return coord;
+          var isNegative = coord.startsWith('-');
+          var cleanCoord = isNegative ? coord.substring(1) : coord;
+          var parts = cleanCoord.split(':');
+          if (parts.length === 3) {
+            // For Dec, ensure degrees is only 2 digits
+            var degrees = parseInt(parts[0]);
+            var minutes = parseFloat(parts[1]);
+            var seconds = parseFloat(parts[2]);
+            
+            if (!isNaN(degrees)) {
+              parts[0] = (degrees % 100).toString().padStart(2, '0'); // Keep only 2 digits for degrees
+            }
+            if (!isNaN(minutes)) {
+              parts[1] = Math.floor(minutes).toString().padStart(2, '0');
+            }
+            if (!isNaN(seconds)) {
+              parts[2] = Math.floor(seconds).toString().padStart(2, '0');
+            }
+            return (isNegative ? '-' : '') + parts.join(':');
           }
           return coord;
         }
@@ -1684,10 +2032,11 @@
     function showBrowserChoicePopup(callback) {
       var isNight = $('body').hasClass('night-mode');
       var currentUrl = window.location.href;
+      var globeIcon = isNight ? '🔴' : '🌐'; // Red circle in night mode, blue globe in day mode
       var modalHtml = `
         <div class="modal__body${isNight ? ' night-mode' : ''}"
           style="${isNight ? 'color:#f33; background:#222; border-radius:8px; padding:15px;' : 'color:#111; background:#f5f5f5; border-radius:8px; padding:15px;'}">
-          <strong>🌐 Open in Your Browser?</strong>
+          <strong>${globeIcon} Open in Your Browser?</strong>
           <div style="margin-top:15px; line-height:1.5;">
             For the best experience with full-screen support and all features, 
             would you like to open SiPi in your default browser?
@@ -1698,7 +2047,7 @@
         </div>
         <div class="modal__footer"
           style="${isNight ? 'background:#222; color:#f33; border-radius:0 0 8px 8px; padding:15px; text-align:center;' : 'background:#f5f5f5; color:#111; border-radius:0 0 8px 8px; padding:15px; text-align:center;'}">
-          <button class="btn btn--primary" id="openInBrowserBtn" style="margin-right:10px;">🌐 Open in Browser</button>
+          <button class="btn btn--primary" id="openInBrowserBtn" style="margin-right:10px;">${globeIcon} Open in Browser</button>
           <button class="btn" id="continueHereBtn">Continue Here</button>
         </div>
       `;
@@ -1980,7 +2329,7 @@
       transition: background 0.15s, color 0.15s, border 0.15s;
       text-align: center;
     }
-    .tray-btn:active, .tray-btn:focus {
+    .tray-btn:active {
       background: #e0eaff;
       color: #111;
       border-color: #1a5a8a;
@@ -2033,8 +2382,7 @@
       box-shadow: 0 2px 8px rgba(255,0,0,0.18) !important;
       border: 1.5px solid #ff0000 !important;
     }
-    body.night-mode .tray-btn:active, 
-    body.night-mode .tray-btn:focus {
+    body.night-mode .tray-btn:active {
       background: #ff0000 !important;
       color: #111 !important;
       border: 1.5px solid #ff0000 !important;
@@ -2057,16 +2405,16 @@
       box-shadow: 0 2px 8px rgba(255,0,0,0.18) !important;
     }
     
+    /* Special styling for toggleMode button only */
+    body.night-mode button#toggleMode.tray-btn {
+      text-shadow: none !important;
+    }
+    
     body.night-mode #controlTrayBtn:active,
-    body.night-mode #controlTrayBtn:focus,
     body.night-mode button#editConfigBtn.tray-btn:active,
-    body.night-mode button#editConfigBtn.tray-btn:focus,
     body.night-mode button#toggleFullScreen.tray-btn:active,
-    body.night-mode button#toggleFullScreen.tray-btn:focus,
     body.night-mode button#toggleMode.tray-btn:active,
-    body.night-mode button#toggleMode.tray-btn:focus,
-    body.night-mode a#helpBtn.tray-btn:active,
-    body.night-mode a#helpBtn.tray-btn:focus {
+    body.night-mode a#helpBtn.tray-btn:active {
       background: #ff0000 !important;
       color: #111 !important;
       border: 1.5px solid #ff0000 !important;
@@ -2158,14 +2506,15 @@
     background: #f5f5f5;
     color: #111;
     border: 2.5px solid #28a;
-    /* Force exact same dimensions as base action-btn */
-    width: 100px !important;
-    height: 100px !important;
-    min-width: 100px !important;
-    min-height: 100px !important;
-    max-width: 100px !important;
-    max-height: 100px !important;
+    /* Force exact same dimensions as base action-btn - 75% size */
+    width: 75px !important;
+    height: 75px !important;
+    min-width: 75px !important;
+    min-height: 75px !important;
+    max-width: 75px !important;
+    max-height: 75px !important;
     box-sizing: border-box !important;
+    font-size: 0.75em;
   }
   .start-action-btn:active, .start-action-btn:focus {
     background: #e0eaff;
@@ -2192,12 +2541,12 @@
     background: transparent;
     border: 2.5px solid #28a;
     box-shadow: none;
-    width: 100px !important;
-    height: 100px !important;
-    min-width: 100px !important;
-    min-height: 100px !important;
-    max-width: 100px !important;
-    max-height: 100px !important;
+    width: 75px !important;
+    height: 75px !important;
+    min-width: 75px !important;
+    min-height: 75px !important;
+    max-width: 75px !important;
+    max-height: 75px !important;
     padding: 0;
     font-size: 2.7em;
     display: inline-flex !important;
@@ -2221,8 +2570,7 @@
   }
   .stop-octagon-shape {
     fill: #a11;
-    stroke: #28a;
-    stroke-width: 2.5 !important;
+    stroke: none;
   }
   .stop-octagon-text {
     font-family: 'Arial Black', Arial, sans-serif;
@@ -2236,14 +2584,14 @@
   }
   /* Extra large STOP button variant for main page */
   .stop-octagon-btn--xlarge {
-    width: 100px;
-    height: 100px;
-    min-width: 100px;
-    min-height: 100px;
+    width: 75px;
+    height: 75px;
+    min-width: 75px;
+    min-height: 75px;
   }
   .stop-octagon-svg--xlarge {
-    width: 100px;
-    height: 100px;
+    width: 75px;
+    height: 75px;
   }
   .stop-octagon-text--xlarge {
     font-size: 40px;
@@ -2441,5 +2789,6 @@
       });
     });
   </script>
+
 </body>
 </html>

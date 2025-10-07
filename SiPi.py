@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 # SiPi Version Information
-__version__ = "0.9.8"
+__version__ = "0.9.9"
 __release_date__ = "2025-08-21"
-__description__ = "SiPi Telescope Control System with serial command interface"
+__description__ = "SiPi Telescope Control System"
 
 import socket
 import threading
