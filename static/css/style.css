@@ -56,6 +56,7 @@ html, body {
   font-family: var(--font-family);
   font-size: var(--font-size-base);
   line-height: 1.5;
+  overflow: hidden;
 }
 
 button {
@@ -100,7 +101,7 @@ button {
 /* Main */
 .app__main {
   flex: 1;
-  overflow: auto;
+  overflow: hidden;
   padding: var(--padding);
   display: flex;
   flex-direction: column;

@@ -249,6 +249,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Guard to prevent overlapping draws
   let isDrawing = false;
+  
+  // Smart redraw system - only redraw when needed
+  let needsRedraw = true;
+  let lastMountPos = { alt: null, az: null };
+  
+  // Helper function to request a redraw (called by user interactions)
+  function requestRedraw() {
+    needsRedraw = true;
+  }
 
   // --- Label Collision Detection System ---
   var placedLabels = []; // Array to track all placed label bounding boxes
@@ -267,6 +276,53 @@ document.addEventListener('DOMContentLoaded', async () => {
     nebulaHits.length = 0;
     planetaryHits.length = 0;
     solarSystemHits.length = 0;
+  }
+
+  // Memory monitoring and leak prevention
+  let memoryLogCounter = 0;
+  let lastMemoryCheck = 0;
+  function aggressiveMemoryCleanup() {
+    memoryLogCounter++;
+    
+    // Log memory every 30 draw cycles
+    if (memoryLogCounter % 30 === 0) {
+      if (performance.memory) {
+        const used = Math.round(performance.memory.usedJSHeapSize / 1048576);
+        const total = Math.round(performance.memory.totalJSHeapSize / 1048576);
+        const limit = Math.round(performance.memory.jsHeapSizeLimit / 1048576);
+        console.log(`[SkyView] Memory: ${used}MB used, ${total}MB total, ${limit}MB limit | PlacedLabels: ${placedLabels.length} | BoundingBoxPool: ${boundingBoxPool.length}`);
+        
+        // Track memory growth
+        if (lastMemoryCheck > 0) {
+          const growth = used - lastMemoryCheck;
+          if (growth > 50) { // More than 50MB growth
+            console.warn(`[SkyView] HIGH memory growth detected: +${growth}MB since last check`);
+          }
+        }
+        lastMemoryCheck = used;
+      }
+    }
+    
+    // Aggressive cleanup every 50 draw cycles
+    if (memoryLogCounter % 50 === 0) {
+      // Limit bounding box pool size
+      if (boundingBoxPool.length > 30) {
+        boundingBoxPool.length = 30;
+      }
+      
+      // Limit placed labels accumulation
+      if (placedLabels.length > 3000) {
+        placedLabels.length = 2000; // Keep some for collision detection but not all
+      }
+      
+      // Force garbage collection if available
+      if (window.gc) {
+        window.gc();
+        console.log('[SkyView] Manual garbage collection triggered');
+      }
+      
+      console.log('[SkyView] Memory cleanup: BoundingBoxPool=' + boundingBoxPool.length + ', PlacedLabels=' + placedLabels.length);
+    }
   }
   
   // Object pool for bounding boxes to reduce memory allocations
@@ -728,8 +784,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       
       // Force fresh mount position update on mobile
       debugLog('[SkyView] MOBILE DEBUG - Forcing mount position update');
+      requestRedraw(); // Force redraw flag
       fetchMount().then(() => {
         debugLog('[SkyView] MOBILE DEBUG - Mount position updated, redrawing');
+        requestRedraw();
         draw();
       }).catch(err => {
         debugLog('[SkyView] MOBILE DEBUG - Mount position update failed, drawing anyway:', err);
@@ -738,12 +796,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
   }
   
-  // Flip button handler (temporary for testing)
-  const flipBtn = document.getElementById('flipBtn');
-  if (flipBtn) {
-    flipBtn.onclick = function() {
+  // Flip E/W checkbox handler
+  const toggleFlipCheckbox = document.getElementById('toggleFlip');
+  if (toggleFlipCheckbox) {
+    toggleFlipCheckbox.addEventListener('change', function() {
       toggleFlip();
-    };
+    });
   }
 
   // Make GoTo button wider for text
@@ -758,6 +816,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function toggleFlip() {
     isFlipped = !isFlipped;
     localStorage.setItem('flipSkyView', isFlipped ? 'true' : 'false');
+    requestRedraw();
     draw(); // Redraw with new flip state
   }
 
@@ -858,7 +917,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     return sign * (degrees + minutes/60 + seconds/3600);
   }
 
+  // Enhanced fetchMount that shares data with main UI
+  let fetchingMount = false; // Guard to prevent overlapping fetches
   async function fetchMount() {
+    // Don't fetch if SkyView is hidden
+    const skyContainer = document.getElementById('skyviewContainer');
+    if (!skyContainer || skyContainer.style.display === 'none') {
+      debugLog('[SkyView] SkyView hidden, skipping mount fetch');
+      return;
+    }
+    
+    if (fetchingMount) {
+      debugLog('[SkyView] Mount fetch already in progress, skipping...');
+      return;
+    }
+    
+    fetchingMount = true;
     try {
       const resp = await fetch('/status');
       if (!resp.ok) throw new Error('Failed to fetch mount position');
@@ -869,25 +943,52 @@ document.addEventListener('DOMContentLoaded', async () => {
       const az = parseDMS(data.az);
       
       if (!isNaN(alt) && !isNaN(az)) {
+        // Only mark for redraw if position actually changed (more than 0.01 degrees)
+        const altChanged = lastMountPos.alt === null || Math.abs(alt - lastMountPos.alt) > 0.01;
+        const azChanged = lastMountPos.az === null || Math.abs(az - lastMountPos.az) > 0.01;
+        
+        if (altChanged || azChanged) {
+          needsRedraw = true;
+          lastMountPos.alt = alt;
+          lastMountPos.az = az;
+          debugLog('[SkyView] Mount position changed, redraw needed:', {alt, az});
+        }
+        
         mountPos.alt = alt;
         mountPos.az = az;
-        debugLog('[SkyView] Mount position updated:', mountPos, 'from raw data:', {alt: data.alt, az: data.az});
       } else {
         mountPos.alt = null;
         mountPos.az = null;
         debugLog('[SkyView] Invalid mount position data:', data, 'parsed as:', {alt, az});
       }
+      
+      // Unified UI - status is shared naturally
+      
     } catch (e) {
       mountPos.alt = null;
       mountPos.az = null;
-      debugLog('[SkyView] Error fetching mount position:', e.message); // Only log message in production to avoid error object references
+      debugLog('[SkyView] Error fetching mount position:', e.message);
+    } finally {
+      fetchingMount = false;
     }
-    draw();
+    
+    // Only redraw if needed
+    if (needsRedraw) {
+      needsRedraw = false;
+      draw();
+    }
   }
 
-  // Fetch mount position on load and every 2 seconds  
+  // Fetch mount position on load and every 1 second
+  // Clear any existing intervals first (protection against multiple loads)
+  if (window.skyviewMountInterval) {
+    clearInterval(window.skyviewMountInterval);
+  }
+  
   fetchMount();
-  let mountPollingInterval = setInterval(fetchMount, 2000);  // --- Solar system position polling ---
+  let mountPollingInterval = setInterval(fetchMount, 1000);  // Standard SkyView polling
+  window.skyviewMountInterval = mountPollingInterval; // Store globally for cleanup
+  window.skyviewFetchMount = fetchMount; // Store function reference for reinitialization
   
   // Cleanup on page unload
   window.addEventListener('beforeunload', function() {
@@ -984,6 +1085,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (el) {
       el.addEventListener('change', () => {
         localStorage.setItem('skyview_' + id, el.checked);
+        requestRedraw();
         draw();
       });
     }
@@ -995,8 +1097,25 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Server time synchronization
   let serverTimeOffset = 0; // Difference between server and client time
   let lastServerTimeUpdate = 0;
+  let updatingServerTime = false; // Guard to prevent concurrent updates
   
   function updateServerTimeOffset() {
+    // Prevent concurrent updates
+    if (updatingServerTime) {
+      debugLog('[SkyView] Server time update already in progress, skipping...');
+      return;
+    }
+    
+    // Don't fetch if SkyView is hidden
+    const skyContainer = document.getElementById('skyviewContainer');
+    if (!skyContainer || skyContainer.style.display === 'none') {
+      debugLog('[SkyView] SkyView hidden, skipping server time update');
+      return;
+    }
+    
+    updatingServerTime = true;
+    lastServerTimeUpdate = Date.now(); // Update timestamp IMMEDIATELY to prevent multiple calls
+    
     // Get server time from status endpoint
     fetch('/status')
       .then(response => response.json())
@@ -1012,19 +1131,21 @@ document.addEventListener('DOMContentLoaded', async () => {
           
           // Calculate offset (server time - client time)
           serverTimeOffset = serverTime.getTime() - now.getTime();
-          lastServerTimeUpdate = now.getTime();
           
         }
       })
-      .catch(e => debugLog('[SkyView] Failed to sync server time:', e.message)); // Only log message to avoid error object retention
+      .catch(e => debugLog('[SkyView] Failed to sync server time:', e.message)) // Only log message to avoid error object retention
+      .finally(() => {
+        updatingServerTime = false;
+      });
   }
   
   function getServerTime() {
     // Return current time adjusted for server offset
     const clientTime = new Date();
     
-    // Update server time offset every 30 seconds
-    if (Date.now() - lastServerTimeUpdate > 30000) {
+    // Update server time offset every 60 seconds (changed from 30 to reduce fetch frequency)
+    if (Date.now() - lastServerTimeUpdate > 60000 && !updatingServerTime) {
       updateServerTimeOffset();
     }
     
@@ -1032,8 +1153,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   
   // Initialize server time sync
+  // Clear any existing time offset intervals first (protection against multiple loads)
+  if (window.skyviewTimeInterval) {
+    clearInterval(window.skyviewTimeInterval);
+  }
+  
   updateServerTimeOffset();
   let timeOffsetInterval = setInterval(updateServerTimeOffset, 60000); // Update every minute
+  window.skyviewTimeInterval = timeOffsetInterval; // Store globally for cleanup
+  window.skyviewUpdateServerTimeOffset = updateServerTimeOffset; // Store function reference for reinitialization
 
   function toJulian(d){ return d.valueOf()/86400000 + 2440587.5; }
   function computeLST(d, lonDeg){
@@ -1114,8 +1242,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     ctx.translate(translateX, translateY);
     ctx.scale(dpr * currentVpScale * canvasScale, dpr * currentVpScale * canvasScale);
 
-    cx = w/2; cy = h/2;
-    baseRadius = Math.min(cx,cy)*0.95;
+    // Account for status bar (30px) and bottom buttons (60px)
+    const statusBarHeight = 30;
+    const bottomButtonHeight = 60;
+    const availableHeight = h - statusBarHeight - bottomButtonHeight;
+    cx = w/2; 
+    // Position center higher - closer to status bar (reduce cy)
+    cy = statusBarHeight + (availableHeight * 0.40);
+    // Reduce radius slightly to prevent W/E labels from being cut off
+    baseRadius = Math.min(cx, availableHeight/2) * 0.92;
     draw();
   }
   window.addEventListener('resize', handleResize);
@@ -1281,8 +1416,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   const CLICK_SELECT_MAX_MS = 200; // ms for mouse click selection
   const CLICK_SELECT_MOVE_THRESH = 10; // px for mouse click selection
 
+  // Initialize event listener storage for cleanup
+  window.skyViewCanvasListeners = {};
+
   let pointerDownInfo = null;
-  canvas.addEventListener('pointerdown', e => {
+  const pointerdownHandler = e => {
     // Defensive: ensure canvas is visible and not covered
     const rect = canvas.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) {
@@ -1357,7 +1495,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             `<button id='toggleCalPointBtn' style="min-width: 100px; padding: 6px 18px; font-size: 1em; margin-top: 6px; border-radius: 6px; border: 2px solid #888; background: #222; color: #fff; cursor: pointer;">${hitObj.enabled ? 'Disable' : 'Enable'}</button>`;
           popup.innerHTML = html;
           popup.style.left = (e.pageX + 8) + 'px';
-          popup.style.top = (e.pageY + 8) + 'px';
+          popup.style.top = Math.max(60, e.pageY + 8) + 'px';
           popup.style.display = 'block';
           setTimeout(() => {
             const btn = document.getElementById('toggleCalPointBtn');
@@ -1482,7 +1620,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               `<button id='toggleCalPointBtn' style="min-width: 100px; padding: 6px 18px; font-size: 1em; margin-top: 6px; border-radius: 6px; border: 2px solid #888; background: #222; color: #fff; cursor: pointer;">${hitObj2.enabled ? 'Disable' : 'Enable'}</button>`;
             popup.innerHTML = html;
             popup.style.left = (event.pageX + 8) + 'px';
-            popup.style.top = (event.pageY + 8) + 'px';
+            popup.style.top = Math.max(60, event.pageY + 8) + 'px';
             popup.style.display = 'block';
             setTimeout(() => {
               const btn = document.getElementById('toggleCalPointBtn');
@@ -1536,11 +1674,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       panStartX = e.clientX; panStartY = e.clientY;
       panOrigX  = translateX; panOrigY  = translateY;
     }
-  });
+  };
+  canvas.addEventListener('pointerdown', pointerdownHandler);
+  window.skyViewCanvasListeners.pointerdown = pointerdownHandler;
 
   // Cancel tap-hold if pointer moves too far or is released, and track last pointer event
   // (removed duplicate declaration of tapHoldLastEvent)
-  canvas.addEventListener('pointermove', e => {
+  const pointermoveHandler1 = e => {
     if (tapHoldStart && tapHoldTimer) {
       tapHoldLastEvent = e;
       const {mx, my} = transformEvent(e);
@@ -1554,8 +1694,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         tapHoldLastEvent = null;
       }
     }
-  });
-  canvas.addEventListener('pointerup', e => {
+  };
+  canvas.addEventListener('pointermove', pointermoveHandler1);
+  window.skyViewCanvasListeners.pointermove = pointermoveHandler1;
+  
+  const pointerupHandler1 = e => {
     try {
       
       // Mouse: fast click selection
@@ -1638,7 +1781,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               `<button id='toggleCalPointBtn' style="min-width: 100px; padding: 6px 18px; font-size: 1em; margin-top: 6px; border-radius: 6px; border: 2px solid #888; background: #222; color: #fff; cursor: pointer;">${hitObj.enabled ? 'Disable' : 'Enable'}</button>`;
             popup.innerHTML = html;
             popup.style.left = (e.pageX + 8) + 'px';
-            popup.style.top = (e.pageY + 8) + 'px';
+            popup.style.top = Math.max(60, e.pageY + 8) + 'px';
             popup.style.display = 'block';
             setTimeout(() => {
               const btn = document.getElementById('toggleCalPointBtn');
@@ -1909,7 +2052,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       debugLog('[MOBILE CRITICAL] Top-level error stack:', error.stack);
       debugLog('[MOBILE CRITICAL] Error occurred during pointerup processing');
     }
-  });
+  };
+  canvas.addEventListener('pointerup', pointerupHandler1);
+  window.skyViewCanvasListeners.pointerup = pointerupHandler1;
 
   // Pan and pinch handling with adaptive throttling
   const handlePointerMove = (e) => {
@@ -1974,8 +2119,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
 
   canvas.addEventListener('pointermove', throttledPointerMove);
+  window.skyViewCanvasListeners.pointermove2 = throttledPointerMove;
 
-  canvas.addEventListener('pointerup', e=>{
+  const pointerupHandler2 = e=>{
     delete pointers[e.pointerId];
     const ids = Object.keys(pointers);
     if(ids.length === 1) {
@@ -1987,7 +2133,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       panOrigY = translateY;
     }
     if(ids.length < 2) initialDist = 0;
-  });
+  };
+  canvas.addEventListener('pointerup', pointerupHandler2);
+  window.skyViewCanvasListeners.pointerup2 = pointerupHandler2;
 
   // Wheel-zoom (desktop) - with adaptive throttling
   const handleWheel = (e) => {
@@ -2023,6 +2171,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
 
   canvas.addEventListener('wheel', throttledWheel, { passive: false });
+  window.skyViewCanvasListeners.wheel = throttledWheel;
 
   // Helper function to get current zoom level (used by device profiler)
   window.getCurrentZoom = function() {
@@ -2140,6 +2289,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Reset hit detection arrays to prevent memory leaks
     resetHitArrays();
+    
+    // Aggressive memory monitoring and cleanup
+    aggressiveMemoryCleanup();
     
     isDrawing = true;
     try {
@@ -3124,8 +3276,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (s.Name && s.Name !== 'NoName' && s.Mag <= magThreshold) {
           const p = project(s.RtAsc, s.Declin, effR);
           if (p.alt > 0) { // Only draw if above horizon
+            // Extract only the first word of the name
+            const firstName = s.Name.trim().split(/\s+/)[0];
             const labelColor = getNightModeColor('rgba(255,255,255,0.7)', 'text');
-            drawLabelWithPointer(s.Name, p.x, p.y, 'star', labelColor, canvasScale, s.Mag);
+            drawLabelWithPointer(firstName, p.x, p.y, 'star', labelColor, canvasScale, s.Mag);
             namedStarCount++;
           }
         }
@@ -3198,17 +3352,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       ctx.fillStyle = getNightModeColor('rgba(224,195,252,0.98)', 'text'); // Same purple as Messier but more opaque
       ctx.font=`${14/canvasScale}px sans-serif`; // Constant visual size
       
-      constFeatures.forEach(f=>{
-        let pts=[]; const g=f.geometry;
-        if(g.type==='MultiLineString') g.coordinates.forEach(l=>pts.push(...l));
-        else if(g.type==='LineString') pts=g.coordinates;
-        const ppts=pts.map(p=>project(p[0]/15,p[1],effR)).filter(p=>p.alt>0);
-        if(!ppts.length) return;
-        const avgX=ppts.reduce((s,p)=>s+p.x,0)/ppts.length;
-        const avgY=ppts.reduce((s,p)=>s+p.y,0)/ppts.length;
+      constFeatures.forEach(constellation => {
+        // Project constellation center coordinates (RA in hours, Dec in degrees)
+        const projectedPos = project(constellation.ra, constellation.dec, effR);
+        
+        // Only draw if above horizon
+        if (projectedPos.alt <= 0) return;
         
         const labelColor = getNightModeColor('rgba(224,195,252,0.98)', 'text');
-        drawLabelWithPointer(f.id, avgX, avgY, 'constellation', labelColor, canvasScale);
+        drawLabelWithPointer(constellation.name, projectedPos.x, projectedPos.y, 'constellation', labelColor, canvasScale);
       });
       
       debugLog('[SkyView] Drew PRIORITY 3 constellation labels');
@@ -3238,7 +3390,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Load stars first
   try {
     debugLog('[SkyView] Fetching stars data...');
-    const starsResponse = await fetch('/corrected_stars.json');
+    const starsResponse = await fetch('/static/stars.json');
     debugLog('[SkyView] Stars response status:', starsResponse.status, starsResponse.statusText);
     
     if (!starsResponse.ok) {
@@ -3316,13 +3468,43 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  // Load constellation centers for constellation names
+  try {
+    console.log('[SkyView] Fetching constellation centers data...');
+    const centersResponse = await fetch('/static/constellation_centers.json');
+    console.log('[SkyView] Constellation centers response status:', centersResponse.status, centersResponse.statusText);
+    
+    if (!centersResponse.ok) {
+      throw new Error(`HTTP ${centersResponse.status}: ${centersResponse.statusText}`);
+    }
+    
+    const centersData = await centersResponse.json();
+    
+    // Convert constellation centers to the format expected by the drawing code
+    constFeatures = centersData.map(center => ({
+      id: center.ConstName,
+      ra: center.RtAsc,     // RA in hours
+      dec: center.Declin,   // Dec in degrees
+      name: center.ConstName
+    }));
+    
+    console.log('[SkyView] Loaded constellation centers:', constFeatures.length, 'constellations');
+  } catch(e) {
+    console.error('[SkyView] Constellation centers load error:', e);
+    console.error('[SkyView] Constellation centers error details:', {
+      name: e.name,
+      message: e.message,
+      stack: e.stack
+    });
+  }
+
   // Generate ecliptic line
   console.log('[SkyView] Generating ecliptic line...');
   eclipticLine = generateEclipticLine();
   console.log('[SkyView] Generated ecliptic points:', eclipticLine.length);
 
   try {
-    const resp = await fetch('/corrected_galaxies.json');
+    const resp = await fetch('/static/galaxies.json');
     if(!resp.ok) throw resp;
     const raw = await resp.json();
     galaxies = raw.map(g=>{
@@ -3344,7 +3526,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   try {
-    openClusters = await (await fetch('/corrected_open_clusters.json')).json();
+    openClusters = await (await fetch('/static/open_clusters.json')).json();
     // ensure RtAsc is float (in hours)
     openClusters = openClusters.map(o => ({
       ...o,
@@ -3361,9 +3543,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Load new object data
   try {
     const [globularData, nebulaData, planetaryData] = await Promise.all([
-      fetch('/corrected_globular_clusters.json').then(r=>r.json()),
-      fetch('/corrected_nebula.json').then(r=>r.json()),
-      fetch('/corrected_planetary_nebula.json').then(r=>r.json())
+      fetch('/static/globular_clusters.json').then(async r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const text = await r.text();
+        try { return JSON.parse(text); } catch(e) { console.error('Invalid JSON in globular_clusters:', text.substring(0, 200)); throw e; }
+      }),
+      fetch('/static/nebula.json').then(async r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const text = await r.text();
+        try { return JSON.parse(text); } catch(e) { console.error('Invalid JSON in nebula:', text.substring(0, 200)); throw e; }
+      }),
+      fetch('/static/planetary_nebula.json').then(async r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const text = await r.text();
+        try { return JSON.parse(text); } catch(e) { console.error('Invalid JSON in planetary_nebula:', text.substring(0, 200)); throw e; }
+      })
     ]);
     globularClusters = globularData;
     nebulae = nebulaData;
@@ -3378,17 +3572,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Load Messier objects separately with error handling
   try {
-    messierObjects = await (await fetch('/corrected_messier.json')).json();
-    console.log('[SkyView] Loaded corrected Messier objects:', messierObjects.length);
+    messierObjects = await (await fetch('/static/messier.json')).json();
+    console.log('[SkyView] Loaded Messier objects:', messierObjects.length);
   } catch(e) {
-    console.warn('Failed to load corrected_messier.json, falling back to regular messier.json:', e);
-    try {
-      messierObjects = await (await fetch('/static/messier.json')).json();
-      console.log('[SkyView] Loaded fallback Messier objects:', messierObjects.length);
-    } catch(e2) {
-      console.error('Failed to load messier.json:', e2);
-      messierObjects = [];
-    }
+    console.error('Failed to load messier.json:', e);
+    messierObjects = [];
   }
 
 
@@ -3399,6 +3587,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   let fetchingCalPoints = false; // Guard to prevent overlapping fetches
 
   async function fetchCalPoints() {
+    // Don't fetch if SkyView is hidden
+    const skyContainer = document.getElementById('skyviewContainer');
+    if (!skyContainer || skyContainer.style.display === 'none') {
+      console.log('[SkyView] SkyView hidden, skipping cal points fetch');
+      return;
+    }
+    
     if (fetchingCalPoints) {
       console.log('[SkyView] Cal points fetch already in progress, skipping...');
       return;
@@ -3488,9 +3683,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Initialize slider styles
   if (starMagSlider) updateSliderStyle(starMagSlider);
   if (galMagSlider) updateSliderStyle(galMagSlider);
+  
+  // Store function reference for reinitialization
+  window.skyviewUpdateSliderStyle = updateSliderStyle;
 
   // Update slider styles when night mode changes
-  const observer = new MutationObserver((mutations) => {
+  const sliderObserver = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
       if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
         if (starMagSlider) updateSliderStyle(starMagSlider);
@@ -3498,11 +3696,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     });
   });
-  observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  sliderObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  window.skyviewSliderObserver = sliderObserver; // Store globally for cleanup
 
   // Fetch cal points on load and every 10s
+  // Clear any existing cal points interval first (protection against multiple loads)
+  if (window.skyviewCalPointsInterval) {
+    clearInterval(window.skyviewCalPointsInterval);
+  }
+  
   fetchCalPoints();
-  setInterval(fetchCalPoints, 10000);
+  let calPointsInterval = setInterval(fetchCalPoints, 10000);
+  window.skyviewCalPointsInterval = calPointsInterval; // Store globally for cleanup
+  window.skyviewFetchCalPoints = fetchCalPoints; // Store function reference for reinitialization
 
   // --- Mount Position: fetch and update reticle ---
   // (Removed duplicate/incorrect fetchMount definition)
@@ -3694,7 +3900,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       .then(response => response.json())
       .then(data => {
         debugLog('Sync response:', data);
-        // Sync complete - no popup needed
+        // Sync complete - immediately update mount position for responsive reticle
+        fetchMount();
       })
       .catch(error => {
         debugLog('Sync error:', error);
@@ -3954,4 +4161,271 @@ function showSelectedAttributes(selected) {
       }
     }
   }
+}
+
+// Function to clean up SkyView and restore main UI polling
+function cleanupSkyView() {
+  console.log('[SkyView] Cleaning up intervals and event listeners...');
+  console.log('[SkyView] Current intervals before cleanup:', {
+    mount: window.skyviewMountInterval,
+    time: window.skyviewTimeInterval,
+    calPoints: window.skyviewCalPointsInterval
+  });
+  
+  // Clear SkyView intervals
+  if (window.skyviewMountInterval) {
+    console.log('[SkyView] Clearing mount interval:', window.skyviewMountInterval);
+    clearInterval(window.skyviewMountInterval);
+    window.skyviewMountInterval = null;
+  }
+  if (window.skyviewTimeInterval) {
+    console.log('[SkyView] Clearing time interval:', window.skyviewTimeInterval);
+    clearInterval(window.skyviewTimeInterval);  
+    window.skyviewTimeInterval = null;
+  }
+  if (window.skyviewCalPointsInterval) {
+    console.log('[SkyView] Clearing cal points interval:', window.skyviewCalPointsInterval);
+    clearInterval(window.skyviewCalPointsInterval);
+    window.skyviewCalPointsInterval = null;
+  }
+  
+  // Disconnect MutationObserver
+  if (window.skyviewSliderObserver) {
+    window.skyviewSliderObserver.disconnect();
+    window.skyviewSliderObserver = null;
+  }
+  
+  // Remove event listeners from canvas
+  const canvas = document.getElementById('skyviewCanvas');
+  if (canvas && window.skyViewCanvasListeners) {
+    const listeners = window.skyViewCanvasListeners;
+    if (listeners.pointerdown) canvas.removeEventListener('pointerdown', listeners.pointerdown);
+    if (listeners.pointermove) canvas.removeEventListener('pointermove', listeners.pointermove);
+    if (listeners.pointermove2) canvas.removeEventListener('pointermove', listeners.pointermove2);
+    if (listeners.pointerup) canvas.removeEventListener('pointerup', listeners.pointerup);
+    if (listeners.pointerup2) canvas.removeEventListener('pointerup', listeners.pointerup2);
+    if (listeners.wheel) canvas.removeEventListener('wheel', listeners.wheel);
+    // DON'T set to null - keep references so we can re-attach them later
+    // window.skyViewCanvasListeners = null;
+  }
+  
+  // Remove resize event listeners
+  if (window.skyViewEventListeners) {
+    window.removeEventListener('resize', window.skyViewEventListeners.resize);
+    if (window.visualViewport && window.skyViewEventListeners.visualViewportResize) {
+      window.visualViewport.removeEventListener('resize', window.skyViewEventListeners.visualViewportResize);
+    }
+    // DON'T set to null - keep references so we can re-attach them later
+    // window.skyViewEventListeners = null;
+  }
+  
+  // Clear arrays to help garbage collection
+  if (typeof starHits !== 'undefined') starHits.length = 0;
+  if (typeof galaxyHits !== 'undefined') galaxyHits.length = 0;
+  if (typeof openHits !== 'undefined') openHits.length = 0;
+  if (typeof globularHits !== 'undefined') globularHits.length = 0;
+  if (typeof nebulaHits !== 'undefined') nebulaHits.length = 0;
+  if (typeof planetaryHits !== 'undefined') planetaryHits.length = 0;
+  if (typeof solarSystemHits !== 'undefined') solarSystemHits.length = 0;
+  if (typeof placedLabels !== 'undefined') placedLabels.length = 0;
+  if (typeof boundingBoxPool !== 'undefined') boundingBoxPool.length = 0;
+  
+  console.log('[SkyView] Cleanup complete');
+}
+
+// Function to reinitialize SkyView event listeners
+function reinitializeSkyView() {
+  console.log('[SkyView] Reinitializing event listeners...');
+  console.log('[SkyView] Current intervals:', {
+    mount: window.skyviewMountInterval,
+    time: window.skyviewTimeInterval,
+    calPoints: window.skyviewCalPointsInterval
+  });
+  
+  const canvas = document.getElementById('skyviewCanvas');
+  if (!canvas) {
+    console.error('[SkyView] Canvas not found during reinitialization');
+    return;
+  }
+  
+  // Ensure listener storage objects exist
+  if (!window.skyViewCanvasListeners) {
+    console.warn('[SkyView] Canvas listeners object missing, creating new one');
+    window.skyViewCanvasListeners = {};
+  }
+  
+  if (!window.skyViewEventListeners) {
+    console.warn('[SkyView] Window listeners object missing, creating new one');
+    window.skyViewEventListeners = {};
+  }
+  
+  // Re-attach canvas event listeners from stored references
+  if (window.skyViewCanvasListeners && Object.keys(window.skyViewCanvasListeners).length > 0) {
+    const listeners = window.skyViewCanvasListeners;
+    console.log('[SkyView] Re-attaching canvas listeners:', Object.keys(listeners));
+    
+    if (listeners.pointerdown) {
+      canvas.addEventListener('pointerdown', listeners.pointerdown);
+    }
+    if (listeners.pointermove) {
+      canvas.addEventListener('pointermove', listeners.pointermove);
+    }
+    if (listeners.pointerup) {
+      canvas.addEventListener('pointerup', listeners.pointerup);
+    }
+    if (listeners.pointermove2) {
+      canvas.addEventListener('pointermove', listeners.pointermove2);
+    }
+    if (listeners.pointerup2) {
+      canvas.addEventListener('pointerup', listeners.pointerup2);
+    }
+    if (listeners.wheel) {
+      canvas.addEventListener('wheel', listeners.wheel, { passive: false });
+    }
+  } else {
+    console.error('[SkyView] No canvas listeners found to reinitialize!');
+  }
+  
+  // Re-attach window event listeners from stored references
+  if (window.skyViewEventListeners && Object.keys(window.skyViewEventListeners).length > 0) {
+    const listeners = window.skyViewEventListeners;
+    console.log('[SkyView] Re-attaching window listeners:', Object.keys(listeners));
+    
+    if (listeners.resize) {
+      window.addEventListener('resize', listeners.resize);
+    }
+    if (window.visualViewport && listeners.visualViewportResize) {
+      window.visualViewport.addEventListener('resize', listeners.visualViewportResize);
+    }
+  } else {
+    console.error('[SkyView] No window listeners found to reinitialize!');
+  }
+  
+  // Restart intervals with aggressive cleanup
+  console.log('[SkyView] Clearing all existing intervals before restart...');
+  
+  // Clear mount interval
+  if (window.skyviewMountInterval) {
+    console.log('[SkyView] Clearing existing mount interval:', window.skyviewMountInterval);
+    clearInterval(window.skyviewMountInterval);
+    window.skyviewMountInterval = null;
+  }
+  
+  if (window.skyviewFetchMount) {
+    console.log('[SkyView] Starting new mount polling interval...');
+    window.skyviewFetchMount();
+    window.skyviewMountInterval = setInterval(window.skyviewFetchMount, 1000);
+    console.log('[SkyView] Restarted mount polling interval:', window.skyviewMountInterval);
+  } else {
+    console.error('[SkyView] skyviewFetchMount function not found!');
+  }
+  
+  // Clear time interval
+  if (window.skyviewTimeInterval) {
+    console.log('[SkyView] Clearing existing time interval:', window.skyviewTimeInterval);
+    clearInterval(window.skyviewTimeInterval);
+    window.skyviewTimeInterval = null;
+  }
+  
+  if (window.skyviewUpdateServerTimeOffset) {
+    console.log('[SkyView] Starting new time sync interval...');
+    window.skyviewUpdateServerTimeOffset();
+    window.skyviewTimeInterval = setInterval(window.skyviewUpdateServerTimeOffset, 60000);
+    console.log('[SkyView] Restarted time sync interval:', window.skyviewTimeInterval);
+  } else {
+    console.error('[SkyView] skyviewUpdateServerTimeOffset function not found!');
+  }
+  
+  // Clear cal points interval
+  if (window.skyviewCalPointsInterval) {
+    console.log('[SkyView] Clearing existing cal points interval:', window.skyviewCalPointsInterval);
+    clearInterval(window.skyviewCalPointsInterval);
+    window.skyviewCalPointsInterval = null;
+  }
+  
+  if (window.skyviewFetchCalPoints) {
+    console.log('[SkyView] Starting new cal points interval...');
+    window.skyviewFetchCalPoints();
+    window.skyviewCalPointsInterval = setInterval(window.skyviewFetchCalPoints, 10000);
+    console.log('[SkyView] Restarted cal points interval:', window.skyviewCalPointsInterval);
+  } else {
+    console.error('[SkyView] skyviewFetchCalPoints function not found!');
+  }
+  
+  // Reconnect MutationObserver
+  if (window.skyviewSliderObserver) {
+    window.skyviewSliderObserver.disconnect();
+  }
+  const starMagSlider = document.getElementById('starMagSlider');
+  const galMagSlider = document.getElementById('galMagSlider');
+  if ((starMagSlider || galMagSlider) && window.skyviewUpdateSliderStyle) {
+    const newSliderObserver = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+          if (starMagSlider) window.skyviewUpdateSliderStyle(starMagSlider);
+          if (galMagSlider) window.skyviewUpdateSliderStyle(galMagSlider);
+        }
+      });
+    });
+    newSliderObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    window.skyviewSliderObserver = newSliderObserver;
+    console.log('[SkyView] Reconnected slider MutationObserver');
+  }
+  
+  // Trigger a redraw
+  if (typeof draw === 'function') {
+    draw();
+    console.log('[SkyView] Triggered initial redraw');
+  }
+  
+  console.log('[SkyView] Reinitialization complete');
+}
+
+// Cleanup handler for page unload
+window.addEventListener('beforeunload', cleanupSkyView);
+
+// Also make cleanup available globally for manual cleanup when hiding SkyView overlay
+window.cleanupSkyView = cleanupSkyView;
+
+// Make reinitialize available globally for restoring SkyView when showing it again
+window.reinitializeSkyView = reinitializeSkyView;
+
+// Diagnostic function to check SkyView state
+window.diagnoseSkyView = function() {
+  console.log('[SkyView] === DIAGNOSTIC INFO ===');
+  console.log('[SkyView] Intervals:', {
+    mount: window.skyviewMountInterval,
+    time: window.skyviewTimeInterval,
+    calPoints: window.skyviewCalPointsInterval
+  });
+  console.log('[SkyView] Functions:', {
+    fetchMount: typeof window.skyviewFetchMount,
+    updateTime: typeof window.skyviewUpdateServerTimeOffset,
+    fetchCalPoints: typeof window.skyviewFetchCalPoints,
+    updateSlider: typeof window.skyviewUpdateSliderStyle
+  });
+  console.log('[SkyView] Listeners:', {
+    canvas: window.skyViewCanvasListeners ? Object.keys(window.skyViewCanvasListeners) : 'null',
+    window: window.skyViewEventListeners ? Object.keys(window.skyViewEventListeners) : 'null'
+  });
+  console.log('[SkyView] Observer:', window.skyviewSliderObserver ? 'exists' : 'null');
+  if (performance.memory) {
+    const used = Math.round(performance.memory.usedJSHeapSize / 1048576);
+    const total = Math.round(performance.memory.totalJSHeapSize / 1048576);
+    console.log('[SkyView] Memory:', `${used}MB / ${total}MB`);
+  }
+  console.log('[SkyView] === END DIAGNOSTIC ===');
+};
+
+// Unified UI - buttons updated by main UI polling naturally
+
+// Simplified unified UI - no polling coordination needed
+
+// Simplified initialization - no polling coordination needed
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log('[SkyView] SkyView initialized');
+  });
+} else {
+  console.log('[SkyView] SkyView initialized');
 }

@@ -23,8 +23,8 @@ from flask import (
     flash, redirect, url_for, send_from_directory
 )
 
-# Import astrometric corrections
-from astrometric_corrections import preprocess_catalogs_for_current_epoch
+# Astrometric corrections removed
+# from astrometric_corrections import preprocess_catalogs_for_current_epoch
 
 # Import SiTech controller communication
 from sitech_controller import get_controller_status, set_controller_mode, SiTechController
@@ -43,16 +43,16 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'  # Replace with a strong secret key
 
-# Global variables for corrected catalog paths
-corrected_catalogs = {
-    'stars': None,
-    'messier': None,
-    'constellations': None,
-    'galaxies': None,
-    'globular_clusters': None,
-    'nebula': None,
-    'open_clusters': None,
-    'planetary_nebula': None
+# Static catalog paths (astrometric corrections removed)
+catalog_paths = {
+    'stars': os.path.join(BASE_DIR, 'static', 'stars.json'),
+    'messier': os.path.join(BASE_DIR, 'static', 'messier.json'),
+    'constellations': os.path.join(BASE_DIR, 'static', 'constellations.json'),
+    'galaxies': os.path.join(BASE_DIR, 'static', 'galaxies.json'),
+    'globular_clusters': os.path.join(BASE_DIR, 'static', 'globular_clusters.json'),
+    'nebula': os.path.join(BASE_DIR, 'static', 'nebula.json'),
+    'open_clusters': os.path.join(BASE_DIR, 'static', 'open_clusters.json'),
+    'planetary_nebula': os.path.join(BASE_DIR, 'static', 'planetary_nebula.json')
 }
 
 
@@ -422,8 +422,8 @@ def status_update_loop():
             else:
                 print("[SiPi STATUS] No persistent socket, attempting to connect")
                 connect_persistent_socket()
-            # poll every 200 ms instead of 500 ms
-            time.sleep(0.2)
+            # Poll every 500ms (2x per second) to reduce CPU usage
+            time.sleep(0.5)
         except Exception as e:
             print(f"[SiPi STATUS] Exception in status loop: {e}")
             try: persistent_socket.close()
@@ -656,6 +656,61 @@ def status():
         alt=alt, az=az, tracking=track,
         boot_id=BOOT_ID
     )
+
+@app.route('/system_status')
+def system_status():
+    """
+    Return system status including hostname resolution information for iOS troubleshooting
+    """
+    hostname = socket.gethostname()
+    
+    try:
+        # Get local IP address
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+    except:
+        local_ip = "127.0.0.1"
+    
+    # Get additional network information for iOS troubleshooting
+    network_info = {
+        'hostname': hostname,
+        'local_ip': local_ip,
+        'fqdn': socket.getfqdn(),
+    }
+    
+    status_data = {
+        'hostname': hostname,
+        'local_ip': local_ip,
+        'boot_id': BOOT_ID,
+        'network_info': network_info,
+        'ios_dns_help': {
+            'ip_address': local_ip,
+            'hostnames': [
+                f"{hostname}.local",
+                hostname,
+                "sipi.local",
+                local_ip
+            ],
+            'instructions': [
+                f"Try accessing: http://{local_ip}:5000",
+                f"Try accessing: http://{hostname}.local:5000",
+                f"Try accessing: http://sipi.local:5000",
+                "If none work, check WiFi connection and DNS settings"
+            ],
+            'troubleshooting': "If you can't access SiPi on iOS, try these URLs in Safari"
+        }
+    }
+    
+    return jsonify(status_data)
+
+@app.route('/ios-help')
+def ios_help():
+    """
+    iOS troubleshooting page for DNS/connectivity issues
+    """
+    return render_template('ios_help.html')
 
 @app.route('/test_connection', methods=['GET'])
 def test_connection():
@@ -1762,68 +1817,8 @@ def remove_last_cal_point():
     resp = send_command("RemoveLastCalPoint\n", timeout=5, terminator="\n")
     return jsonify(response=resp)
 
-# --- Astrometric Corrections ---
-def check_and_update_catalogs_for_time_change():
-    """Check if significant time change occurred and regenerate catalogs if needed."""
-    global corrected_catalogs
-    
-    try:
-        # Check if any catalog file exists to get its timestamp
-        stars_path = corrected_catalogs.get('stars')
-        if not stars_path or not os.path.exists(stars_path):
-            return  # No existing catalogs to check
-        
-        # Get current Julian Day
-        current_jd = datetime.datetime.now(datetime.timezone.utc).timestamp() / 86400.0 + 2440587.5
-        
-        # Check the cached catalog's Julian Day from filename
-        import re
-        jd_match = re.search(r'JD(\d+)', os.path.basename(stars_path))
-        if jd_match:
-            cached_jd = float(jd_match.group(1))
-            
-            # If difference is more than 0.5 days (12 hours), regenerate
-            jd_difference = abs(current_jd - cached_jd)
-            if jd_difference > 0.5:
-                print(f"[CATALOG] Significant time change detected: {jd_difference:.2f} days")
-                print(f"[CATALOG] Regenerating catalogs for current epoch...")
-                
-                # Regenerate all catalogs
-                corrected_catalogs = preprocess_catalogs_for_current_epoch(BASE_DIR)
-                print("[CATALOG] Catalogs updated for new time")
-            
-    except Exception as e:
-        print(f"[CATALOG] Error checking time change: {e}")
-
-def initialize_astrometric_corrections():
-    """Initialize astrometric corrections at startup."""
-    global corrected_catalogs
-    
-    print("Initializing astrometric corrections...")
-    try:
-        corrected_catalogs = preprocess_catalogs_for_current_epoch(BASE_DIR)
-        print("Astrometric corrections initialized successfully.")
-        print(f"Stars catalog: {corrected_catalogs['stars']}")
-        print(f"Messier catalog: {corrected_catalogs['messier']}")
-        print(f"Constellations catalog: {corrected_catalogs['constellations']}")
-        print(f"Galaxies catalog: {corrected_catalogs['galaxies']}")
-        print(f"Globular clusters catalog: {corrected_catalogs['globular_clusters']}")
-        print(f"Nebula catalog: {corrected_catalogs['nebula']}")
-        print(f"Open clusters catalog: {corrected_catalogs['open_clusters']}")
-        print(f"Planetary nebula catalog: {corrected_catalogs['planetary_nebula']}")
-    except Exception as e:
-        print(f"Warning: Astrometric corrections failed: {e}")
-        print("Falling back to original catalogs.")
-        corrected_catalogs = {
-            'stars': os.path.join(BASE_DIR, 'static', 'stars.json'),
-            'messier': os.path.join(BASE_DIR, 'static', 'messier.json'),
-            'constellations': os.path.join(BASE_DIR, 'static', 'constellations.json'),
-            'galaxies': os.path.join(BASE_DIR, 'static', 'galaxies.json'),
-            'globular_clusters': os.path.join(BASE_DIR, 'static', 'globular_clusters.json'),
-            'nebula': os.path.join(BASE_DIR, 'static', 'nebula.json'),
-            'open_clusters': os.path.join(BASE_DIR, 'static', 'open_clusters.json'),
-            'planetary_nebula': os.path.join(BASE_DIR, 'static', 'planetary_nebula.json')
-        }
+# --- Astrometric Corrections Removed ---
+# Functions for astrometric corrections have been removed
 
 @app.route('/current_lst')
 def current_lst():
@@ -1866,125 +1861,57 @@ def current_lst():
 
 @app.route('/corrected_stars.json')
 def corrected_stars():
-    """Serve the astrometrically corrected star catalog."""
-    try:
-        # Check if catalogs need regeneration due to time change
-        check_and_update_catalogs_for_time_change()
-        
-        with open(corrected_catalogs['stars'], 'r') as f:
-            data = json.load(f)
-        return jsonify(data)
-    except Exception as e:
-        print(f"Error serving corrected stars: {e}")
-        # Fallback to original catalog
-        return send_from_directory(os.path.join(BASE_DIR, 'static'), 'stars.json')
+    """Serve the star catalog (astrometric corrections removed)."""
+    return send_from_directory(os.path.join(BASE_DIR, 'static'), 'stars.json')
 
 @app.route('/corrected_messier.json')
 def corrected_messier():
-    """Serve the astrometrically corrected Messier catalog."""
-    try:
-        with open(corrected_catalogs['messier'], 'r') as f:
-            data = json.load(f)
-        return jsonify(data)
-    except Exception as e:
-        print(f"Error serving corrected Messier catalog: {e}")
-        # Fallback to original catalog
-        return send_from_directory(os.path.join(BASE_DIR, 'static'), 'messier.json')
+    """Serve the Messier catalog (astrometric corrections removed)."""
+    return send_from_directory(os.path.join(BASE_DIR, 'static'), 'messier.json')
 
 @app.route('/corrected_constellations.json')
 def corrected_constellations():
-    """Serve the astrometrically corrected constellation catalog."""
-    try:
-        with open(corrected_catalogs['constellations'], 'r') as f:
-            data = json.load(f)
-        return jsonify(data)
-    except Exception as e:
-        print(f"Error serving corrected constellation catalog: {e}")
-        # Fallback to original catalog
-        return send_from_directory(os.path.join(BASE_DIR, 'static'), 'constellations.json')
+    """Serve the constellation catalog (astrometric corrections removed)."""
+    return send_from_directory(os.path.join(BASE_DIR, 'static'), 'constellations.json')
 
 @app.route('/corrected_galaxies.json')
 def corrected_galaxies():
-    """Serve the astrometrically corrected galaxy catalog."""
-    try:
-        with open(corrected_catalogs['galaxies'], 'r') as f:
-            data = json.load(f)
-        return jsonify(data)
-    except Exception as e:
-        print(f"Error serving corrected galaxy catalog: {e}")
-        # Fallback to original catalog
-        return send_from_directory(os.path.join(BASE_DIR, 'static'), 'galaxies.json')
+    """Serve the galaxy catalog (astrometric corrections removed)."""
+    return send_from_directory(os.path.join(BASE_DIR, 'static'), 'galaxies.json')
 
 @app.route('/corrected_globular_clusters.json')
 def corrected_globular_clusters():
-    """Serve the astrometrically corrected globular cluster catalog."""
-    try:
-        with open(corrected_catalogs['globular_clusters'], 'r') as f:
-            data = json.load(f)
-        return jsonify(data)
-    except Exception as e:
-        print(f"Error serving corrected globular cluster catalog: {e}")
-        # Fallback to original catalog
-        return send_from_directory(os.path.join(BASE_DIR, 'static'), 'globular_clusters.json')
+    """Serve the globular cluster catalog (astrometric corrections removed)."""
+    return send_from_directory(os.path.join(BASE_DIR, 'static'), 'globular_clusters.json')
 
 @app.route('/corrected_nebula.json')
 def corrected_nebula():
-    """Serve the astrometrically corrected nebula catalog."""
-    try:
-        with open(corrected_catalogs['nebula'], 'r') as f:
-            data = json.load(f)
-        return jsonify(data)
-    except Exception as e:
-        print(f"Error serving corrected nebula catalog: {e}")
-        # Fallback to original catalog
-        return send_from_directory(os.path.join(BASE_DIR, 'static'), 'nebula.json')
+    """Serve the nebula catalog (astrometric corrections removed)."""
+    return send_from_directory(os.path.join(BASE_DIR, 'static'), 'nebula.json')
 
 @app.route('/corrected_open_clusters.json')
 def corrected_open_clusters():
-    """Serve the astrometrically corrected open cluster catalog."""
-    try:
-        with open(corrected_catalogs['open_clusters'], 'r') as f:
-            data = json.load(f)
-        return jsonify(data)
-    except Exception as e:
-        print(f"Error serving corrected open cluster catalog: {e}")
-        # Fallback to original catalog
-        return send_from_directory(os.path.join(BASE_DIR, 'static'), 'open_clusters.json')
+    """Serve the open cluster catalog (astrometric corrections removed)."""
+    return send_from_directory(os.path.join(BASE_DIR, 'static'), 'open_clusters.json')
 
 @app.route('/corrected_planetary_nebula.json')
 def corrected_planetary_nebula():
-    """Serve the astrometrically corrected planetary nebula catalog."""
-    try:
-        with open(corrected_catalogs['planetary_nebula'], 'r') as f:
-            data = json.load(f)
-        return jsonify(data)
-    except Exception as e:
-        print(f"Error serving corrected planetary nebula catalog: {e}")
-        # Fallback to original catalog
-        return send_from_directory(os.path.join(BASE_DIR, 'static'), 'planetary_nebula.json')
+    """Serve the planetary nebula catalog (astrometric corrections removed)."""
+    return send_from_directory(os.path.join(BASE_DIR, 'static'), 'planetary_nebula.json')
 
 @app.route('/reprocess_catalogs', methods=['POST'])
 def reprocess_catalogs():
-    """Manually trigger catalog reprocessing."""
-    try:
-        global corrected_catalogs
-        corrected_catalogs = preprocess_catalogs_for_current_epoch(BASE_DIR)
-        return jsonify({
-            'status': 'success',
-            'message': 'Catalogs reprocessed successfully',
-            'catalogs': corrected_catalogs
-        })
-    except Exception as e:
-        return jsonify({
-            'status': 'error',
-            'message': f'Reprocessing failed: {str(e)}'
-        }), 500
+    """Catalog reprocessing removed (astrometric corrections disabled)."""
+    return jsonify({
+        'status': 'disabled',
+        'message': 'Astrometric corrections have been removed from this system'
+    })
 
 @app.route('/catalog_status')
 def catalog_status():
-    """Get status of current catalogs."""
+    """Get status of current catalogs (astrometric corrections removed)."""
     status = {}
-    for name, path in corrected_catalogs.items():
+    for name, path in catalog_paths.items():
         if path and os.path.exists(path):
             try:
                 with open(path, 'r') as f:
@@ -1992,22 +1919,15 @@ def catalog_status():
                 
                 # Handle different catalog formats
                 if name == 'constellations':
-                    # Constellation catalog has metadata at root level
-                    is_corrected = '_correction_metadata' in data
-                    correction_jd = data.get('_correction_metadata', {}).get('correction_jd') if is_corrected else None
                     sample_size = len(data.get('features', []))
                 else:
-                    # Star and Messier catalogs have metadata in objects
-                    sample = data[:3] if isinstance(data, list) else []
-                    is_corrected = '_correction_jd' in sample[0] if sample else False
-                    correction_jd = sample[0].get('_correction_jd') if is_corrected and sample else None
                     sample_size = len(data) if isinstance(data, list) else 0
                 
                 status[name] = {
                     'path': path,
                     'exists': True,
-                    'corrected': is_corrected,
-                    'correction_jd': correction_jd,
+                    'corrected': False,  # No corrections applied
+                    'correction_jd': None,
                     'file_size': os.path.getsize(path),
                     'modified': os.path.getmtime(path),
                     'object_count': sample_size
@@ -2100,10 +2020,11 @@ def performance_status():
         ]
     })
 
-@app.route('/astrometric')
-def astrometric_admin():
-    """Admin interface for astrometric corrections."""
-    return render_template('astrometric.html')
+# Astrometric admin interface removed
+# @app.route('/astrometric')
+# def astrometric_admin():
+#     """Admin interface for astrometric corrections."""
+#     return render_template('astrometric.html')
 
 @app.route('/sitech_service_status')
 def sitech_service_status():
@@ -2279,7 +2200,7 @@ if __name__ == '__main__':
     connect_command_socket()
     connect_persistent_socket()
     
-    initialize_astrometric_corrections()  # Initialize corrected catalogs
+    # Astrometric corrections removed
     wait_for_ip()
     print("[SiPi STARTUP] Starting status update thread")
     threading.Thread(target=status_update_loop, daemon=True).start()

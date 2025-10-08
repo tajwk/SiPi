@@ -1,0 +1,442 @@
+[
+  {
+    "RtAsc": 7.9453,
+    "Declin": 39.906,
+    "ConstName": "AND"
+  },
+  {
+    "RtAsc": 10.1967,
+    "Declin": -33.4638,
+    "ConstName": "ANT"
+  },
+  {
+    "RtAsc": 16.1916,
+    "Declin": -76.0018,
+    "ConstName": "APS"
+  },
+  {
+    "RtAsc": 22.2936,
+    "Declin": -9.8677,
+    "ConstName": "AQR"
+  },
+  {
+    "RtAsc": 19.5842,
+    "Declin": 3.1503,
+    "ConstName": "AQL"
+  },
+  {
+    "RtAsc": 17.3386,
+    "Declin": -55.7936,
+    "ConstName": "ARA"
+  },
+  {
+    "RtAsc": 2.6658,
+    "Declin": 20.6283,
+    "ConstName": "ARI"
+  },
+  {
+    "RtAsc": 6.0033,
+    "Declin": 41.1501,
+    "ConstName": "AUR"
+  },
+  {
+    "RtAsc": 14.6839,
+    "Declin": 32.0405,
+    "ConstName": "BOO"
+  },
+  {
+    "RtAsc": 4.7327,
+    "Declin": -38.1184,
+    "ConstName": "CAE"
+  },
+  {
+    "RtAsc": 8.6476,
+    "Declin": 75.1409,
+    "ConstName": "CAM"
+  },
+  {
+    "RtAsc": 8.6477,
+    "Declin": 19.4364,
+    "ConstName": "CNC"
+  },
+  {
+    "RtAsc": 13.1766,
+    "Declin": 40.0799,
+    "ConstName": "CVN"
+  },
+  {
+    "RtAsc": 6.8166,
+    "Declin": -22.3275,
+    "ConstName": "CMA"
+  },
+  {
+    "RtAsc": 7.6411,
+    "Declin": 6.3005,
+    "ConstName": "CMI"
+  },
+  {
+    "RtAsc": 21.036,
+    "Declin": -17.7828,
+    "ConstName": "CAP"
+  },
+  {
+    "RtAsc": 8.7443,
+    "Declin": -61.251,
+    "ConstName": "CAR"
+  },
+  {
+    "RtAsc": 7.3347,
+    "Declin": 62.671,
+    "ConstName": "CAS"
+  },
+  {
+    "RtAsc": 13.0625,
+    "Declin": -47.7813,
+    "ConstName": "CEN"
+  },
+  {
+    "RtAsc": 11.8193,
+    "Declin": 77.6944,
+    "ConstName": "CEP"
+  },
+  {
+    "RtAsc": 4.6292,
+    "Declin": -7.7316,
+    "ConstName": "CET"
+  },
+  {
+    "RtAsc": 10.6881,
+    "Declin": -79.3046,
+    "ConstName": "CHA"
+  },
+  {
+    "RtAsc": 14.6802,
+    "Declin": -63.943,
+    "ConstName": "CIR"
+  },
+  {
+    "RtAsc": 5.8392,
+    "Declin": -35.5138,
+    "ConstName": "COL"
+  },
+  {
+    "RtAsc": 12.7756,
+    "Declin": 22.7875,
+    "ConstName": "COM"
+  },
+  {
+    "RtAsc": 18.647,
+    "Declin": -41.2134,
+    "ConstName": "CRA"
+  },
+  {
+    "RtAsc": 15.8561,
+    "Declin": 32.1549,
+    "ConstName": "CRB"
+  },
+  {
+    "RtAsc": 12.4333,
+    "Declin": -18.4513,
+    "ConstName": "CRV"
+  },
+  {
+    "RtAsc": 11.4034,
+    "Declin": -15.9044,
+    "ConstName": "CRT"
+  },
+  {
+    "RtAsc": 12.4483,
+    "Declin": -60.1888,
+    "ConstName": "CRU"
+  },
+  {
+    "RtAsc": 20.5162,
+    "Declin": 43.9464,
+    "ConstName": "CYG"
+  },
+  {
+    "RtAsc": 20.6792,
+    "Declin": 12.3551,
+    "ConstName": "DEL"
+  },
+  {
+    "RtAsc": 5.1054,
+    "Declin": -60.5538,
+    "ConstName": "DOR"
+  },
+  {
+    "RtAsc": 15.5443,
+    "Declin": 68.6848,
+    "ConstName": "DRA"
+  },
+  {
+    "RtAsc": 21.1888,
+    "Declin": 7.9732,
+    "ConstName": "EQU"
+  },
+  {
+    "RtAsc": 3.4023,
+    "Declin": -29.915,
+    "ConstName": "ERI"
+  },
+  {
+    "RtAsc": 2.8015,
+    "Declin": -31.3959,
+    "ConstName": "FOR"
+  },
+  {
+    "RtAsc": 7.1159,
+    "Declin": 23.1613,
+    "ConstName": "GEM"
+  },
+  {
+    "RtAsc": 22.4956,
+    "Declin": -45.6654,
+    "ConstName": "GRU"
+  },
+  {
+    "RtAsc": 17.2634,
+    "Declin": 28.2053,
+    "ConstName": "HER"
+  },
+  {
+    "RtAsc": 3.256,
+    "Declin": -53.2184,
+    "ConstName": "HOR"
+  },
+  {
+    "RtAsc": 11.1864,
+    "Declin": -20.1483,
+    "ConstName": "HYA"
+  },
+  {
+    "RtAsc": 2.2542,
+    "Declin": -72.8217,
+    "ConstName": "HYI"
+  },
+  {
+    "RtAsc": 21.8721,
+    "Declin": -61.3567,
+    "ConstName": "IND"
+  },
+  {
+    "RtAsc": 22.4882,
+    "Declin": 45.9911,
+    "ConstName": "LAC"
+  },
+  {
+    "RtAsc": 10.685,
+    "Declin": 15.505,
+    "ConstName": "LEO"
+  },
+  {
+    "RtAsc": 10.3089,
+    "Declin": 33.0126,
+    "ConstName": "LMI"
+  },
+  {
+    "RtAsc": 5.5502,
+    "Declin": -18.9076,
+    "ConstName": "LEP"
+  },
+  {
+    "RtAsc": 15.2038,
+    "Declin": -15.3725,
+    "ConstName": "LIB"
+  },
+  {
+    "RtAsc": 15.2376,
+    "Declin": -43.0095,
+    "ConstName": "LUP"
+  },
+  {
+    "RtAsc": 7.9815,
+    "Declin": 47.1924,
+    "ConstName": "LYN"
+  },
+  {
+    "RtAsc": 18.8699,
+    "Declin": 36.9561,
+    "ConstName": "LYR"
+  },
+  {
+    "RtAsc": 5.3817,
+    "Declin": -78.4417,
+    "ConstName": "MEN"
+  },
+  {
+    "RtAsc": 20.9655,
+    "Declin": -36.4025,
+    "ConstName": "MIC"
+  },
+  {
+    "RtAsc": 7.006,
+    "Declin": -2.1606,
+    "ConstName": "MON"
+  },
+  {
+    "RtAsc": 12.5705,
+    "Declin": -70.0362,
+    "ConstName": "MUS"
+  },
+  {
+    "RtAsc": 15.9854,
+    "Declin": -52.0945,
+    "ConstName": "NOR"
+  },
+  {
+    "RtAsc": 11.712,
+    "Declin": -80.9849,
+    "ConstName": "OCT"
+  },
+  {
+    "RtAsc": 17.3846,
+    "Declin": -5.6609,
+    "ConstName": "OPH"
+  },
+  {
+    "RtAsc": 5.6539,
+    "Declin": 7.1297,
+    "ConstName": "ORI"
+  },
+  {
+    "RtAsc": 19.6057,
+    "Declin": -65.6603,
+    "ConstName": "PAV"
+  },
+  {
+    "RtAsc": 18.5528,
+    "Declin": 19.2808,
+    "ConstName": "PEG"
+  },
+  {
+    "RtAsc": 3.1794,
+    "Declin": 46.3574,
+    "ConstName": "PER"
+  },
+  {
+    "RtAsc": 7.3954,
+    "Declin": -47.8074,
+    "ConstName": "PHE"
+  },
+  {
+    "RtAsc": 5.7159,
+    "Declin": -53.7565,
+    "ConstName": "PIC"
+  },
+  {
+    "RtAsc": 7.4764,
+    "Declin": 11.4715,
+    "ConstName": "PSC"
+  },
+  {
+    "RtAsc": 22.2858,
+    "Declin": -30.5614,
+    "ConstName": "PSA"
+  },
+  {
+    "RtAsc": 7.488,
+    "Declin": -34.2273,
+    "ConstName": "PUP"
+  },
+  {
+    "RtAsc": 8.9142,
+    "Declin": -27.8611,
+    "ConstName": "PYX"
+  },
+  {
+    "RtAsc": 3.9033,
+    "Declin": -60.5669,
+    "ConstName": "RET"
+  },
+  {
+    "RtAsc": 19.69,
+    "Declin": 18.7883,
+    "ConstName": "SGE"
+  },
+  {
+    "RtAsc": 19.1881,
+    "Declin": -28.2494,
+    "ConstName": "SGR"
+  },
+  {
+    "RtAsc": 16.7172,
+    "Declin": -29.6179,
+    "ConstName": "SCO"
+  },
+  {
+    "RtAsc": 9.7389,
+    "Declin": -31.8148,
+    "ConstName": "SCL"
+  },
+  {
+    "RtAsc": 18.6705,
+    "Declin": -9.8028,
+    "ConstName": "SCT"
+  },
+  {
+    "RtAsc": 0,
+    "Declin": 0,
+    "ConstName": "SER"
+  },
+  {
+    "RtAsc": 10.2725,
+    "Declin": -2.6169,
+    "ConstName": "SEX"
+  },
+  {
+    "RtAsc": 4.625,
+    "Declin": 16.9448,
+    "ConstName": "TAU"
+  },
+  {
+    "RtAsc": 19.3276,
+    "Declin": -50.9134,
+    "ConstName": "TEL"
+  },
+  {
+    "RtAsc": 2.1922,
+    "Declin": 31.9689,
+    "ConstName": "TRI"
+  },
+  {
+    "RtAsc": 16.0791,
+    "Declin": -66.012,
+    "ConstName": "TRA"
+  },
+  {
+    "RtAsc": 13.1266,
+    "Declin": -64.8087,
+    "ConstName": "TUC"
+  },
+  {
+    "RtAsc": 11.2824,
+    "Declin": 54.521,
+    "ConstName": "UMA"
+  },
+  {
+    "RtAsc": 12.7399,
+    "Declin": 82.7792,
+    "ConstName": "UMI"
+  },
+  {
+    "RtAsc": 9.5341,
+    "Declin": -47.6833,
+    "ConstName": "VEL"
+  },
+  {
+    "RtAsc": 13.3606,
+    "Declin": -2.5837,
+    "ConstName": "VIR"
+  },
+  {
+    "RtAsc": 7.7829,
+    "Declin": -69.7503,
+    "ConstName": "VOL"
+  },
+  {
+    "RtAsc": 20.2599,
+    "Declin": 24.1969,
+    "ConstName": "VUL"
+  }
+]

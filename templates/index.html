@@ -8,11 +8,9 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-touch-fullscreen" content="yes">
 
-  <!-- Apply night mode immediately to prevent flash -->
+  <!-- Apply night mode immediately - always enabled -->
   <script>
-    if (localStorage.getItem('nightMode') === 'enabled') {
-      document.documentElement.classList.add('night-mode');
-    }
+    document.documentElement.classList.add('night-mode');
   </script>
 
   <!-- Modern Avalon-inspired stylesheet -->
@@ -50,20 +48,20 @@
       touch-action: manipulation;
     }
     
-    #skyviewContainer { display: none; position: relative; min-height: 100vh; background: black; color: white; }
+    #skyviewContainer { display: none; position: relative; min-height: 100vh; background: black; color: white; padding-top: 85px; padding-bottom: 75px; box-sizing: border-box; z-index: 1; }
     /* Coordinates display - centered horizontally above buttons */
     #skyviewTopBar {
-      position:fixed; bottom:70px; left:50%; transform:translateX(-50%); width:auto;
+      position:fixed; bottom:200px; left:50%; transform:translateX(-50%); width:auto;
       padding:10px; background:rgba(0,0,0,0.85);
       border:1px solid #555;
       border-radius:8px;
       display:flex; gap:8px; align-items:center; z-index:20;
     }
     
-    /* Horizontal button row at bottom */
+    /* Horizontal button row at bottom - above static control bar */
     #skyviewBottomButtons {
       position: fixed;
-      bottom: 10px;
+      bottom: 95px;
       left: 50%;
       transform: translateX(-50%);
       display: flex;
@@ -71,20 +69,41 @@
       z-index: 25;
     }
     
-    /* Uniform button styling - all buttons same size */
+    /* Uniform button styling - for SYNC and GO buttons */
     .skyview-btn--uniform {
-      width: 40px !important;
-      height: 40px !important;
-      min-width: 40px !important;
-      min-height: 40px !important;
-      max-width: 40px !important;
-      max-height: 40px !important;
+      width: 72px !important;
+      height: 60px !important;
+      min-width: 72px !important;
+      min-height: 60px !important;
+      max-width: 72px !important;
+      max-height: 60px !important;
       padding: 0 !important;
       margin: 0 !important;
-      border: 1px solid #555 !important;
+      border: 1px solid #ff0000 !important;
       border-radius: 8px !important;
-      background: #28a !important;
-      color: white !important;
+      background: #1a1a1a !important;
+      color: #ff0000 !important;
+      cursor: pointer !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      box-sizing: border-box !important;
+    }
+    
+    /* Smaller button styling - for OBJ, Redraw, Search, and STOP */
+    .skyview-btn--small {
+      width: 50px !important;
+      height: 50px !important;
+      min-width: 50px !important;
+      min-height: 50px !important;
+      max-width: 50px !important;
+      max-height: 50px !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      border: 1px solid #ff0000 !important;
+      border-radius: 8px !important;
+      background: #1a1a1a !important;
+      color: #ff0000 !important;
       cursor: pointer !important;
       display: flex !important;
       align-items: center !important;
@@ -92,11 +111,11 @@
       box-sizing: border-box !important;
     }
     #skyviewTopBar input {
-      width:6em; background:#222; color:#fff;
+      width:6em; background:#1a1a1a; color:#fff;
       border:1px solid #555; padding:2px 4px;
     }
     #skyviewTopBar button {
-      background:#28a; color:#fff; border:none;
+      background:#1a1a1a; color:#ff0000; border:1px solid #ff0000;
       padding:4px 8px; cursor:pointer;
     }
     #refreshBtn {
@@ -104,15 +123,15 @@
       top: 12px;
       right: 90px;
       z-index: 30;
-      background: #28a;
-      color: white;
-      border: none;
+      background: #1a1a1a;
+      color: #ff0000;
+      border: 1px solid #ff0000;
       padding: 4px 8px;
       border-radius: 3px;
       cursor: pointer;
     }
     #starAttributes {
-      position:absolute; top:10px; left:10px; z-index:25;
+      position:absolute; top:65px; left:10px; z-index:25;
       background:rgba(0,0,0,0.7); padding:8px; border-radius:4px;
       font-size:0.9em; line-height:1.4;
       max-width: calc(80vw - 40px);
@@ -145,9 +164,9 @@
       width: auto !important;
       max-width: 120px !important;
       z-index: 31;
-      background: #28a;
-      color: white;
-      border: none;
+      background: #222;
+      color: #ff0000;
+      border: 1px solid #ff0000;
       padding: 6px 12px;
       border-radius: 8px;
       font-size: 1.0em;
@@ -156,19 +175,21 @@
     }
     #toggleBar {
       position: fixed;
-      top: 60px;
-      right: 10px;
+      bottom: 145px;
+      left: 10px;
       width: auto;
       max-width: 540px;
-      z-index: 30;
+      z-index: 2500;
       transform: none;
       background: rgba(0,0,0,0.92);
-      padding: 14px 18px 14px 18px;
+      padding: 6px 10px 6px 10px;
       border-radius: 12px;
       display: flex;
-      flex-wrap: wrap;
-      gap: 18px 24px;
-      font-size: 1em;
+      flex-direction: column-reverse;
+      flex-wrap: nowrap;
+      gap: 4px;
+      font-size: 0.95em;
+      line-height: 1.2;
       align-items: flex-start;
       box-sizing: border-box;
       transition: transform 0.25s, opacity 0.25s;
@@ -196,12 +217,12 @@
     }
     @media (max-width: 600px) {
       #toggleBar {
-        flex-direction: column;
+        flex-direction: column-reverse;
         align-items: flex-start;
         width: auto;
         max-width: 405px;
-        right: 5px;
-        top: 50px;
+        left: 5px;
+        bottom: 145px;
       }
       #toggleBar label {
         min-width: unset;
@@ -219,14 +240,15 @@
       position: fixed;
       left: 50%;
       transform: translateX(-50%);
-      /* Place above the button row (buttons are 40px high + 10px margin = 60px from bottom) */
-      bottom: 60px;
+      /* Place canvas just below status bar - N label should be right below status bar */
+      top: 30px !important;
+      bottom: 60px !important;
       background: black;
       box-sizing: border-box;
       z-index: 10; /* Below controls (z-index:20) but above background */
-      /* Maximize size: use all available width and height above buttons, but always a circle */
-      width: min(calc(100vw - 12px), calc(100vh - 140px));
-      height: min(calc(100vw - 12px), calc(100vh - 140px));
+      /* Let JavaScript handle width/height, but constrain position */
+      width: min(calc(100vw - 12px), calc(100vh - 90px));
+      height: min(calc(100vw - 12px), calc(100vh - 90px));
       min-width: 200px;
       min-height: 200px;
       aspect-ratio: 1 / 1;
@@ -244,7 +266,7 @@
     }
     #popup button {
       margin-top:6px; padding:4px 8px;
-      background:#28a; color:white; border:none;
+      background:#222; color:#ff0000; border:1px solid #ff0000;
       border-radius:3px; cursor:pointer;
     }
     #galFilterBar { display: none !important; visibility: hidden !important; height: 0 !important; width: 0 !important; overflow: hidden !important; position: absolute !important; }
@@ -289,14 +311,13 @@
       align-items: center;
       gap: var(--gap);
     }
-    .search-form__row,
-    .search-actions {
+    .search-form__row {
       display: flex;
       gap: var(--gap);
       justify-content: center;
     }
 
-    /* Blank spacer after SkyView/Model */
+    /* Blank spacer after search */
     .small-spacer {
       height: var(--gap);
     }
@@ -308,12 +329,22 @@
       margin: var(--gap) 0.5em var(--gap) 0.5em;
     }
 
-    /* Status panel layout */
+    /* Status panel layout - Fixed at top */
     .status-panel {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 2400;
+      background: rgba(245, 245, 245, 0.95);
+      backdrop-filter: blur(10px);
+      border-bottom: 2px solid rgba(255, 0, 0, 0.3);
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      padding: var(--gap);
+      padding: 4px var(--gap);
+      min-height: 24px;
+      box-sizing: border-box;
     }
     .status-panel__left,
     .status-panel__right {
@@ -373,11 +404,11 @@
     }
     .handpad-arc,
     .handpad-center {
-      fill: var(--surface) !important;
-      stroke: var(--accent) !important;
+      fill: #1a1a1a !important;
+      stroke: #ff0000 !important;
       stroke-width: 2;
       cursor: pointer;
-      fill-opacity: 0.3;
+      fill-opacity: 0.8;
       -webkit-user-select: none;
       -moz-user-select: none;
       -ms-user-select: none;
@@ -408,8 +439,9 @@
     }
     body.night-mode .status-panel,
     html.night-mode .status-panel {
-      background: #222;
+      background: rgba(34, 34, 34, 0.95);
       color: #ff0000;
+      border-bottom: 2px solid rgba(255, 0, 0, 0.3);
     }
     /* SkyView night mode overrides */
     #skyviewContainer {
@@ -565,18 +597,22 @@
       justify-content: center;
       align-items: center;
       gap: 18px;
-      padding: 14px 0 18px 0;
+      padding: 8px 0 10px 0;
     }
     .search-results__actions .btn {
-      background: #f5f5f5;
-      color: #333;
-      border: 1.5px solid #28a;
+      background: #222;
+      color: #ff0000;
+      border: 1.5px solid #ff0000;
       display: flex;
       align-items: center;
       justify-content: center;
       box-sizing: border-box;
       text-align: center;
-      padding: 0 16px;
+      padding: 0.5em 1em;
+      height: 44px;
+      min-height: 44px;
+      border-radius: 8px;
+      font-size: 1em;
     }
     .search-results__actions .btn:active {
       background: #e0eaff;
@@ -618,15 +654,15 @@
     console.log("vibrationEnabled =", vibrationEnabled, "tiltEnabled =", tiltEnabled);
   </script>
 
+  <!-- STATUS PANEL (Fixed at top, always visible) -->
+  <div id="status" class="status-panel"></div>
+
   <div id="mainViewContainer">
     <div class="container">
 
-      <!-- STATUS PANEL -->
-      <div id="status" class="status-panel"></div>
-
       <hr class="separator">
 
-      <!-- SEARCH + SKYVIEW / MODEL -->
+      <!-- SEARCH + MODEL -->
       <div id="controlPanel" class="control-panel">
         <form id="searchForm" class="search-form" autocomplete="off">
           <!-- Search row -->
@@ -641,6 +677,7 @@
               <button type="button" id="clearSearchBtn" aria-label="Clear search">&times;</button>
             </div>
             <button type="submit" class="btn btn--primary">Search</button>
+            <button type="button" id="modelButton" class="btn btn--secondary">Model</button>
           </div>
   <style>
     .search-form__row--relative { position: relative; }
@@ -686,16 +723,36 @@
     .search-form__row--with-clear .btn--primary {
       margin-left: 0.5em;
     }
+    .search-form__row--with-clear .btn--secondary {
+      margin-left: 0.5em;
+    }
+    
+    /* Make search form buttons same size as SkyView buttons */
+    .search-form .btn {
+      height: 44px;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      font-size: 1em;
+    }
+    
+    /* Make model panel buttons same size as SkyView buttons */
+    .model-panel .btn {
+      height: 44px;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      font-size: 1em;
+    }
     @media (max-width: 600px) {
       .search-form__input { width: 100%; min-width: 0; }
     }
   </style>
           <div id="results" class="search-results"></div>
-          <!-- SkyView/Model row -->
-          <div class="search-actions">
-            <button type="button" id="skyviewButton" class="btn btn--secondary">SkyView</button>
-            <button type="button" id="modelButton"   class="btn btn--secondary">Model</button>
-          </div>
           <div class="small-spacer"></div>
         </form>
 
@@ -718,17 +775,7 @@
       <!-- HANDPAD / MOVEMENT CONTROLS -->
       <div id="directionControl" class="handpad"></div>
 
-      <!-- Control Tray for Mode/Park (right edge, handpad height) -->
-      <div id="controlTrayBtn" title="Show/hide controls">&#x25C0;</div>
-      <div id="controlTray" class="hide">
-        <button id="controlTrayCollapse" title="Collapse tray" class="tray-collapse-btn">&#x25B6;</button>
-        <button class="tray-btn" id="modeToggleButton">Manual</button>
-        <button class="tray-btn" id="parkToggleButton">Park</button>
-        <button class="tray-btn" id="editConfigBtn" title="Settings">⚙</button>
-        <button class="tray-btn" id="toggleFullScreen" title="Fullscreen">⛶</button>
-        <button class="tray-btn" id="toggleMode" title="Day/Night">🌙</button>
-        <a class="tray-btn" id="helpBtn" title="Help" href="{{ url_for('quickstart') }}" target="_blank" rel="noopener">Help</a>
-      </div>
+
 
       <!-- START and STOP BUTTONS below Handpad -->
       <div class="handpad-action-row">
@@ -736,7 +783,7 @@
         <button id="trackToggleButton" title="Stop" aria-label="Stop" class="action-btn stop-octagon-btn stop-octagon-btn--xlarge">
           <svg class="stop-octagon-svg stop-octagon-svg--xlarge" width="75" height="75" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
             <polygon class="stop-octagon-shape" points="30.18,5 69.82,5 95,30.18 95,69.82 69.82,95 30.18,95 5,69.82 5,30.18"/>
-            <text class="stop-octagon-text stop-octagon-text--xlarge" x="50" y="56" text-anchor="middle" font-size="30" font-family="'Arial Black', Arial, sans-serif" font-weight="900" letter-spacing="1.0" fill="#111" dominant-baseline="middle">STOP</text>
+            <text class="stop-octagon-text stop-octagon-text--xlarge" x="50" y="56" text-anchor="middle" font-size="30" font-family="'Arial Black', Arial, sans-serif" font-weight="900" letter-spacing="1.0" dominant-baseline="middle">STOP</text>
           </svg>
         </button>
       </div>
@@ -781,31 +828,21 @@
       </div>
     </div>
     
-    <!-- Horizontal row of 8 buttons at bottom -->
+    <!-- Horizontal row of buttons at bottom -->
     <div id="skyviewBottomButtons">
-      <!-- Back button -->
-      <button id="backBtn" aria-label="Back" class="skyview-btn skyview-btn--uniform">
-        <span style="width:40px;height:40px;line-height:40px;display:inline-block;text-align:center;font-size:1.2em;">&#8592;</span>
-      </button>
-      
-      <!-- Fullscreen button -->
-      <button id="fullscreenBtn" aria-label="Fullscreen" class="skyview-btn skyview-btn--uniform">
-        <span style="width:40px;height:40px;line-height:40px;display:inline-block;text-align:center;font-size:1.2em;">⛶</span>
-      </button>
-      
-      <!-- Flip button -->
-      <button id="flipBtn" aria-label="Flip E/W" class="skyview-btn skyview-btn--uniform">
-        <span style="width:40px;height:40px;line-height:40px;display:inline-block;text-align:center;font-size:1.2em;">&#8596;</span>
+      <!-- Objects button -->
+      <button id="skyviewObjectsBtn" aria-label="Objects" class="skyview-btn skyview-btn--small">
+        <span style="width:50px;height:50px;line-height:50px;display:inline-block;text-align:center;font-size:0.9em;font-weight:bold;">OBJ</span>
       </button>
       
       <!-- Redraw button -->
-      <button id="redrawBtn" aria-label="Redraw" class="skyview-btn skyview-btn--uniform">
-        <span style="width:40px;height:40px;line-height:40px;display:inline-block;text-align:center;font-size:1.2em;">&#8635;</span>
+      <button id="redrawBtn" aria-label="Redraw" class="skyview-btn skyview-btn--small">
+        <span style="width:50px;height:50px;line-height:50px;display:inline-block;text-align:center;font-size:1.1em;">&#8635;</span>
       </button>
       
       <!-- Sync button (telrad reticle exactly matching skyview canvas) -->
-      <button id="syncBtn" aria-label="Sync" class="skyview-btn skyview-btn--uniform">
-        <svg width="40" height="40" viewBox="0 0 40 40">
+      <button id="syncBtn" aria-label="Sync" class="skyview-btn skyview-btn--small">
+        <svg width="50" height="50" viewBox="0 0 40 40">
           <g transform="translate(20,20) scale(0.75)" fill="none" stroke="currentColor" stroke-width="1.5">
             <!-- Inner complete circle (r=7) -->
             <circle cx="0" cy="0" r="7"/>
@@ -834,27 +871,27 @@
       </button>
       
       <!-- Search button -->
-      <button id="searchBtn" aria-label="Search Objects" class="skyview-btn skyview-btn--uniform">
-        <span style="width:40px;height:40px;line-height:40px;display:inline-block;text-align:center;font-size:1.4em;">⌕</span>
+      <button id="searchBtn" aria-label="Search Objects" class="skyview-btn skyview-btn--small">
+        <span style="width:50px;height:50px;line-height:50px;display:inline-block;text-align:center;font-size:1.3em;">⌕</span>
       </button>
       
       <!-- Go button -->
-      <button id="gotoCoordsBtn" aria-label="Go" class="skyview-btn skyview-btn--uniform">
-        <span style="width:40px;height:40px;line-height:40px;display:inline-block;text-align:center;font-size:1.0em;font-weight:bold;">GO</span>
+      <button id="gotoCoordsBtn" aria-label="Go" class="skyview-btn skyview-btn--small">
+        <span style="width:50px;height:50px;line-height:50px;display:inline-block;text-align:center;font-size:1.0em;font-weight:bold;">GO</span>
       </button>
       
       <!-- STOP button (rightmost) -->
-      <button id="stopBtn" aria-label="Stop" class="skyview-btn skyview-btn--uniform">
-        <svg class="stop-octagon-svg" width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-          <polygon class="stop-octagon-shape" points="12.07,2 27.93,2 38,12.07 38,27.93 27.93,38 12.07,38 2,27.93 2,12.07" style="stroke-width:1;"/>
-          <text class="stop-octagon-text" x="20" y="21.5" text-anchor="middle" font-size="5" font-family="'Arial Black', Arial, sans-serif" font-weight="900" letter-spacing="0.5" fill="#111" dominant-baseline="middle">STOP</text>
+      <button id="stopBtn" aria-label="Stop" class="skyview-btn skyview-btn--small">
+        <svg class="stop-octagon-svg" width="50" height="50" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg">
+          <polygon class="stop-octagon-shape" points="15.1,2.5 34.9,2.5 47.5,15.1 47.5,34.9 34.9,47.5 15.1,47.5 2.5,34.9 2.5,15.1" style="stroke-width:1;"/>
+          <text class="stop-octagon-text" x="25" y="27" text-anchor="middle" font-size="6.2" font-family="'Arial Black', Arial, sans-serif" font-weight="900" letter-spacing="0.5" dominant-baseline="middle">STOP</text>
         </svg>
       </button>
     </div>
   <style>
     .skyview-bottom-btns {
       position: absolute;
-      bottom: 18px;
+      bottom: 93px;
       right: 18px;
       z-index: 30;
     }
@@ -865,14 +902,14 @@
       gap: 12px;
     }
     .skyview-btn {
-      background: #28a;
-      color: #fff;
-      border: none;
+      background: #1a1a1a;
+      color: #ff0000;
+      border: 2px solid #ff0000;
       border-radius: 8px;
-      width: 40px;
-      height: 40px;
-      min-width: 40px;
-      min-height: 40px;
+      width: 72px;
+      height: 60px;
+      min-width: 72px;
+      min-height: 60px;
       font-size: 1.2em;
       display: flex;
       align-items: center;
@@ -888,47 +925,49 @@
       padding: 0;
     }
     .skyview-btn--icon {
-      background: #28a;
+      background: #1a1a1a;
+      color: #ff0000;
+      border: 2px solid #ff0000;
     }
     .stop-octagon-svg {
-      width: 40px;
-      height: 40px;
+      width: 50px;
+      height: 50px;
       display: block;
     }
     @media (max-width: 600px) {
       .skyview-btn {
-        width: 32px;
-        height: 32px;
-        min-width: 32px;
-        min-height: 32px;
+        width: 60px;
+        height: 50px;
+        min-width: 60px;
+        min-height: 50px;
         font-size: 1em;
       }
       .skyview-bottom-btns {
-        bottom: 56px; /* 1.5 * 32px button height, moves up for visibility */
+        bottom: 85px; /* Above static control bar */
         right: 8px;
       }
       .skyview-btn-vertical {
         gap: 8px;
       }
       .stop-octagon-svg {
-        width: 32px;
-        height: 32px;
+        width: 50px;
+        height: 50px;
       }
       .skyview-btn--icon span {
-        width: 32px !important;
-        height: 32px !important;
-        line-height: 32px !important;
+        width: 60px !important;
+        height: 50px !important;
+        line-height: 50px !important;
         font-size: 1em !important;
       }
     }
     
     /* Search and Sync Button Styles */
     .skyview-btn--search {
-      background: #28a;
-      color: #fff;
-      width: 40px;
-      height: 40px;
-      border: none;
+      background: #1a1a1a;
+      color: #ff0000;
+      width: 44px;
+      height: 44px;
+      border: 2px solid #ff0000;
       border-radius: 8px;
       display: flex;
       align-items: center;
@@ -953,13 +992,13 @@
       color: #ff0000;
     }
     
-    /* All skyview buttons now same size (40x40) - inherit container styling */
+    /* SYNC and GO buttons - same size as other skyview buttons */
     #skyviewContainer #syncBtn,
     #skyviewContainer #gotoCoordsBtn {
-      width: 40px !important;
-      height: 40px !important;
-      min-width: 40px !important;
-      min-height: 40px !important;
+      width: 50px !important;
+      height: 50px !important;
+      min-width: 50px !important;
+      min-height: 50px !important;
       padding: 0 !important;
       cursor: pointer !important;
       box-sizing: border-box !important;
@@ -1023,9 +1062,9 @@
     }
     
     #searchExecuteBtn, #searchCancelBtn {
-      background: #28a !important;
-      color: #fff !important;
-      border: none !important;
+      background: #1a1a1a !important;
+      color: #ff0000 !important;
+      border: 2px solid #ff0000 !important;
       border-radius: 4px !important;
       padding: 8px 16px !important;
       cursor: pointer !important;
@@ -1083,12 +1122,12 @@
     /* Mobile responsiveness for new buttons */
     @media (max-width: 600px) {
       .skyview-btn--search {
-        width: 32px;
-        height: 32px;
+        width: 45px;
+        height: 40px;
       }
       #skyviewContainer #syncBtn, #skyviewContainer #gotoCoordsBtn {
-        width: 32px !important;
-        height: 32px !important;
+        width: 50px !important;
+        height: 50px !important;
         padding: 0 !important;
         font-size: 0.8em !important;
       }
@@ -1115,12 +1154,12 @@
     </div>
     <button id="toggleMenuBtn">Objects &#x25BC;</button>
     <div id="toggleBar" class="hide">
+      <label style="margin-left:2em;"><input type="checkbox" id="toggleStarNames" checked> Names (Stars)</label>
       <label><input type="checkbox" id="toggleStars" checked> <span style="color: white;">●</span> Stars <input type="range" id="starMagSlider" min="1" max="18" value="18" step="1" style="width: 120px; margin-left: 8px;"></label>
-      <label style="margin-left:0.5em;"><input type="checkbox" id="toggleStarNames" checked> Names</label>
+      <label style="margin-left:2em;"><input type="checkbox" id="toggleConstLabels" checked> Names (Constellations)</label>
       <label><input type="checkbox" id="toggleConst"> <span style="color: #a259e6;">─</span> Constellations</label>
-      <label style="margin-left:0.5em;"><input type="checkbox" id="toggleConstLabels" checked> Names</label>
-      <label><input type="checkbox" id="toggleMessierNames" checked> Messier Names</label>
       <label><input type="checkbox" id="toggleGal"> <span style="color: rgb(255,100,150); font-size: 14px;">⬭</span> Galaxies <input type="range" id="galMagSlider" min="1" max="18" value="18" step="1" style="width: 120px; margin-left: 8px;"></label>
+      <label><input type="checkbox" id="toggleMessierNames" checked> Messier Names</label>
       <label><input type="checkbox" id="toggleOpen"> <span style="color: rgb(100,100,255);">○</span> Open Clusters</label>
       <label><input type="checkbox" id="toggleGlobular"> <span style="color: rgb(0,180,80);">⊕</span> Globular Clusters</label>
       <label><input type="checkbox" id="toggleNebula"> <span style="color: rgb(255,100,255);">□</span> Nebulae</label>
@@ -1129,12 +1168,23 @@
       <label><input type="checkbox" id="toggleEcliptic"> <span style="color: #FFD700;">⸻</span> Ecliptic</label>
       <label><input type="checkbox" id="toggleCalPoints" checked> <span style="color: yellow;">⊕</span> Calibration Points</label>
       <label><input type="checkbox" id="toggleSkyViewNightMode"> <span>☾</span> True Night Mode</label>
+      <label><input type="checkbox" id="toggleFlip"> <span>&#8596;</span> Flip E/W</label>
     </div>
     <canvas id="skyviewCanvas"
             data-latitude="{{ site_latitude }}"
             data-longitude="{{ site_longitude }}">
     </canvas>
     <div id="popup"></div>
+  </div>
+
+  <!-- Bottom Control Bar (Fixed at bottom, always visible) -->
+  <div id="mainControlBar">
+    <button class="main-control-btn" id="skyviewButton">Sky</button>
+    <button class="main-control-btn" id="modeToggleButton">Man</button>
+    <button class="main-control-btn" id="parkToggleButton">Park</button>
+    <button class="main-control-btn" id="mainEditConfigBtn" title="Settings">⚙</button>
+    <button class="main-control-btn" id="mainToggleFullScreen" title="Fullscreen">⛶</button>
+    <a class="main-control-btn" id="helpBtn" title="Help" href="{{ url_for('quickstart') }}" target="_blank" rel="noopener">Help</a>
   </div>
 
   <!-- Search Popup -->
@@ -1154,12 +1204,13 @@
 
   <script>
   $(function(){
+    // Apply night mode to body now that DOM is loaded
+    document.body.classList.add('night-mode');
+    
     // Insert header buttons
     $('.control-buttons').html(`
       <div class="control-buttons-left">
         <button class="btn btn--icon" id="editConfigBtn"    title="Settings">⚙</button>
-        <button class="btn btn--icon" id="toggleFullScreen" title="Fullscreen">⛶</button>
-        <button class="btn btn--icon" id="toggleMode"        title="Day/Night">🌙</button>
       </div>
       <div class="control-buttons-right"></div>
     `);
@@ -1183,60 +1234,35 @@
       );
     }
 
-    // Night-mode toggle
-    function applyNight(){
-      var on = localStorage.getItem('nightMode')==='enabled';
-      $('body').toggleClass('night-mode', on);
-      $('html').toggleClass('night-mode', on);
-      $('#toggleMode').text(on?'☀':'🌙');
-      
-      // Apply correct styling for current mode
+    // Force night mode styling - always enabled
+    function forceControlButtonNightMode() {
+      // Apply night mode styling to control buttons
       setTimeout(function() {
-        forceTrayButtonNightMode();
-      }, 100);
-    }
-    
-    // Function to force night mode styling on tray buttons
-    function forceTrayButtonNightMode() {
-      // Wait a bit for the CSS to apply, then force the styles
-      setTimeout(function() {
-        $('.tray-btn, #controlTrayBtn, #controlTrayCollapse').each(function() {
+        $('.main-control-btn').each(function() {
           var $btn = $(this);
-          if ($('body').hasClass('night-mode')) {
-            $btn.css({
-              'background': '#222',
-              'color': '#ff0000', 
-              'border': '1.5px solid #ff0000',
-              'box-shadow': '0 2px 8px rgba(255,0,0,0.18)'
-            });
-          } else {
-            // Remove night mode styling if not in night mode
-            $btn.removeAttr('style');
-          }
+          $btn.css({
+            'background': '#1a1a1a',
+            'color': '#ff0000', 
+            'border': '2px solid #ff0000',
+            'box-shadow': '0 2px 8px rgba(255,0,0,0.18)'
+          });
         });
       }, 50);
     }
     
-    applyNight();
-    window.addEventListener('storage', function(e){
-      if(e.key==='nightMode') applyNight();
-    });
-    $('#toggleMode').click(function(){
-      var on = !$('body').hasClass('night-mode');
-      localStorage.setItem('nightMode', on?'enabled':'disabled');
-      applyNight();
-    });
+    // Apply night mode styling on load
+    forceControlButtonNightMode();
 
     // Auto-blur buttons after click to remove persistent highlighting
-    $('.tray-btn, #controlTrayBtn').on('click', function() {
+    $('.main-control-btn').on('click', function() {
       var $btn = $(this);
       setTimeout(function() {
         $btn.blur();
       }, 100);
     });
 
-    // Set up MutationObserver to watch for style changes on tray buttons
-    function setupTrayButtonWatcher() {
+    // Set up MutationObserver to watch for style changes on control buttons
+    function setupControlButtonWatcher() {
       if (typeof MutationObserver !== 'undefined') {
         var observer = new MutationObserver(function(mutations) {
           if ($('body').hasClass('night-mode')) {
@@ -1245,19 +1271,19 @@
               if (mutation.type === 'attributes' && 
                   (mutation.attributeName === 'style' || mutation.attributeName === 'class')) {
                 var target = $(mutation.target);
-                if (target.hasClass('tray-btn') || target.attr('id') === 'controlTrayBtn' || target.attr('id') === 'controlTrayCollapse') {
+                if (target.hasClass('main-control-btn')) {
                   needsForce = true;
                 }
               }
             });
             if (needsForce) {
-              forceTrayButtonNightMode();
+              forceControlButtonNightMode();
             }
           }
         });
         
-        // Watch for changes on tray buttons
-        $('.tray-btn, #controlTrayBtn, #controlTrayCollapse').each(function() {
+        // Watch for changes on control buttons
+        $('.main-control-btn').each(function() {
           observer.observe(this, { 
             attributes: true, 
             attributeFilter: ['style', 'class'] 
@@ -1267,17 +1293,17 @@
     }
     
     // Initialize the watcher after a short delay
-    setTimeout(setupTrayButtonWatcher, 100);
+    setTimeout(setupControlButtonWatcher, 100);
     
     // Less frequent enforcement to avoid conflicts
     setInterval(function() {
-      forceTrayButtonNightMode(); // This now handles both night and day modes
+      forceControlButtonNightMode(); // This now handles both night and day modes
     }, 5000); // Check every 5 seconds instead of 2
     
     // Also force on window events
     $(window).on('load resize orientationchange', function() {
       setTimeout(function() {
-        forceTrayButtonNightMode(); // Handles both modes
+        forceControlButtonNightMode(); // Handles both modes
       }, 100);
     });
     
@@ -1323,6 +1349,15 @@
     });
     $('#editConfigBtn').click(function(){
       window.location.href = "{{ url_for('edit_config') }}";
+    });
+
+    // Main Control Bar button handlers (duplicated for bottom bar)
+    $('#mainEditConfigBtn').click(function(){
+      window.location.href = "{{ url_for('edit_config') }}";
+    });
+    $('#mainToggleFullScreen').click(function(){
+      if(!document.fullscreenElement) document.documentElement.requestFullscreen();
+      else document.exitFullscreen();
     });
 
     // Update Status Panel
@@ -1447,14 +1482,15 @@
     setInterval(updateStatus, 500);
     updateStatus();
 
-    // Update Mode and Park/Unpark button labels (full text)
+    // Update Mode and Park/Unpark button labels (shortened text for square buttons)
     function updateModeAndParkButtons() {
       $.getJSON('/status', function(d) {
         var isManual = d.tracking === 'Blinky';
-        // Swap labels: show 'Auto' when manual, 'Manual' when auto
-        $('#modeToggleButton').text(isManual ? 'Auto' : 'Manual');
+        // Swap labels: show 'Aut' when manual, 'Man' when auto
+        $('#modeToggleButton').text(isManual ? 'Aut' : 'Man');
+        
         var isParked = d.tracking === 'Parking' || d.tracking === 'Parked';
-        $('#parkToggleButton').text(isParked ? 'Unpark' : 'Park');
+        $('#parkToggleButton').text(isParked ? 'Unpk' : 'Park');
       });
     }
     setInterval(updateModeAndParkButtons, 500);
@@ -1555,29 +1591,49 @@
       setTimeout(function(){ window.searchResults = []; }, 0);
     };
 
-    // SkyView toggle logic
+    // SkyView toggle logic - handles both directions
     $('#skyviewButton').off('click').on('click', function(e) {
       console.log('[SkyView] Button clicked');
       
       const mainContainer = document.getElementById('mainViewContainer');
       const skyContainer = document.getElementById('skyviewContainer');
+      const skyButton = $('#skyviewButton');
       
-      // Hide main container
-      if (mainContainer) {
-        mainContainer.style.display = 'none';
+      // Check if currently in SkyView
+      const isInSkyView = skyContainer && skyContainer.style.display !== 'none';
+      
+      if (isInSkyView) {
+        // Go back to main view
+        if (mainContainer) mainContainer.style.display = 'block';
+        if (skyContainer) skyContainer.style.display = 'none';
+        $('#mainViewContainer').show();
+        $('#skyviewContainer').hide();
+        skyButton.text('Sky');
+        console.log('[SkyView] Returned to main view');
+        
+        // Clean up SkyView resources to prevent memory leaks
+        if (typeof window.cleanupSkyView === 'function') {
+          window.cleanupSkyView();
+        }
+      } else {
+        // Go to SkyView
+        if (mainContainer) mainContainer.style.display = 'none';
+        if (skyContainer) {
+          skyContainer.style.display = 'block';
+          skyContainer.style.visibility = 'visible';
+        }
+        $('#mainViewContainer').hide();
+        $('#skyviewContainer').show();
+        skyButton.html('<span style="color:#ff0000;font-size:1.8em;line-height:1;">⌂</span>');
+        console.log('[SkyView] Switched to SkyView');
+        
+        // Reinitialize SkyView event listeners and intervals
+        if (typeof window.reinitializeSkyView === 'function') {
+          setTimeout(function() {
+            window.reinitializeSkyView();
+          }, 100);
+        }
       }
-      
-      // Show sky container  
-      if (skyContainer) {
-        skyContainer.style.display = 'block';
-        skyContainer.style.visibility = 'visible';
-      }
-      
-      // Double-check with jQuery too
-      $('#mainViewContainer').hide();
-      $('#skyviewContainer').show();
-      
-      console.log('[SkyView] Containers toggled successfully');
       
       // Force SkyView JS to re-initialize if needed
       if (typeof window.dispatchEvent === 'function') {
@@ -1596,10 +1652,22 @@
     $('#stopBtn').off('click').on('click', function() {
       $.post('/abort');
     });
-    // Back arrow in SkyView (handled in skyview.js as well)
+
+    // SkyView Objects button - toggles Objects menu
+    $('#skyviewObjectsBtn').off('click').on('click', function() {
+      var toggleBar = document.getElementById('toggleBar');
+      var toggleMenuBtn = document.getElementById('toggleMenuBtn');
+      if (toggleBar && toggleMenuBtn) {
+        toggleBar.classList.toggle('hide');
+        toggleMenuBtn.textContent = toggleBar.classList.contains('hide') ? 'Objects \u25b2' : 'Objects \u25bc';
+      }
+    });
+    
+    // Back arrow in SkyView (handled in skyview.js as well) - now redundant but kept for compatibility
     $('#refreshBtn').off('click').on('click', function() {
       $('#skyviewContainer').hide();
       $('#mainViewContainer').show();
+      $('#skyviewButton').text('Sky');
     });
     // SkyView menu toggle
     var toggleMenuBtn = document.getElementById('toggleMenuBtn');
@@ -1730,20 +1798,20 @@
     `);
     // Update handpad SVG style injection for night mode red
     $("<style id='handpadArcStyle'>\n"
-      // Day mode: blue border, gray background, black text
+      // Always use night mode colors: red border, dark gray background, red text
       + ".handpad-arc, .handpad-center {\n"
-      + "  stroke: #28a !important;\n"
+      + "  stroke: #ff0000 !important;\n"
       + "  stroke-width: 2.5 !important;\n"
-      + "  fill: #f5f5f5 !important;\n"
+      + "  fill: #1a1a1a !important;\n"
       + "  opacity: 1;\n"
       + "  cursor: pointer;\n"
       + "  transition: opacity 0.15s, fill 0.15s, stroke 0.15s;\n"
       + "}\n"
-      + ".speed-label { font-size: 2.1em; font-weight: bold; fill: #111 !important; pointer-events: none; }\n"
+      + ".speed-label { font-size: 2.1em; font-weight: bold; fill: #ff0000 !important; pointer-events: none; }\n"
       // Night mode: dark bg, #ff0000 border/text
       + "body.night-mode .handpad-arc, body.night-mode .handpad-center {\n"
       + "  stroke: #ff0000 !important;\n"
-      + "  fill: #222 !important;\n"
+      + "  fill: #1a1a1a !important;\n"
       + "}\n"
       + "body.night-mode .speed-label { fill: #ff0000 !important; }\n"
       + "</style>").appendTo('head');
@@ -1797,55 +1865,8 @@
       if (!bootId) return; // backend must provide this
       var lastBootId = localStorage.getItem('lastBootId');
       if (lastBootId !== bootId) {
-        // Enhanced captive portal detection
-        var forceCaptiveDetection = false;
-        var currentUrl = window.location.href;
-        
-        // Force captive portal if coming from specific URLs
-        if (document.referrer.includes('generate_204') ||
-            document.referrer.includes('connectivitycheck') ||
-            document.referrer.includes('play.googleapis.com') ||
-            document.referrer.includes('captive.apple.com') ||
-            currentUrl.includes('?captive=1')) {
-          forceCaptiveDetection = true;
-          console.log('[Captive Portal] FORCED detection due to referrer/URL');
-        }
-        
-        // Check for Android captive portal window titles
-        if (navigator.userAgent.includes('Android')) {
-          var androidCaptiveTitles = [
-            'Sign in to Wi-Fi network',
-            'Sign in to WiFi network', 
-            'Sign in to network',
-            'WiFi sign in',
-            'Wi-Fi sign in',
-            'Network sign in',
-            'Internet may not be available'
-          ];
-          
-          if (androidCaptiveTitles.some(title => document.title.includes(title))) {
-            forceCaptiveDetection = true;
-            console.log('[Captive Portal] FORCED detection due to Android title:', document.title);
-          }
-        }
-        
-        // Check if user is in captive portal mode before showing browser choice
-        if (forceCaptiveDetection || isCaptivePortalMode()) {
-          // Add URL parameter to help with detection on reload
-          if (!currentUrl.includes('?captive=1') && !currentUrl.includes('&captive=1')) {
-            var separator = currentUrl.includes('?') ? '&' : '?';
-            var newUrl = currentUrl + separator + 'captive=1';
-            window.history.replaceState({}, '', newUrl);
-          }
-          
-          // First show browser choice popup, then system time popup
-          showBrowserChoicePopup(function() {
-            showSystemTimePopup(bootId);
-          });
-        } else {
-          // Skip browser popup, go directly to system time popup
-          showSystemTimePopup(bootId);
-        }
+        // Skip browser popup entirely - go directly to system time popup
+        showSystemTimePopup(bootId);
       }
     });
 
@@ -2151,17 +2172,16 @@
     function showSystemTimePopup(bootId) {
       var deviceTime = new Date();
       var timeStr = deviceTime.toLocaleString();
-      var isNight = $('body').hasClass('night-mode');
       var modalHtml = `
-        <div class="modal__body${isNight ? ' night-mode' : ''}"
-          style="${isNight ? 'color:#f33; background:#222; border-radius:8px; padding:10px 0;' : 'color:#111; background:#f5f5f5; border-radius:8px; padding:10px 0;'}">
+        <div class="modal__body night-mode"
+          style="color:#ff0000; background:#222; border-radius:8px; padding:10px 0;">
           <strong>Set System Time?</strong>
           <div style="margin-top:10px;">Would you like to set the Pi's system time to your device's current time?</div>
           <div style="margin-top:10px; font-size:1.1em;">Current device time: <span id="currentTimeDisplay" style="font-weight:bold;">${timeStr}</span></div>
           <div style="margin-top:5px; font-style:italic; font-size:0.9em;">(The exact time will be captured when you click "Set Time")</div>
         </div>
         <div class="modal__footer"
-          style="${isNight ? 'background:#222; color:#f33; border-radius:0 0 8px 8px; padding:10px 0; text-align:center;' : 'background:#f5f5f5; color:#111; border-radius:0 0 8px 8px; padding:10px 0; text-align:center;'}">
+          style="background:#222; color:#ff0000; border-radius:0 0 8px 8px; padding:10px 0; text-align:center;">
           <button class="btn btn--primary" id="setSystemTimeBtn">Set Time</button>
           <button class="btn" id="dismissTimeBtn">Dismiss</button>
         </div>
@@ -2227,246 +2247,23 @@
     // --- Manual/Auto and Park/Unpark button logic ---
     $(document).on('click', '#modeToggleButton', function() {
       $.post('/toggle_mode', function(d) {
-        // Optionally update label immediately
-        $('#modeToggleButton').text(d.mode === 'Manual' ? 'Manual' : 'Auto');
+        // Use same logic as status update - check tracking state
+        var isManual = d.tracking === 'Blinky';
+        $('#modeToggleButton').text(isManual ? 'Aut' : 'Man');
       }, 'json');
     });
     $(document).on('click', '#parkToggleButton', function() {
       var label = $(this).text().trim().toLowerCase();
-      if(label === 'park') {
+      if(label.includes('park')) {
         $.post('/park');
       } else {
+        // For any other text (including 'unpk'), send unpark
         $.post('/unpark');
       }
     });
   </script>
 
-  <!-- Control Tray Styles -->
   <style>
-    /* Control Tray Styles */
-    #controlTrayBtn {
-      position: fixed;
-      top: 50%;
-      right: 0;
-      transform: translateY(-50%);
-      background: #f5f5f5;
-      color: #111;
-      border-radius: 8px 0 0 8px;
-      border: 1.5px solid #28a;
-      padding: 0 8px;
-      font-size: 2.1em;
-      cursor: pointer;
-      z-index: 9000;
-      box-shadow: -2px 2px 8px rgba(0,0,0,0.18);
-      width: 38px;
-      height: 56px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      user-select: none;
-      transition: background 0.15s, color 0.15s, border 0.15s;
-    }
-    #controlTrayBtn:active, #controlTrayBtn:focus {
-      background: #e0eaff;
-      color: #111;
-      border-color: #1a5a8a;
-    }
-    body.night-mode #controlTrayBtn,
-    html.night-mode #controlTrayBtn {
-      background: #222;
-      color: #ff0000;
-      box-shadow: -2px 2px 8px rgba(255,0,0,0.18);
-      border: 1.5px solid #ff0000;
-    }
-    body.night-mode #controlTrayBtn:active, body.night-mode #controlTrayBtn:focus {
-      background: #ff0000;
-      color: #111;
-      border-color: #ff0000;
-    }
-    #controlTray {
-      position: fixed;
-      top: calc(50% + 160px); /* Move drawer down by about four button heights (incremented again) */
-      right: 0;
-      transform: translateY(-50%);
-      background: #f5f5f5;
-      border-radius: 16px 0 0 16px;
-      box-shadow: -2px 2px 16px rgba(0,0,0,0.22);
-      padding: 16px 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      align-items: flex-end;
-      z-index: 9001;
-      min-width: 0;
-      width: 120px;
-      max-width: 140px;
-      transition: right 0.25s, opacity 0.25s;
-      border: 1.5px solid #28a;
-    }
-    #controlTray.hide {
-      right: -140px;
-      opacity: 0;
-      pointer-events: none;
-    }
-    body.night-mode #controlTray {
-      background: rgba(34,34,34,0.98);
-      box-shadow: -2px 2px 16px rgba(255,0,0,0.22);
-      border: 1.5px solid #ff0000;
-    }
-    .tray-btn {
-      font-size: 1.08em;
-      padding: 10px 0;
-      border-radius: 8px;
-      background: #f5f5f5;
-      color: #111;
-      border: 1.5px solid #28a;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.18);
-      min-width: 90px;
-      width: 100%;
-      font-weight: bold;
-      letter-spacing: 0.04em;
-      cursor: pointer;
-      transition: background 0.15s, color 0.15s, border 0.15s;
-      text-align: center;
-    }
-    .tray-btn:active {
-      background: #e0eaff;
-      color: #111;
-      border-color: #1a5a8a;
-    }
-    .tray-collapse-btn {
-      background: #f5f5f5 !important;
-      color: #111 !important;
-      border: 1.5px solid #28a !important;
-      box-shadow: none !important;
-      font-size: 2.1em !important;
-      width: 38px !important;
-      min-width: 38px !important;
-      height: 38px !important;
-      min-height: 38px !important;
-      padding: 0 !important;
-      align-self: center;
-      margin-top: 10px;
-      margin-bottom: 0;
-      text-align: center;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 8px !important;
-      transition: background 0.15s, color 0.15s, border 0.15s;
-    }
-    .tray-collapse-btn:active, .tray-collapse-btn:focus {
-      background: #e0eaff !important;
-      color: #111 !important;
-      border-color: #1a5a8a !important;
-    }
-    body.night-mode .tray-collapse-btn {
-      color: #ff0000 !important;
-      background: transparent !important;
-      border: 1.5px solid #ff0000 !important;
-    }
-    body.night-mode .tray-collapse-btn:active, body.night-mode .tray-collapse-btn:focus {
-      color: #fff !important;
-      background: #ff0000 !important;
-      border: 1.5px solid #ff0000 !important;
-    }
-    .tray-btn:active, .tray-btn:focus {
-      background: #1a5a8a;
-      color: #eee;
-    }
-    /* Force red color for all tray buttons in night mode */
-    body.night-mode .tray-btn,
-    html.night-mode .tray-btn {
-      background: #222 !important;
-      color: #ff0000 !important;
-      box-shadow: 0 2px 8px rgba(255,0,0,0.18) !important;
-      border: 1.5px solid #ff0000 !important;
-    }
-    body.night-mode .tray-btn:active {
-      background: #ff0000 !important;
-      color: #111 !important;
-      border: 1.5px solid #ff0000 !important;
-    }
-    body.night-mode .tray-btn:hover {
-      background: #330000 !important;
-      color: #ff0000 !important;
-      border: 1.5px solid #ff0000 !important;
-    }
-    
-    /* Specific ID overrides for extra specificity */
-    body.night-mode #controlTrayBtn,
-    body.night-mode button#editConfigBtn.tray-btn,
-    body.night-mode button#toggleFullScreen.tray-btn,
-    body.night-mode button#toggleMode.tray-btn,
-    body.night-mode a#helpBtn.tray-btn {
-      background: #222 !important;
-      color: #ff0000 !important;
-      border: 1.5px solid #ff0000 !important;
-      box-shadow: 0 2px 8px rgba(255,0,0,0.18) !important;
-    }
-    
-    /* Special styling for toggleMode button only */
-    body.night-mode button#toggleMode.tray-btn {
-      text-shadow: none !important;
-    }
-    
-    body.night-mode #controlTrayBtn:active,
-    body.night-mode button#editConfigBtn.tray-btn:active,
-    body.night-mode button#toggleFullScreen.tray-btn:active,
-    body.night-mode button#toggleMode.tray-btn:active,
-    body.night-mode a#helpBtn.tray-btn:active {
-      background: #ff0000 !important;
-      color: #111 !important;
-      border: 1.5px solid #ff0000 !important;
-    }
-    
-    body.night-mode #controlTrayBtn:hover,
-    body.night-mode button#editConfigBtn.tray-btn:hover,
-    body.night-mode button#toggleFullScreen.tray-btn:hover,
-    body.night-mode button#toggleMode.tray-btn:hover,
-    body.night-mode a#helpBtn.tray-btn:hover {
-      background: #330000 !important;
-      color: #ff0000 !important;
-      border: 1.5px solid #ff0000 !important;
-    }
-    @media (max-width: 700px) {
-      #controlTray, #controlTrayBtn {
-        top: calc(50% + 80px); /* Move drawer down even more on mobile too (double previous) */
-        bottom: unset;
-        left: unset;
-        right: 0;
-        transform: translateY(-50%);
-        border-radius: 16px 0 0 16px;
-        min-width: 0;
-        width: 90px;
-        max-width: 110px;
-        flex-direction: column;
-        align-items: flex-end;
-        box-shadow: -2px 2px 16px rgba(0,0,0,0.22);
-      }
-      #controlTray.hide {
-        right: -110px;
-        bottom: unset;
-        opacity: 0;
-      }
-      .tray-btn {
-        min-width: 70px;
-        font-size: 1em;
-        padding: 8px 0;
-      }
-      #controlTrayBtn {
-        right: 0;
-        left: unset;
-        top: 50%;
-        bottom: unset;
-        border-radius: 8px 0 0 8px;
-        padding: 0 4px;
-        font-size: 1.7em;
-        width: 32px;
-        height: 44px;
-      }
-    }
-
   /* STOP OCTAGON BUTTON (main page, now inline with Start) */
   .handpad-action-row {
     display: flex;
@@ -2479,8 +2276,8 @@
     min-height: 110px; /* Ensure minimum height to prevent cramping */
   }
   .action-btn {
-    background: #f5f5f5;
-    border: 2.5px solid #28a;
+    background: #1a1a1a;
+    border: 2.5px solid #ff0000;
     border-radius: 8px;
     width: 100px !important;
     height: 100px !important;
@@ -2494,7 +2291,7 @@
     justify-content: center;
     cursor: pointer;
     transition: background 0.15s, border 0.15s, box-shadow 0.15s;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+    box-shadow: 0 2px 8px rgba(255,0,0,0.18);
     position: relative;
     z-index: 2101;
     margin: 0;
@@ -2503,9 +2300,9 @@
   }
   .start-action-btn {
     font-weight: bold;
-    background: #f5f5f5;
-    color: #111;
-    border: 2.5px solid #28a;
+    background: #1a1a1a;
+    color: #ff0000;
+    border: 2.5px solid #ff0000;
     /* Force exact same dimensions as base action-btn - 75% size */
     width: 75px !important;
     height: 75px !important;
@@ -2523,7 +2320,7 @@
   }
   body.night-mode .start-action-btn,
   html.night-mode .start-action-btn {
-    background: #222;
+    background: #1a1a1a;
     color: #ff0000;
     border: 2.5px solid #ff0000;
   }
@@ -2533,14 +2330,14 @@
     border-color: #ff0000;
   }
   .action-btn:active, .action-btn:focus {
-    background: #e0eaff;
+    background: #330000;
     outline: none;
-    border-color: #1a5a8a;
+    border-color: #ff0000;
   }
   .stop-octagon-btn {
-    background: transparent;
-    border: 2.5px solid #28a;
-    box-shadow: none;
+    background: #1a1a1a;
+    border: 2.5px solid #ff0000;
+    box-shadow: 0 2px 8px rgba(255,0,0,0.18);
     width: 75px !important;
     height: 75px !important;
     min-width: 75px !important;
@@ -2569,15 +2366,16 @@
     display: block;
   }
   .stop-octagon-shape {
-    fill: #a11;
-    stroke: none;
+    fill: none;
+    stroke: #ff0000;
+    stroke-width: 2;
   }
   .stop-octagon-text {
     font-family: 'Arial Black', Arial, sans-serif;
     font-size: 0.54em;
     font-weight: 900;
     letter-spacing: 0.04em;
-    fill: #fff;
+    fill: #ff0000;
     dominant-baseline: middle;
     pointer-events: none;
     user-select: none;
@@ -2598,13 +2396,13 @@
     letter-spacing: 1.2px;
     font-family: 'Arial Black', Arial, sans-serif;
     font-weight: 900;
-    fill: #fff;
+    fill: #ff0000;
     dominant-baseline: middle;
     pointer-events: none;
     user-select: none;
   }
   body.night-mode .stop-octagon-btn {
-    background: #222;
+    background: #1a1a1a;
     border: 2.5px solid #ff0000;
     box-shadow: 0 2px 8px rgba(255,0,0,0.18);
   }
@@ -2613,8 +2411,9 @@
     border-color: #ff0000;
   }
   body.night-mode .stop-octagon-shape {
-    fill: #222;
+    fill: none;
     stroke: #ff0000;
+    stroke-width: 2;
   }
   body.night-mode .stop-octagon-text {
     fill: #ff0000;
@@ -2622,8 +2421,9 @@
   
   /* SkyView STOP button should always use night mode colors (red) */
   #stopBtn .stop-octagon-shape {
-    fill: #222 !important;
+    fill: none !important;
     stroke: #ff0000 !important;
+    stroke-width: 2 !important;
   }
   #stopBtn .stop-octagon-text {
     fill: #ff0000 !important;
@@ -2732,62 +2532,165 @@
     color: #ff0000 !important;
     border: 1.5px solid #ff0000 !important;
   }
+
+  /* Main UI Bottom Control Bar (similar to SkyView toggleBar) */
+  #mainControlBar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(34, 34, 34, 0.95);
+    backdrop-filter: blur(10px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    z-index: 2500;
+    border-top: 2px solid rgba(255, 0, 0, 0.3);
+    min-height: 60px;
+    box-sizing: border-box;
+  }
+
+  .main-control-btn {
+    background: #1a1a1a;
+    color: #ff0000;
+    border: 2px solid #ff0000;
+    border-radius: 8px;
+    width: 50px;
+    height: 50px;
+    min-width: 50px;
+    min-height: 50px;
+    font-size: 1.1em;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border 0.15s;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+    text-decoration: none;
+    text-align: center;
+    box-sizing: border-box;
+    padding: 4px;
+  }
+
+  .main-control-btn:active, .main-control-btn:focus {
+    background: #e0eaff;
+    color: #111;
+    border-color: #1a5a8a;
+    outline: none;
+  }
+
+  .main-control-btn:hover {
+    background: #e8f2ff;
+    border-color: #1a7aa8;
+  }
+
+  /* Night mode styles for main control bar */
+  body.night-mode #mainControlBar {
+    background: rgba(34, 34, 34, 0.95);
+    border-top: 2px solid rgba(255, 0, 0, 0.3);
+  }
+
+  body.night-mode .main-control-btn {
+    background: #222;
+    color: #ff0000;
+    border: 2px solid #ff0000;
+    box-shadow: 0 2px 8px rgba(255,0,0,0.18);
+  }
+
+  body.night-mode .main-control-btn:active, 
+  body.night-mode .main-control-btn:focus {
+    background: #ff0000;
+    color: #fff;
+    border-color: #ff0000;
+  }
+
+  body.night-mode .main-control-btn:hover {
+    background: #330000;
+    color: #ff0000;
+    border-color: #ff0000;
+  }
+
+  /* Add padding to main container to avoid overlap with fixed status bar and control bar */
+  #mainViewContainer {
+    padding-top: 85px;
+    padding-bottom: 75px;
+  }
+
+  /* Responsive adjustments */
+  @media (max-width: 700px) {
+    #mainControlBar {
+      gap: 8px;
+      padding: 8px;
+      min-height: 45px;
+    }
+    
+    .main-control-btn {
+      width: 50px;
+      height: 50px;
+      min-width: 50px;
+      min-height: 50px;
+      font-size: 0.8em;
+    }
+
+    #mainViewContainer {
+      padding-top: 70px;
+      padding-bottom: 65px;
+    }
+    
+    #skyviewContainer {
+      padding-top: 70px;
+      padding-bottom: 65px;
+    }
+    
+    #skyviewTopBar {
+      bottom: 125px;
+    }
+    
+    #skyviewBottomButtons {
+      bottom: 75px;
+    }
+  }
+
+  @media (max-width: 500px) {
+    #mainControlBar {
+      gap: 6px;
+      padding: 6px;
+    }
+    
+    .main-control-btn {
+      width: 50px;
+      height: 50px;
+      min-width: 50px;
+      min-height: 50px;
+      font-size: 0.75em;
+    }
+
+    #mainViewContainer {
+      padding-top: 60px;
+      padding-bottom: 55px;
+    }
+    
+    #skyviewContainer {
+      padding-top: 60px;
+      padding-bottom: 55px;
+    }
+    
+    #skyviewTopBar {
+      bottom: 110px;
+    }
+    
+    #skyviewBottomButtons {
+      bottom: 65px;
+    }
+  }
 </style>
-<script>
-  // Control Tray toggle logic
-  $(function(){
-    var $tray = $('#controlTray');
-    var $btn = $('#controlTrayBtn');
-    var $collapse = $('#controlTrayCollapse');
-    
-    // Ensure tray starts closed and button shows correct arrow
-    $tray.addClass('hide').hide();
-    $btn.html('&#x25C0;'); // Left arrow to indicate "open tray"
-    
-    function setArrow() {
-      if ($tray.hasClass('hide')) {
-        $btn.html('&#x25C0;'); // Left arrow = "open tray"
-      } else {
-        $btn.html('&#x25B6;'); // Right arrow = "close tray"
-      }
-    }
-    
-    $btn.on('click', function(){
-      $tray.toggleClass('hide');
-      setArrow();
-      // If tray is now open, ensure it is visible
-      if (!$tray.hasClass('hide')) {
-        $tray.show();
-      } else {
-        $tray.hide();
-      }
-    });
-    $(document).on('click', '#controlTrayCollapse', function(e) {
-      $tray.addClass('hide');
-      setArrow();
-      $tray.hide();
-      e.stopPropagation();
-    });
-    // Tray starts closed by default as configured above
-  });
-  </script>
+
   <script>
-    // --- Control Tray visibility logic ---
-    function updateTrayVisibility() {
-      var mainVisible = document.getElementById('mainViewContainer').style.display !== 'none';
-      document.getElementById('controlTrayBtn').style.display = mainVisible ? '' : 'none';
-      document.getElementById('controlTray').style.display = mainVisible ? '' : 'none';
-    }
-    document.addEventListener('DOMContentLoaded', function() {
-      updateTrayVisibility();
-      // Main to SkyView
-      var skyBtn = document.getElementById('skyviewButton');
-      if (skyBtn) skyBtn.addEventListener('click', updateTrayVisibility);
-      // SkyView to Main
-      document.body.addEventListener('click', function(e) {
-        if (e.target && e.target.id === 'refreshBtn') updateTrayVisibility();
-      });
-    });
+    // --- Control bars are now always visible ---
+    // Both status bar (top) and control bar (bottom) remain visible in all views
   </script>
 
 </body>
