@@ -1485,9 +1485,9 @@
     // Update Mode and Park/Unpark button labels (shortened text for square buttons)
     function updateModeAndParkButtons() {
       $.getJSON('/status', function(d) {
-        var isManual = d.tracking === 'Blinky';
-        // Swap labels: show 'Aut' when manual, 'Man' when auto
-        $('#modeToggleButton').text(isManual ? 'Aut' : 'Man');
+        var isManual = d.tracking === 'Blinky/Manual';
+        // Show what mode pressing will switch TO: 'Auto' when manual, 'Man' when auto/tracking
+        $('#modeToggleButton').text(isManual ? 'Auto' : 'Man');
         
         var isParked = d.tracking === 'Parking' || d.tracking === 'Parked';
         $('#parkToggleButton').text(isParked ? 'Unpk' : 'Park');
