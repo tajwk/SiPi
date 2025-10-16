@@ -2461,8 +2461,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         // --- Color by spectral type ---
         let color = 'white';
-        if (s.SpectType && typeof s.SpectType === 'string') {
-          switch (s.SpectType.charAt(0).toUpperCase()) {
+        if (s.SpecType && typeof s.SpecType === 'string') {
+          switch (s.SpecType.charAt(0).toUpperCase()) {
             case 'O': color = '#9bb0ff'; break; // blue
             case 'B': color = '#aabfff'; break; // blue-white
             case 'A': color = '#cad7ff'; break; // white
@@ -3204,7 +3204,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (selectedObject.visualRadius !== undefined) {
         // Stars store their visual radius separately
         objectRadius = selectedObject.visualRadius;
-      } else if (selectedObject.Mag !== undefined && selectedObject.SpectType !== undefined) {
+      } else if (selectedObject.Mag !== undefined && selectedObject.SpecType !== undefined) {
         // This is likely a star, calculate visual radius from magnitude
         const minRadius = 1.2;
         const areaStep = 1.5;
@@ -3811,6 +3811,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const searchInput = document.getElementById('searchInput');
   const searchExecuteBtn = document.getElementById('searchExecuteBtn');
   const searchCancelBtn = document.getElementById('searchCancelBtn');
+  const searchResults = document.getElementById('searchResults');
+
+  let searchTimeout;
 
   if (searchBtn && searchPopup && searchOverlay) {
     searchBtn.addEventListener('click', () => {
@@ -3818,6 +3821,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       searchPopup.style.display = 'block';
       searchOverlay.style.display = 'block';
       searchInput.focus();
+      searchResults.style.display = 'none';
+      searchResults.innerHTML = '';
     });
 
     searchCancelBtn.addEventListener('click', () => {
@@ -3825,6 +3830,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       searchPopup.style.display = 'none';
       searchOverlay.style.display = 'none';
       searchInput.value = '';
+      searchResults.style.display = 'none';
+      searchResults.innerHTML = '';
     });
 
     searchOverlay.addEventListener('click', () => {
@@ -3832,25 +3839,142 @@ document.addEventListener('DOMContentLoaded', async () => {
       searchPopup.style.display = 'none';
       searchOverlay.style.display = 'none';
       searchInput.value = '';
+      searchResults.style.display = 'none';
+      searchResults.innerHTML = '';
     });
 
-    searchExecuteBtn.addEventListener('click', () => {
+    // Perform search
+    function performSearch() {
       const searchTerm = searchInput.value.trim();
-      debugLog('Search execute clicked with term:', searchTerm);
-      if (searchTerm) {
-        // TODO: Implement search functionality with backend
-        alert(`Search functionality will be implemented later.\nSearching for: ${searchTerm}`);
+      debugLog('Searching for:', searchTerm);
+      
+      if (searchTerm.length < 2) {
+        searchResults.style.display = 'none';
+        searchResults.innerHTML = '';
+        return;
       }
+
+      // Show loading state
+      searchResults.style.display = 'block';
+      searchResults.innerHTML = '<div class="search-no-results">Searching...</div>';
+
+      fetch(`/search_sky?q=${encodeURIComponent(searchTerm)}&limit=20`)
+        .then(r => r.json())
+        .then(results => {
+          displaySearchResults(results);
+        })
+        .catch(err => {
+          debugLog('Search error:', err);
+          searchResults.innerHTML = '<div class="search-no-results">Search failed. Please try again.</div>';
+        });
+    }
+
+    // Display search results
+    function displaySearchResults(results) {
+      if (results.length === 0) {
+        searchResults.innerHTML = '<div class="search-no-results">No objects found</div>';
+        return;
+      }
+
+      const html = results.map(obj => {
+        const catalogType = obj.catalog_type || 'unknown';
+        const ra = obj.RtAsc !== undefined ? obj.RtAsc.toFixed(2) : 'N/A';
+        const dec = obj.Declin !== undefined ? obj.Declin.toFixed(2) : 'N/A';
+        
+        return `
+          <div class="search-result-item" data-ra="${obj.RtAsc}" data-dec="${obj.Declin}" data-name="${obj.Name}">
+            <div>
+              <span class="search-result-name">${obj.Name}</span>
+              <span class="search-result-type">[${catalogType}]</span>
+            </div>
+            <div class="search-result-coords">RA: ${ra}° | Dec: ${dec}°</div>
+          </div>
+        `;
+      }).join('');
+
+      searchResults.innerHTML = html;
+
+      // Add click handlers to results
+      const resultItems = searchResults.querySelectorAll('.search-result-item');
+      resultItems.forEach(item => {
+        item.addEventListener('click', () => {
+          const ra = parseFloat(item.getAttribute('data-ra'));
+          const dec = parseFloat(item.getAttribute('data-dec'));
+          const name = item.getAttribute('data-name');
+          
+          selectSearchResult(ra, dec, name);
+        });
+      });
+    }
+
+    // Select a search result
+    function selectSearchResult(ra, dec, name) {
+      debugLog('Selected object:', name, 'RA:', ra, 'Dec:', dec);
+      
+      // Close search popup
       searchPopup.style.display = 'none';
       searchOverlay.style.display = 'none';
       searchInput.value = '';
+      searchResults.style.display = 'none';
+      searchResults.innerHTML = '';
+
+      // Calculate Alt/Az coordinates for this object
+      const coords = eqToAltAz(ra, dec, lat, lon);
+      
+      // Fix azimuth reference frame - add 180° if needed
+      let correctedAz = coords.az;
+      if (correctedAz < 180) {
+        correctedAz += 180;
+      } else {
+        correctedAz -= 180;
+      }
+
+      // Set selectedObject to match the format used by canvas click handler
+      selectedObject = {
+        Name: name,
+        RtAsc: ra,
+        Declin: dec,
+        altDeg: coords.alt,
+        azDeg: correctedAz
+      };
+
+      // Update the coordinate input fields
+      if (altInput && azInput) {
+        altInput.value = degToDMS(coords.alt);
+        azInput.value = degToDMS(correctedAz);
+      }
+      
+      if (raInput && decInput) {
+        const raValue = decimalHMStoHMS(ra);
+        const decValue = degToDMS(dec);
+        raInput.value = raValue;
+        decInput.value = decValue;
+      }
+
+      // Update the selected object info display (same as canvas click)
+      showSelectedAttributes(selectedObject);
+
+      // Redraw to show the selection circle
+      draw();
+    }
+
+    searchExecuteBtn.addEventListener('click', () => {
+      performSearch();
     });
 
     // Handle Enter key in search input
     searchInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') {
-        searchExecuteBtn.click();
+        performSearch();
       }
+    });
+
+    // Live search as user types (debounced)
+    searchInput.addEventListener('input', () => {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        performSearch();
+      }, 500); // Wait 500ms after user stops typing
     });
 
     // Handle Escape key to close popup
@@ -4134,11 +4258,11 @@ function showSelectedAttributes(selected) {
     }
   }
   // Spectral Type
-  if (selected.SpectType) {
+  if (selected.SpecType) {
     const el = document.getElementById('specInfo');
     if (el) {
       el.classList.add('active');
-      el.textContent = `Spectral Type: ${selected.SpectType}`;
+      el.textContent = `Spectral Type: ${selected.SpecType}`;
     }
   }
   // Color Index

@@ -1061,6 +1061,51 @@
       color: #888 !important;
     }
     
+    #searchResults {
+      background: #2a2a2a !important;
+      border: 1px solid #444 !important;
+      border-radius: 4px !important;
+    }
+    
+    .search-result-item {
+      padding: 10px !important;
+      border-bottom: 1px solid #444 !important;
+      cursor: pointer !important;
+      transition: background 0.2s !important;
+    }
+    
+    .search-result-item:hover {
+      background: #3a3a3a !important;
+    }
+    
+    .search-result-item:last-child {
+      border-bottom: none !important;
+    }
+    
+    .search-result-name {
+      font-weight: bold !important;
+      color: #ff6666 !important;
+      font-size: 14px !important;
+    }
+    
+    .search-result-type {
+      color: #888 !important;
+      font-size: 12px !important;
+      margin-left: 8px !important;
+    }
+    
+    .search-result-coords {
+      color: #aaa !important;
+      font-size: 11px !important;
+      margin-top: 4px !important;
+    }
+    
+    .search-no-results {
+      padding: 20px !important;
+      text-align: center !important;
+      color: #888 !important;
+    }
+    
     #searchExecuteBtn, #searchCancelBtn {
       background: #1a1a1a !important;
       color: #ff0000 !important;
@@ -1188,10 +1233,11 @@
   </div>
 
   <!-- Search Popup -->
-  <div id="searchPopup" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1000; background: var(--bg-color, #1a1a1a); border: 2px solid var(--border-color, #444); border-radius: 8px; padding: 20px; min-width: 300px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
-    <h3 style="margin: 0 0 15px 0; color: var(--text-color, #ffffff); text-align: center;">Search Objects</h3>
+  <div id="searchPopup" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1000; background: var(--bg-color, #1a1a1a); border: 2px solid var(--border-color, #444); border-radius: 8px; padding: 20px; min-width: 400px; max-width: 90vw; max-height: 80vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+    <h3 style="margin: 0 0 15px 0; color: var(--text-color, #ffffff); text-align: center;">Search Sky Objects</h3>
     <div style="display: flex; flex-direction: column; gap: 10px;">
-      <input id="searchInput" type="text" placeholder="Enter object name (e.g., M31, Vega, Polaris)" style="padding: 8px; border: 1px solid var(--border-color, #666); border-radius: 4px; background: var(--input-bg, #2a2a2a); color: var(--text-color, #ffffff); font-size: 14px;">
+      <input id="searchInput" type="text" placeholder="Enter object name (e.g., M31, Vega, NGC 224)" style="padding: 8px; border: 1px solid var(--border-color, #666); border-radius: 4px; background: var(--input-bg, #2a2a2a); color: var(--text-color, #ffffff); font-size: 14px;">
+      <div id="searchResults" style="display: none; max-height: 400px; overflow-y: auto; margin-top: 10px;"></div>
       <div style="display: flex; gap: 10px; justify-content: center;">
         <button id="searchExecuteBtn" class="skyview-btn" style="flex: 1;">Search</button>
         <button id="searchCancelBtn" class="skyview-btn" style="flex: 1;">Cancel</button>

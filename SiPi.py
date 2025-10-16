@@ -818,6 +818,101 @@ def search():
         print(f"[SiPi SEARCH DEBUG] Exception in search: {e}")
         return jsonify(results=[], error=str(e))
 
+# Global catalog index for fast searching
+CATALOG_INDEX = None
+
+def load_catalog_index():
+    """Load all catalogs and create search index (called once at startup)"""
+    global CATALOG_INDEX
+    if CATALOG_INDEX is not None:
+        return CATALOG_INDEX
+    
+    print("[SiPi CATALOG] Loading catalog index...")
+    CATALOG_INDEX = {
+        'by_name': {},
+        'all_objects': []
+    }
+    
+    for catalog_type, catalog_file in catalog_paths.items():
+        if not os.path.exists(catalog_file):
+            print(f"[SiPi CATALOG] Warning: {catalog_file} not found")
+            continue
+            
+        try:
+            with open(catalog_file, 'r') as f:
+                objects = json.load(f)
+            
+            for obj in objects:
+                # Add catalog type to each object
+                obj['catalog_type'] = catalog_type
+                
+                # Index by name (lowercase for case-insensitive search)
+                name = obj.get('Name', '').lower().strip()
+                if name:
+                    # Store all objects with this name (handle duplicates)
+                    if name not in CATALOG_INDEX['by_name']:
+                        CATALOG_INDEX['by_name'][name] = []
+                    CATALOG_INDEX['by_name'][name].append(obj)
+                
+                # Store in all objects list
+                CATALOG_INDEX['all_objects'].append(obj)
+            
+            print(f"[SiPi CATALOG] Loaded {len(objects)} objects from {catalog_type}")
+        except Exception as e:
+            print(f"[SiPi CATALOG] Error loading {catalog_file}: {e}")
+    
+    print(f"[SiPi CATALOG] Index complete: {len(CATALOG_INDEX['all_objects'])} total objects")
+    return CATALOG_INDEX
+
+@app.route('/search_sky')
+def search_sky():
+    """Search all catalogs for matching objects"""
+    query = request.args.get('q', '').strip().lower()
+    limit = int(request.args.get('limit', 50))
+    
+    if not query or len(query) < 2:
+        return jsonify([])
+    
+    # Load catalogs if not already loaded
+    index = load_catalog_index()
+    
+    results = []
+    seen_names = set()
+    
+    # Exact match first
+    if query in index['by_name']:
+        for obj in index['by_name'][query]:
+            if obj['Name'] not in seen_names:
+                results.append(obj)
+                seen_names.add(obj['Name'])
+    
+    # Partial matches (starts with)
+    for name, objs in index['by_name'].items():
+        if len(results) >= limit:
+            break
+        if name.startswith(query):
+            for obj in objs:
+                if obj['Name'] not in seen_names:
+                    results.append(obj)
+                    seen_names.add(obj['Name'])
+                    if len(results) >= limit:
+                        break
+    
+    # Contains matches (if we still have room)
+    if len(results) < limit:
+        for name, objs in index['by_name'].items():
+            if len(results) >= limit:
+                break
+            if query in name and not name.startswith(query):
+                for obj in objs:
+                    if obj['Name'] not in seen_names:
+                        results.append(obj)
+                        seen_names.add(obj['Name'])
+                        if len(results) >= limit:
+                            break
+    
+    return jsonify(results)
+
 @app.route('/sync', methods=['POST'])
 def sync():
     ra = request.form.get('ra','')
@@ -2199,6 +2294,10 @@ if __name__ == '__main__':
     get_site_location()
     connect_command_socket()
     connect_persistent_socket()
+    
+    # Load catalog index at startup
+    print("[SiPi STARTUP] Loading catalog index...")
+    load_catalog_index()
     
     # Astrometric corrections removed
     wait_for_ip()
