@@ -639,6 +639,16 @@
       background: #222;
       color: #ff0000;
     }
+    
+    /* Force icon buttons to render as text, not emoji */
+    .icon-btn {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica", "Arial", sans-serif !important;
+      font-variation-settings: 'emoji' 'text' !important;
+      -webkit-font-feature-settings: 'liga' 0 !important;
+      font-feature-settings: 'liga' 0 !important;
+      text-rendering: optimizeLegibility !important;
+      font-size: 20px !important;
+    }
   </style>
 
   <script src="{{ url_for('static', filename='js/jquery-3.6.0.min.js') }}"></script>
@@ -1227,8 +1237,8 @@
     <button class="main-control-btn" id="skyviewButton">Sky</button>
     <button class="main-control-btn" id="modeToggleButton">Man</button>
     <button class="main-control-btn" id="parkToggleButton">Park</button>
-    <button class="main-control-btn" id="mainEditConfigBtn" title="Settings">⚙</button>
-    <button class="main-control-btn" id="mainToggleFullScreen" title="Fullscreen">⛶</button>
+    <button class="main-control-btn icon-btn" id="mainEditConfigBtn" title="Settings">&#x2699;&#xFE0E;</button>
+    <button class="main-control-btn icon-btn" id="mainToggleFullScreen" title="Fullscreen">&#x26F6;&#xFE0E;</button>
     <a class="main-control-btn" id="helpBtn" title="Help" href="{{ url_for('quickstart') }}" target="_blank" rel="noopener">Help</a>
   </div>
 
@@ -1256,7 +1266,7 @@
     // Insert header buttons
     $('.control-buttons').html(`
       <div class="control-buttons-left">
-        <button class="btn btn--icon" id="editConfigBtn"    title="Settings">⚙</button>
+        <button class="btn btn--icon icon-btn" id="editConfigBtn"    title="Settings">&#x2699;&#xFE0E;</button>
       </div>
       <div class="control-buttons-right"></div>
     `);
@@ -2741,3 +2751,4 @@
 
 </body>
 </html>
+
