@@ -20,7 +20,7 @@
   <style>
     /* SkyView styles from skyview.html */
     html, body {
-      margin:0; padding:0; overflow-x:hidden;
+      margin:0; padding:0; overflow:hidden;
       background:black; color:white;
       /* Disable zoom and touch manipulation */
       touch-action: manipulation;
@@ -51,11 +51,13 @@
     #skyviewContainer { display: none; position: relative; min-height: 100vh; background: black; color: white; padding-top: 85px; padding-bottom: 75px; box-sizing: border-box; z-index: 1; }
     /* Coordinates display - centered horizontally above buttons */
     #skyviewTopBar {
-      position:fixed; bottom:200px; left:50%; transform:translateX(-50%); width:auto;
-      padding:10px; background:rgba(0,0,0,0.85);
+      position:fixed; bottom:180px; left:50%; transform:translateX(-50%); width:auto;
+      padding:8px 10px; background:rgba(0,0,0,0.85);
       border:1px solid #555;
       border-radius:8px;
       display:flex; gap:8px; align-items:center; z-index:20;
+      font-size: 14px;
+      line-height: 1.2;
     }
     
     /* Horizontal button row at bottom - above static control bar */
@@ -113,6 +115,10 @@
     #skyviewTopBar input {
       width:6em; background:#1a1a1a; color:#fff;
       border:1px solid #555; padding:2px 4px;
+      font-size: 14px;
+      line-height: 1.2;
+      height: 22px;
+      box-sizing: border-box;
     }
     #skyviewTopBar button {
       background:#1a1a1a; color:#ff0000; border:1px solid #ff0000;
@@ -1629,18 +1635,20 @@
           '<button id="goToBtn" class="btn btn--primary">GoTo</button>'+ 
           '<button id="closeResultsBtn" class="btn btn--secondary">X</button>'+ 
         '</div>'
-      );
+      ).show();
       $('#syncButton').off('click').on('click',function(){
         if(window.currentRA && window.currentDEC) {
           window.justSynced = true;
           $.post('/sync',{ra:window.currentRA,dec:window.currentDEC});
         }
+        $('#results').empty().hide();
       });
       $('#goToBtn').off('click').on('click',function(){
         $.post('/goto',{ra:it.raw_ra,dec:window.currentDEC});
+        $('#results').empty().hide();
       });
       $('#closeResultsBtn').off('click').on('click',function(){
-        $('#results').empty();
+        $('#results').empty().hide();
       });
       hideModal();
       // Clear searchResults after a selection to prevent popup reappearing
@@ -2702,7 +2710,7 @@
     }
     
     #skyviewTopBar {
-      bottom: 125px;
+      bottom: 133px;
     }
     
     #skyviewBottomButtons {
@@ -2735,7 +2743,7 @@
     }
     
     #skyviewTopBar {
-      bottom: 110px;
+      bottom: 118px;
     }
     
     #skyviewBottomButtons {
@@ -2751,4 +2759,3 @@
 
 </body>
 </html>
-
