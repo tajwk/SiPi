@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # SiPi Version Information
-__version__ = "1.0.0"
+__version__ = "1.0"
 __release_date__ = "2025-08-21"
 __description__ = "SiPi Telescope Control System"
 
@@ -1053,6 +1053,67 @@ def moveaxis():
 def abort():
     send_move_no_wait("Abort\n")
     return jsonify(response="Command sent")
+
+# WiFi Joystick support - global speed state
+joystick_speed_index = 0
+joystick_speeds = ["Slew", "Pan", "Guide"]
+
+@app.route('/joystick_move', methods=['POST'])
+def joystick_move():
+    """Handle joystick movement commands from Pico W"""
+    try:
+        data = request.get_json()
+        direction = data.get('direction', '')
+        
+        if not direction:
+            return jsonify(status="error", message="Missing direction"), 400
+        
+        # Map directions to axes: up/down = Pri (Primary/Altitude), left/right = Sec (Secondary/Azimuth)
+        if direction == "up":
+            axis = "Pri"
+            is_positive = True
+        elif direction == "down":
+            axis = "Pri"
+            is_positive = False
+        elif direction == "right":
+            axis = "Sec"
+            is_positive = True
+        elif direction == "left":
+            axis = "Sec"
+            is_positive = False
+        else:
+            return jsonify(status="error", message="Invalid direction"), 400
+        
+        # Get current speed setting
+        speed = joystick_speeds[joystick_speed_index]
+        
+        # Map speed to command code (uppercase for positive, lowercase for negative)
+        if speed == "Slew":
+            code = "S" if is_positive else "s"
+        elif speed == "Pan":
+            code = "P" if is_positive else "p"
+        else:  # Guide
+            code = "G" if is_positive else "g"
+        
+        # Send move command
+        cmd = f"MoveAxisSPG{axis} {code}\n"
+        send_move_no_wait(cmd)
+        
+        return jsonify(status="ok", direction=direction, speed=speed, axis=axis, code=code)
+    
+    except Exception as e:
+        return jsonify(status="error", message=str(e)), 500
+
+@app.route('/joystick_speed', methods=['POST'])
+def joystick_speed():
+    """Toggle joystick speed (button press from Pico W)"""
+    global joystick_speed_index
+    try:
+        joystick_speed_index = (joystick_speed_index + 1) % len(joystick_speeds)
+        current_speed = joystick_speeds[joystick_speed_index]
+        return jsonify(status="ok", speed=current_speed, index=joystick_speed_index)
+    except Exception as e:
+        return jsonify(status="error", message=str(e)), 500
 
 @app.route('/park', methods=['POST'])
 def park():
