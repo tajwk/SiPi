@@ -199,7 +199,7 @@ Enable and Start Services
 	sudo systemctl enable sitech sipi 
 	sudo systemctl start sitech sipi
 
-Give permissions. Replace sitech:sitech with [yourUsername]:[yourUsername]
+Give permissions. Replace sitech:sitech with yourUsername:yourUsername
 
 	sudo chown -R sitech:sitech /usr/share/SiTech/SiTechExe
 
