@@ -136,8 +136,8 @@ Instal SIPI
 
 Install xvfb
 		
-		sudo apt update
-		sudo apt install xvfb
+	sudo apt update
+	sudo apt install xvfb
 
 
 Create start script:
@@ -199,22 +199,15 @@ Enable and Start Services
 	sudo systemctl enable sitech sipi 
 	sudo systemctl start sitech sipi
 
-Give permissions. Replace sitech:sitech with yourUsername:yourUsername
+Give permissions. Replace yourUsername with your Linux username:
 
-	sudo chown -R sitech:sitech /usr/share/SiTech/SiTechExe
+	sudo chown -R yourUsername:yourUsername /usr/share/SiTech/SiTechExe
 
-Other things to do:
-
-Enable VNC
-Setup com port
-Edit Config
-
-Authorize github ssh for updates
-	sudo -u sitech ssh-keyscan github.com >> /home/sitech/.ssh/known_hosts
-	sudo chown sitech:sitech /home/sitech/.ssh/known_hosts
+Authorize github ssh for updates.
+	sudo mkdir -p /home/sitech/.ssh
+	sudo chown yourUsername:yourUsername /home/sitech/.ssh
+	sudo chmod 700 /home/sitech/.ssh
+Add GitHub's SSH key to known_hosts
+	sudo -u yourUsername ssh-keyscan github.com >> /home/sitech/.ssh/known_hosts
+	sudo chown yourUsername:yourUsername /home/sitech/.ssh/known_hosts
 	sudo chmod 600 /home/sitech/.ssh/known_hosts
-
-
-Notes:
-
-If you edit config in web interface and then click Change Config in SiTechExe prior to restarting SiTechExe, your settings will be lost
