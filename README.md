@@ -142,7 +142,7 @@ Install xvfb
 
 Create start script:
 
-	cd /opt/SiTech/SiTechExe/SiTechExe
+	cd /opt/SiTech/SiTechExe
 	sudo nano start_sitech.sh
 	
 		Add:
