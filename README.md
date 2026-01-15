@@ -194,7 +194,7 @@ Create Services:
 		[Install]
 		WantedBy=multi-user.target
 		
-Enable and Start Services
+Enable and Start Services:
 	
 	sudo systemctl enable sitech sipi 
 	sudo systemctl start sitech sipi
@@ -203,11 +203,14 @@ Give permissions. Replace yourUsername with your Linux username:
 
 	sudo chown -R yourUsername:yourUsername /usr/share/SiTech/SiTechExe
 
-Authorize github ssh for updates.
+Authorize github ssh for updates:
+
 	sudo mkdir -p /home/sitech/.ssh
 	sudo chown yourUsername:yourUsername /home/sitech/.ssh
 	sudo chmod 700 /home/sitech/.ssh
-Add GitHub's SSH key to known_hosts
+
+Add GitHub's SSH key to known_hosts:
+
 	sudo -u yourUsername ssh-keyscan github.com >> /home/sitech/.ssh/known_hosts
 	sudo chown yourUsername:yourUsername /home/sitech/.ssh/known_hosts
 	sudo chmod 600 /home/sitech/.ssh/known_hosts
