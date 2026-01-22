@@ -94,7 +94,7 @@ Configure Static IP for wlan0:
 	
 	Add:
 		interface wlan0
-		static ip_address=192.168.4.1/24
+		static ip_address=192.168.11.1/24
 		nohook wpa_supplicant
 		
 Configure dnsmasq
@@ -104,7 +104,7 @@ Configure dnsmasq
 	
 	Add:
 		interface=wlan0
-		dhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h
+		dhcp-range=192.168.11.2,192.168.11.20,255.255.255.0,24h
 
 Unblock WiFi
 
