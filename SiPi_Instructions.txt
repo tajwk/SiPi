@@ -24,18 +24,7 @@ Download SiTechExe:
 	
 Unzip without extracting:
 
-	sudo unzip SiTechInstallerLinux.zip
-
-Modify SiTechInstaller.sh 
-	
-	sudo nano SiTechInstaller.sh
-	
-Change the line:
-	SiTechBinDirectory=~/bin/SiTech
-to
-	SiTechBinDirectory=/opt/SiTech
-and save the file
-	
+	sudo unzip SiTechInstallerLinux.zip	
 
 Run the installer with sudo:
 
