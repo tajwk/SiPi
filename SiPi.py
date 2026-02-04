@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # SiPi Version Information
-__version__ = "1.0"
+__version__ = "1.1"
 __release_date__ = "2025-08-21"
 __description__ = "SiPi Telescope Control System"
 
