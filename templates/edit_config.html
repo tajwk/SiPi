@@ -305,16 +305,9 @@ function showConfirm(msg, cb) {
     cb(false);
   });
 }
-  (function(){
-    if (localStorage.getItem('nightMode') === 'enabled') {
-      document.body.classList.add('night-mode');
-    }
-  })();
-  window.addEventListener('storage', function(e){
-    if (e.key === 'nightMode') {
-      document.body.classList.toggle('night-mode', e.newValue === 'enabled');
-    }
-  });
+  // Apply night mode immediately - always enabled (matches main page)
+  document.documentElement.classList.add('night-mode');
+  document.body.classList.add('night-mode');
 </script>
 
 <!-- Help button at top right -->
@@ -354,6 +347,11 @@ function showConfirm(msg, cb) {
           <legend>Mount Type</legend>
           <label><input type="radio" name="mountType" value="0" {% if mount_type=='0' %}checked{% endif %}> Alt/Az</label><br>
           <label><input type="radio" name="mountType" value="1" {% if mount_type=='1' %}checked{% endif %}> Equatorial</label><br>
+          <label><input type="radio" name="mountType" value="2" {% if mount_type=='2' %}checked{% endif %}> GEM (German Equatorial)</label><br>
+          <div id="gemSubSettings" style="display:none; margin-left:25px; margin-top:8px;">
+            <label><input type="checkbox" id="autoTrackOnStartCheckbox"> Auto Track on Start</label><br>
+            <label><input type="checkbox" id="autoFlipOnTrackCheckbox"> Auto Flip on Track End</label>
+          </div>
           <label><input type="radio" name="mountType" value="3" {% if mount_type=='3' %}checked{% endif %}> Alt/Alt</label>
         </fieldset>
       </div>
@@ -462,7 +460,6 @@ function showConfirm(msg, cb) {
       </div>
       <div style="text-align:center;">
         <button id="saveWifiBtn" class="btn">Save</button>
-        <button id="fixWifiBtn" class="btn" style="margin-left:10px;" title="Fix WiFi script permissions">Fix Permissions</button>
       </div>
     </div>
     <div class="grid-item">
@@ -808,13 +805,52 @@ $(function(){
   const o3init = getOption3Bits(lines0);
   if ((o2init & 1073741824) !== 0) $('#xpxpCheckbox').prop('checked', true);
   if ((o3init & 536870912) !== 0) $('#dontReverseCrossingCheckbox').prop('checked', true);
+  
+  // Helper: Get OptionBits from config text
+  function getOptionBits(lines) {
+    for (let i=0; i<lines.length; i++) {
+      if (lines[i].startsWith('OptionBits=')) {
+        const val = lines[i].split('=')[1];
+        return parseInt(val) || 0;
+      }
+    }
+    return 0;
+  }
+  function setOptionBits(lines, val) {
+    for (let i=0; i<lines.length; i++) {
+      if (lines[i].startsWith('OptionBits=')) lines[i] = 'OptionBits='+val;
+    }
+    return lines;
+  }
+  
+  // Initialize GEM sub-settings based on OptionBits
+  const obInit = getOptionBits(lines0);
+  if ((obInit & 1024) !== 0) $('#autoTrackOnStartCheckbox').prop('checked', true);
+  if ((obInit & 2048) !== 0) $('#autoFlipOnTrackCheckbox').prop('checked', true);
+  
+  // Show/hide GEM sub-settings based on mount type
+  function updateGemSubSettings() {
+    const isGem = $('input[name="mountType"]:checked').val() === '2';
+    $('#gemSubSettings').toggle(isGem);
+  }
+  updateGemSubSettings();
   // Mount type mapping
   $('input[name="mountType"]').change(function(){
     const mode = this.value;
-    const lines = $('#configTextarea').val().split('\n').map(l =>
+    let lines = $('#configTextarea').val().split('\n').map(l =>
       l.startsWith('AlignmentMode=') ? 'AlignmentMode='+mode : l
     );
+    
+    // If GEM (mode 2) is selected, automatically enable Az/RA NoWrap (bit 24 = 16777216)
+    if (mode === '2') {
+      const ob = getOptionBits(lines);
+      const newOb = ob | 16777216; // Set bit 24
+      lines = setOptionBits(lines, newOb);
+      $('#noWrapCheckbox').prop('checked', true);
+    }
+    
     $('#configTextarea').val(lines.join('\n'));
+    updateGemSubSettings();
   });
 
   // Encoder options mapping
@@ -876,6 +912,17 @@ $(function(){
     } else {
       $('#dontReverseCrossingCheckbox').prop('checked', false);
     }
+    // Update GEM sub-setting checkboxes
+    if ((ob & 1024) !== 0) {
+      $('#autoTrackOnStartCheckbox').prop('checked', true);
+    } else {
+      $('#autoTrackOnStartCheckbox').prop('checked', false);
+    }
+    if ((ob & 2048) !== 0) {
+      $('#autoFlipOnTrackCheckbox').prop('checked', true);
+    } else {
+      $('#autoFlipOnTrackCheckbox').prop('checked', false);
+    }
   });
   // XPXP checkbox logic
   $('#xpxpCheckbox').change(function(){
@@ -899,6 +946,31 @@ $(function(){
     }
     $('#configTextarea').val(setOption3Bits(lines, o3).join('\n'));
   });
+  
+  // Auto Track on Start checkbox logic (OptionBits bit 10 = 1024)
+  $('#autoTrackOnStartCheckbox').change(function(){
+    let lines = $('#configTextarea').val().split('\n');
+    let ob = getOptionBits(lines);
+    if(this.checked) {
+      ob = ob | 1024; // Set bit 10
+    } else {
+      ob = ob & ~1024; // Clear bit 10
+    }
+    $('#configTextarea').val(setOptionBits(lines, ob).join('\n'));
+  });
+  
+  // Auto Flip on Track End checkbox logic (OptionBits bit 11 = 2048)
+  $('#autoFlipOnTrackCheckbox').change(function(){
+    let lines = $('#configTextarea').val().split('\n');
+    let ob = getOptionBits(lines);
+    if(this.checked) {
+      ob = ob | 2048; // Set bit 11
+    } else {
+      ob = ob & ~2048; // Clear bit 11
+    }
+    $('#configTextarea').val(setOptionBits(lines, ob).join('\n'));
+  });
+  
   // Set Park
   $('#setParkButton').click(() => {
     $.post('/setpark')
@@ -985,43 +1057,39 @@ $(function(){
     });
   });
 
-  // Wi-Fi Fix Permissions
-  $('#fixWifiBtn').click(function(e) {
-    e.preventDefault();
-    $(this).prop('disabled', true).text('Fixing...');
-    
-    $.post('/fix_wifi_permissions')
-      .done(function(data) {
-        if (data && data.success) {
-          showModal('WiFi permissions fixed successfully!\\n' + data.message);
-        } else {
-          showModal('Failed to fix WiFi permissions: ' + (data.error || 'Unknown error'));
-        }
-      })
-      .fail(function(xhr) {
-        const errorMsg = xhr.responseJSON ? xhr.responseJSON.error : xhr.statusText;
-        showModal('Error fixing WiFi permissions: ' + errorMsg);
-      })
-      .always(function() {
-        $('#fixWifiBtn').prop('disabled', false).text('Fix Permissions');
-      });
-  });
-
-  // Wi-Fi Save
+  // Wi-Fi Save (with automatic permissions fix)
   $('#saveWifiBtn').click(function(e) {
     e.preventDefault();
     const ssid = $('#wifiSsidInput').val();
     const pass = $('#wifiPassphraseInput').val();
-    $.post('/update_wifi', { ssid, pass })
-      .done(function(data) {
-        if (data && data.success) {
-          showModal('Wi-Fi settings saved!');
-        } else {
-          showModal('Failed to save Wi-Fi settings.');
-        }
+    const $btn = $(this);
+    
+    $btn.prop('disabled', true).text('Fixing permissions...');
+    
+    // First, fix permissions
+    $.post('/fix_wifi_permissions')
+      .done(function(permData) {
+        // Permissions fixed, now save WiFi settings
+        $btn.text('Saving...');
+        $.post('/update_wifi', { ssid, pass })
+          .done(function(data) {
+            if (data && data.success) {
+              showModal('Wi-Fi settings saved!');
+            } else {
+              showModal('Failed to save Wi-Fi settings.');
+            }
+          })
+          .fail(function(xhr) {
+            showModal('Error saving Wi-Fi settings: ' + (xhr.responseText || xhr.statusText));
+          })
+          .always(function() {
+            $btn.prop('disabled', false).text('Save');
+          });
       })
       .fail(function(xhr) {
-        showModal('Error saving Wi-Fi settings: ' + (xhr.responseText || xhr.statusText));
+        const errorMsg = xhr.responseJSON ? xhr.responseJSON.error : xhr.statusText;
+        showModal('Error fixing WiFi permissions: ' + errorMsg);
+        $btn.prop('disabled', false).text('Save');
       });
   });
 
