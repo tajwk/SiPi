@@ -1049,6 +1049,58 @@ def moveaxis():
     send_move_no_wait(cmd)
     return jsonify(response="Command sent")
 
+@app.route('/get_speed', methods=['GET'])
+def get_speed():
+    """Get current joystick speed for UI synchronization"""
+    return jsonify(speed=joystick_speeds[joystick_speed_index], index=joystick_speed_index)
+
+@app.route('/set_speed', methods=['POST'])
+def set_speed():
+    """Set speed from virtual handpad"""
+    global joystick_speed_index
+    try:
+        data = request.get_json() or {}
+        index = data.get('index')
+        if index is not None and 0 <= index < len(joystick_speeds):
+            joystick_speed_index = index
+            return jsonify(status="ok", speed=joystick_speeds[joystick_speed_index], index=joystick_speed_index)
+        return jsonify(status="error", message="Invalid index"), 400
+    except Exception as e:
+        return jsonify(status="error", message=str(e)), 500
+
+@app.route('/joystick_heartbeat', methods=['POST'])
+def joystick_heartbeat():
+    """Receive heartbeat from joystick to detect disconnection"""
+    global joystick_last_heartbeat
+    import time
+    joystick_last_heartbeat = time.time()
+    return jsonify(status="ok")
+
+def check_joystick_timeout():
+    """Background thread to check for joystick disconnection"""
+    global joystick_last_heartbeat, joystick_moving_axes
+    import time
+    import threading
+    
+    while True:
+        time.sleep(0.5)  # Check every 500ms
+        
+        # If we haven't received a heartbeat in 3 seconds AND the joystick is moving axes
+        if joystick_last_heartbeat > 0 and joystick_moving_axes:
+            time_since_heartbeat = time.time() - joystick_last_heartbeat
+            if time_since_heartbeat > 3.0:
+                # Joystick disconnected while moving - emergency stop
+                print(f"Joystick timeout detected ({time_since_heartbeat:.1f}s) - stopping axes: {joystick_moving_axes}")
+                for axis in list(joystick_moving_axes):
+                    send_move_no_wait(f"MoveAxisSPG{axis}\n")
+                joystick_moving_axes.clear()
+                joystick_last_heartbeat = 0  # Reset to avoid repeated stops
+
+# Start joystick timeout monitor thread
+import threading
+joystick_monitor = threading.Thread(target=check_joystick_timeout, daemon=True)
+joystick_monitor.start()
+
 @app.route('/abort', methods=['POST'])
 def abort():
     send_move_no_wait("Abort\n")
@@ -1057,29 +1109,46 @@ def abort():
 # WiFi Joystick support - global speed state
 joystick_speed_index = 0
 joystick_speeds = ["Slew", "Pan", "Guide"]
+joystick_last_heartbeat = 0
+joystick_moving_axes = set()  # Track which axes the joystick is currently moving
 
 @app.route('/joystick_move', methods=['POST'])
 def joystick_move():
-    """Handle joystick movement commands from Pico W"""
+    """Handle joystick movement commands from Pico W - per-axis control"""
+    global joystick_moving_axes
     try:
         data = request.get_json()
+        axis = data.get('axis', '')
         direction = data.get('direction', '')
         
-        if not direction:
-            return jsonify(status="error", message="Missing direction"), 400
+        if not axis:
+            return jsonify(status="error", message="Missing axis"), 400
         
-        # Map directions to axes: up/down = Pri (Primary/Altitude), left/right = Sec (Secondary/Azimuth)
+        if axis not in ['Pri', 'Sec']:
+            return jsonify(status="error", message="Invalid axis, must be Pri or Sec"), 400
+        
+        # Handle stop command - send empty arg to specified axis
+        if direction == "stop" or not direction:
+            send_move_no_wait(f"MoveAxisSPG{axis}\n")
+            joystick_moving_axes.discard(axis)  # Mark this axis as stopped
+            return jsonify(status="ok", axis=axis, direction="stop", message=f"Stop command sent to {axis} axis")
+        
+        # Map directions to axis polarity
         if direction == "up":
-            axis = "Pri"
+            if axis != "Pri":
+                return jsonify(status="error", message="up/down only valid for Pri axis"), 400
             is_positive = True
         elif direction == "down":
-            axis = "Pri"
+            if axis != "Pri":
+                return jsonify(status="error", message="up/down only valid for Pri axis"), 400
             is_positive = False
         elif direction == "right":
-            axis = "Sec"
+            if axis != "Sec":
+                return jsonify(status="error", message="left/right only valid for Sec axis"), 400
             is_positive = True
         elif direction == "left":
-            axis = "Sec"
+            if axis != "Sec":
+                return jsonify(status="error", message="left/right only valid for Sec axis"), 400
             is_positive = False
         else:
             return jsonify(status="error", message="Invalid direction"), 400
@@ -1098,6 +1167,7 @@ def joystick_move():
         # Send move command
         cmd = f"MoveAxisSPG{axis} {code}\n"
         send_move_no_wait(cmd)
+        joystick_moving_axes.add(axis)  # Mark this axis as actively moving
         
         return jsonify(status="ok", direction=direction, speed=speed, axis=axis, code=code)
     
@@ -1224,7 +1294,9 @@ def fix_wifi_permissions():
         return jsonify(success=False, error='WiFi hotspot functionality is not available on Windows. The application runs over LAN.'), 400
     
     try:
-        wifi_script = "/usr/local/bin/update_hostapd_conf.sh"
+        # Script is in the same directory as SiPi.py
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        wifi_script = os.path.join(script_dir, "update_hostapd_conf.sh")
         messages = []
         
         # Check if script exists
@@ -1282,12 +1354,15 @@ def update_wifi():
         print(f"[DEBUG] Updating WiFi - SSID: '{ssid}', Password length: {len(passwd)}")
         
         # Check if script exists and is executable
-        script_path = '/usr/local/bin/update_hostapd_conf.sh'
+        # Script is in the same directory as SiPi.py
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        script_path = os.path.join(script_dir, "update_hostapd_conf.sh")
+        
         if not os.path.exists(script_path):
             return jsonify(success=False, error=f'WiFi update script not found at {script_path}'), 500
         
         if not os.access(script_path, os.X_OK):
-            return jsonify(success=False, error='WiFi update script is not executable. Run: sudo chmod 755 /usr/local/bin/update_hostapd_conf.sh'), 500
+            return jsonify(success=False, error=f'WiFi update script is not executable. Run: sudo chmod 755 {script_path}'), 500
         
         result = subprocess.run(
             ['sudo', script_path, ssid, passwd],
@@ -1908,7 +1983,7 @@ def edit_config():
                   'polite')
     drag_mode  = bool(ob & 8)
     no_wrap    = bool(ob & (1<<24))
-    mount_type = str(mmode if mmode in (0,1,3) else 0)
+    mount_type = str(mmode if mmode in (0,1,2,3) else 0)
 
     wssid = wpass = ""
     if not IS_WINDOWS and HOSTAPD_CONF and os.path.exists(HOSTAPD_CONF):
