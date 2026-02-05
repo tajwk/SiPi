@@ -2207,6 +2207,114 @@ document.addEventListener('DOMContentLoaded', async () => {
     ctx.setLineDash([]);
   }
 
+  // Draw equatorial grid (RA/Dec lines)
+  function drawEquatorialGrid(r) {
+    ctx.save();
+    
+    // Draw perimeter circle (same as alt/az grid)
+    ctx.strokeStyle = getNightModeColor('#888', 'border'); 
+    ctx.lineWidth = 2 / canvasScale;
+    ctx.beginPath(); 
+    ctx.arc(cx, cy, r, 0, 2*Math.PI); 
+    ctx.stroke();
+    
+    // Set up for grid lines (same gray as alt/az grid)
+    ctx.strokeStyle = getNightModeColor('#666', 'line');
+    ctx.setLineDash([4, 4]); // Dashed line
+    ctx.lineWidth = 0.5 / canvasScale;
+    
+    // Draw RA lines (hour lines from 0h to 23h)
+    for (let raHours = 0; raHours < 24; raHours += 2) { // Every 2 hours for clarity
+      const linePoints = [];
+      
+      // Sample declination from -90° to +90°
+      for (let dec = -90; dec <= 90; dec += 2) {
+        const p = project(raHours, dec, r);
+        if (p.alt > -5) { // Include points slightly below horizon
+          linePoints.push({x: p.x, y: p.y, dec: dec, alt: p.alt});
+        }
+      }
+      
+      // Draw connected line segments
+      if (linePoints.length > 1) {
+        ctx.beginPath();
+        ctx.moveTo(linePoints[0].x, linePoints[0].y);
+        for (let i = 1; i < linePoints.length; i++) {
+          ctx.lineTo(linePoints[i].x, linePoints[i].y);
+        }
+        ctx.stroke();
+        
+        // Label at midpoint instead of highest to avoid clustering
+        const midIdx = Math.floor(linePoints.length / 2);
+        const labelPoint = linePoints[midIdx];
+        
+        ctx.fillStyle = getNightModeColor('#888', 'text');
+        ctx.font = `${11/canvasScale}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        drawFlippableText(`${raHours}h`, labelPoint.x, labelPoint.y - 3/canvasScale);
+      }
+    }
+    
+    // Draw Dec lines (declination circles from -75° to +75°)
+    for (let dec = -75; dec <= 75; dec += 15) { // Every 15 degrees
+      const linePoints = [];
+      
+      // Sample RA from 0h to 24h
+      for (let raHours = 0; raHours <= 24; raHours += 0.25) { // Fine sampling
+        const p = project(raHours, dec, r);
+        if (p.alt > -5) { // Include points slightly below horizon
+          linePoints.push({x: p.x, y: p.y, ra: raHours});
+        }
+      }
+      
+      // Draw connected line segments
+      if (linePoints.length > 1) {
+        ctx.beginPath();
+        ctx.moveTo(linePoints[0].x, linePoints[0].y);
+        for (let i = 1; i < linePoints.length; i++) {
+          const prevRA = linePoints[i-1].ra;
+          const currRA = linePoints[i].ra;
+          if (Math.abs(currRA - prevRA) < 1) { // No wraparound
+            ctx.lineTo(linePoints[i].x, linePoints[i].y);
+          } else {
+            // Start new segment after wraparound
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(linePoints[i].x, linePoints[i].y);
+          }
+        }
+        ctx.stroke();
+        
+        // Place label on the side (east or west) with more spacing
+        // Use a point at 25% or 75% of the arc to avoid clustering
+        if (linePoints.length > 3) {
+          const labelIdx = dec >= 0 ? Math.floor(linePoints.length * 0.25) : Math.floor(linePoints.length * 0.75);
+          const labelPoint = linePoints[labelIdx];
+          
+          ctx.fillStyle = getNightModeColor('#888', 'text');
+          ctx.font = `${11/canvasScale}px sans-serif`;
+          
+          // Determine which side based on position relative to center
+          if (labelPoint.x < cx) {
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            const sign = dec >= 0 ? '+' : '';
+            drawFlippableText(`${sign}${dec}°`, labelPoint.x - 3/canvasScale, labelPoint.y);
+          } else {
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            const sign = dec >= 0 ? '+' : '';
+            drawFlippableText(`${sign}${dec}°`, labelPoint.x + 3/canvasScale, labelPoint.y);
+          }
+        }
+      }
+    }
+    
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
   // Draw NSEW labels outside the projection (called before clipping)
   function drawNSEWLabels(r) {
     ctx.fillStyle = getNightModeColor('red', 'compass');
@@ -2325,7 +2433,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     ctx.save();
     ctx.beginPath(); ctx.arc(cx,cy,effR,0,2*Math.PI); ctx.clip();
 
-    drawGrid(effR);
+    // Draw Alt/Az grid only if equatorial grid is not enabled
+    const toggleEquatorialGridCheck = document.getElementById('toggleEquatorialGrid');
+    if (!toggleEquatorialGridCheck || !toggleEquatorialGridCheck.checked) {
+      drawGrid(effR);
+    }
 
     // --- PHASE 1: Draw all objects WITHOUT labels ---
     // This allows us to establish visual positions first, then add labels with priorities
@@ -2355,6 +2467,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
       ctx.restore();
     }
+    
+    // --- equatorial grid ---
+    const toggleEquatorialGrid = document.getElementById('toggleEquatorialGrid');
+    if(toggleEquatorialGrid && toggleEquatorialGrid.checked){
+      debugLog('[SkyView] Drawing equatorial grid');
+      drawEquatorialGrid(effR);
+    }
+    
     // Constellation labels will be drawn in PHASE 2 with priority system
 
     // --- ecliptic line ---
@@ -3634,6 +3754,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     toggleEcliptic.addEventListener('change', draw);
   }
 
+  const toggleEquatorialGrid = document.getElementById('toggleEquatorialGrid');
+  if (toggleEquatorialGrid) {
+    toggleEquatorialGrid.addEventListener('change', draw);
+  }
+
   if (toggleSolarSystem) {
     toggleSolarSystem.addEventListener('change', draw);
   }
@@ -4104,6 +4229,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     'toggleConst',
     'toggleConstLabels',
     'toggleEcliptic',
+    'toggleEquatorialGrid',
     'toggleMessierNames',
     'toggleGal',
     'toggleOpen',
@@ -4121,6 +4247,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     toggleConst: true,
     toggleConstLabels: false,
     toggleEcliptic: false,
+    toggleEquatorialGrid: false,
     toggleMessierNames: true,
     toggleGal: false,
     toggleOpen: false,
