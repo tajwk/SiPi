@@ -689,7 +689,9 @@
                      class="search-form__input"
                      placeholder="Enter object name…"
                      required
-                     autocomplete="off">
+                     autocomplete="off"
+                     readonly
+                     onfocus="this.removeAttribute('readonly');">
               <button type="button" id="clearSearchBtn" aria-label="Clear search">&times;</button>
             </div>
             <button type="submit" class="btn btn--primary">Search</button>
@@ -1227,6 +1229,7 @@
       <label><input type="checkbox" id="togglePlanetary"> <span style="color: rgb(127,255,0);">△</span> Planetary Nebulae</label>
       <label><input type="checkbox" id="toggleSolarSystem" checked> <span style="color: orange;">☉</span> Solar System</label>
       <label><input type="checkbox" id="toggleEcliptic"> <span style="color: #FFD700;">⸻</span> Ecliptic</label>
+      <label><input type="checkbox" id="toggleEquatorialGrid"> <span style="color: #4488ff;">╬</span> Equatorial Grid</label>
       <label><input type="checkbox" id="toggleCalPoints" checked> <span style="color: yellow;">⊕</span> Calibration Points</label>
       <label><input type="checkbox" id="toggleSkyViewNightMode"> <span>☾</span> True Night Mode</label>
       <label><input type="checkbox" id="toggleFlip"> <span>&#8596;</span> Flip E/W</label>
@@ -1252,7 +1255,7 @@
   <div id="searchPopup" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1000; background: var(--bg-color, #1a1a1a); border: 2px solid var(--border-color, #444); border-radius: 8px; padding: 20px; min-width: 400px; max-width: 90vw; max-height: 80vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
     <h3 style="margin: 0 0 15px 0; color: var(--text-color, #ffffff); text-align: center;">Search Sky Objects</h3>
     <div style="display: flex; flex-direction: column; gap: 10px;">
-      <input id="searchInput" type="text" placeholder="Enter object name (e.g., M31, Vega, NGC 224)" style="padding: 8px; border: 1px solid var(--border-color, #666); border-radius: 4px; background: var(--input-bg, #2a2a2a); color: var(--text-color, #ffffff); font-size: 14px;">
+      <input id="searchInput" type="text" placeholder="Enter object name (e.g., M31, Vega, NGC 224)" autocomplete="off" readonly onfocus="this.removeAttribute('readonly');" style="padding: 8px; border: 1px solid var(--border-color, #666); border-radius: 4px; background: var(--input-bg, #2a2a2a); color: var(--text-color, #ffffff); font-size: 14px;">
       <div id="searchResults" style="display: none; max-height: 400px; overflow-y: auto; margin-top: 10px;"></div>
       <div style="display: flex; gap: 10px; justify-content: center;">
         <button id="searchExecuteBtn" class="skyview-btn" style="flex: 1;">Search</button>
@@ -1893,12 +1896,26 @@
         stopMove(axis,this);
       });
     });
-    // Speed toggle
+    // Speed toggle - sync with server
     $('#speedButton').click(function(){
       window.currentSpeedIndex=(window.currentSpeedIndex+1)%speeds.length;
       window.currentSpeed=speeds[window.currentSpeedIndex];
       $('.speed-label').text(window.currentSpeed);
+      // Update server speed so joystick stays in sync
+      $.post('/set_speed', JSON.stringify({index: window.currentSpeedIndex}), null, 'json')
+        .fail(()=>console.log('Failed to sync speed to server'));
     });
+    
+    // Poll server speed every 500ms to stay in sync with joystick button
+    setInterval(function(){
+      $.get('/get_speed', function(data){
+        if(data.index !== window.currentSpeedIndex){
+          window.currentSpeedIndex = data.index;
+          window.currentSpeed = speeds[window.currentSpeedIndex];
+          $('.speed-label').text(window.currentSpeed);
+        }
+      });
+    }, 500);
 
     // Dismiss modal if backdrop clicked
     $('#customModal').click(e=>{ if(e.target.id==='customModal') hideModal(); });
