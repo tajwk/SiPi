@@ -686,10 +686,15 @@
             <div class="search-input-wrapper">
               <input type="text"
                      id="searchQuery"
+                     name="obj_name_query"
                      class="search-form__input"
                      placeholder="Enter object name…"
                      required
                      autocomplete="off"
+                     autocorrect="off"
+                     autocapitalize="off"
+                     spellcheck="false"
+                     data-form-type="other"
                      readonly
                      onfocus="this.removeAttribute('readonly');">
               <button type="button" id="clearSearchBtn" aria-label="Clear search">&times;</button>
@@ -1255,7 +1260,7 @@
   <div id="searchPopup" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1000; background: var(--bg-color, #1a1a1a); border: 2px solid var(--border-color, #444); border-radius: 8px; padding: 20px; min-width: 400px; max-width: 90vw; max-height: 80vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
     <h3 style="margin: 0 0 15px 0; color: var(--text-color, #ffffff); text-align: center;">Search Sky Objects</h3>
     <div style="display: flex; flex-direction: column; gap: 10px;">
-      <input id="searchInput" type="text" placeholder="Enter object name (e.g., M31, Vega, NGC 224)" autocomplete="off" readonly onfocus="this.removeAttribute('readonly');" style="padding: 8px; border: 1px solid var(--border-color, #666); border-radius: 4px; background: var(--input-bg, #2a2a2a); color: var(--text-color, #ffffff); font-size: 14px;">
+      <input id="searchInput" name="sky_obj_query" type="text" placeholder="Enter object name (e.g., M31, Vega, NGC 224)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" readonly onfocus="this.removeAttribute('readonly');" style="padding: 8px; border: 1px solid var(--border-color, #666); border-radius: 4px; background: var(--input-bg, #2a2a2a); color: var(--text-color, #ffffff); font-size: 14px;">
       <div id="searchResults" style="display: none; max-height: 400px; overflow-y: auto; margin-top: 10px;"></div>
       <div style="display: flex; gap: 10px; justify-content: center;">
         <button id="searchExecuteBtn" class="skyview-btn" style="flex: 1;">Search</button>
@@ -1902,8 +1907,13 @@
       window.currentSpeed=speeds[window.currentSpeedIndex];
       $('.speed-label').text(window.currentSpeed);
       // Update server speed so joystick stays in sync
-      $.post('/set_speed', JSON.stringify({index: window.currentSpeedIndex}), null, 'json')
-        .fail(()=>console.log('Failed to sync speed to server'));
+      $.ajax({
+        url: '/set_speed',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({index: window.currentSpeedIndex}),
+        error: function() { console.log('Failed to sync speed to server'); }
+      });
     });
     
     // Poll server speed every 500ms to stay in sync with joystick button
@@ -2251,8 +2261,28 @@
 
     // Function to show system time popup
     function showSystemTimePopup(bootId) {
-      var deviceTime = new Date();
-      var timeStr = deviceTime.toLocaleString();
+      // Check Pi time vs device time before showing the prompt
+      var t0 = Date.now();
+      $.getJSON('/pi_time', function(d) {
+        var t1 = Date.now();
+        var networkDelay = (t1 - t0) / 2000; // half round-trip in seconds
+        var piTime = d.unix + networkDelay;
+        var deviceTime = Date.now() / 1000;
+        var diff = Math.abs(piTime - deviceTime);
+        if (diff < 3) {
+          // Times are close enough — skip the prompt
+          localStorage.setItem('lastBootId', bootId);
+          return;
+        }
+        showSystemTimePopupModal(bootId);
+      }).fail(function() {
+        // If /pi_time is unreachable, show the prompt anyway
+        showSystemTimePopupModal(bootId);
+      });
+    }
+
+    function showSystemTimePopupModal(bootId) {
+      var timeStr = new Date().toLocaleString();
       var modalHtml = `
         <div class="modal__body night-mode"
           style="color:#ff0000; background:#222; border-radius:8px; padding:10px 0;">
@@ -2268,27 +2298,22 @@
         </div>
       `;
       showModal(modalHtml);
-      
-      // Update the time display every second
+
       const updateTimeInterval = setInterval(function() {
-        const now = new Date();
-        $('#currentTimeDisplay').text(now.toLocaleString());
+        $('#currentTimeDisplay').text(new Date().toLocaleString());
       }, 1000);
-      
-      // Make sure to clear the interval when the modal is closed
+
       const originalHideModal = window.hideModal;
       window.hideModal = function() {
         clearInterval(updateTimeInterval);
         originalHideModal();
         window.hideModal = originalHideModal;
       };
-      
+
       $('#setSystemTimeBtn').off('click').on('click', function() {
-        // Get the current time at the moment the button is clicked
         const currentTime = new Date();
-        // Format the current time as local dt_str (YYYY-MM-DD HH:MM:SS)
         function pad(n) { return n.toString().padStart(2, '0'); }
-        const dt_str = currentTime.getFullYear() + '-' + pad(currentTime.getMonth()+1) + '-' + pad(currentTime.getDate()) + ' ' + 
+        const dt_str = currentTime.getFullYear() + '-' + pad(currentTime.getMonth()+1) + '-' + pad(currentTime.getDate()) + ' ' +
                        pad(currentTime.getHours()) + ':' + pad(currentTime.getMinutes()) + ':' + pad(currentTime.getSeconds());
         $.ajax({
           url: '/set_time',
