@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 # SiPi Version Information
-__version__ = "1.2"
-__release_date__ = "2025-08-21"
+__version__ = "1.3"
+__release_date__ = "2026-05-12"
 __description__ = "SiPi Telescope Control System"
 
 import socket
@@ -284,8 +284,8 @@ def connect_persistent_socket():
     try:
         print(f"[SiPi CONNECTION] Attempting to connect persistent socket to {SI_TECH_HOST}:{SI_TECH_PORT}")
         persistent_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        persistent_socket.settimeout(5)  # timeout applies to connect() as well
         persistent_socket.connect((SI_TECH_HOST, SI_TECH_PORT))
-        persistent_socket.settimeout(5)
         print("[SiPi CONNECTION] Persistent socket connected successfully")
     except Exception as e:
         print(f"[SiPi CONNECTION] Failed to connect persistent socket: {e}")
@@ -296,8 +296,8 @@ def connect_move_socket():
     try:
         print(f"[SiPi CONNECTION] Attempting to connect move socket to {SI_TECH_HOST}:{SI_TECH_PORT}")
         move_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        move_socket.settimeout(5)  # timeout applies to connect() as well
         move_socket.connect((SI_TECH_HOST, SI_TECH_PORT))
-        move_socket.settimeout(5)
         print("[SiPi CONNECTION] Move socket connected successfully")
     except Exception as e:
         print(f"[SiPi CONNECTION] Failed to connect move socket: {e}")
@@ -308,8 +308,8 @@ def connect_command_socket():
     try:
         print(f"[SiPi CONNECTION] Attempting to connect command socket to {SI_TECH_HOST}:{SI_TECH_PORT}")
         command_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        command_socket.settimeout(5)  # timeout applies to connect() as well
         command_socket.connect((SI_TECH_HOST, SI_TECH_PORT))
-        command_socket.settimeout(5)
         print("[SiPi CONNECTION] Command socket connected successfully")
     except Exception as e:
         print(f"[SiPi CONNECTION] Failed to connect command socket: {e}")
@@ -331,9 +331,16 @@ def send_move_no_wait(command):
                 move_socket.sendall(command.encode('ascii'))
 
 # Persistent command-socket helper
-def send_command(command, timeout=5, retries=1, terminator=None):
+def send_command(command, timeout=5, retries=1, terminator=None, lock_timeout=None):
     global command_socket
-    with command_socket_lock:
+    if lock_timeout is not None:
+        if not command_socket_lock.acquire(timeout=lock_timeout):
+            print(f"[SiPi COMMAND] Could not acquire lock within {lock_timeout}s, skipping: {command.strip()}")
+            return ""
+    else:
+        command_socket_lock.acquire()
+    lock_held = True
+    try:
         if command_socket is None:
             print("[SiPi COMMAND] No command socket, attempting to connect")
             connect_command_socket()
@@ -373,7 +380,10 @@ def send_command(command, timeout=5, retries=1, terminator=None):
             command_socket = None
             if retries > 0:
                 print(f"[SiPi COMMAND] Retrying command (retries left: {retries-1})")
-                return send_command(command, timeout, retries - 1, terminator)
+                # Release before recursive retry so the retry can re-acquire cleanly
+                lock_held = False
+                command_socket_lock.release()
+                return send_command(command, timeout, retries - 1, terminator, lock_timeout)
             return ""
         finally:
             try:
@@ -381,12 +391,16 @@ def send_command(command, timeout=5, retries=1, terminator=None):
                     s.settimeout(orig_to)
             except:
                 pass
+    finally:
+        if lock_held:
+            command_socket_lock.release()
 
 
 # Version helper for SiTechExe
 def get_site_version():
-    # Use a 0.25-second timeout so we don’t stall the page load
-    raw = send_command("GetSiTechVersion\n", timeout=0.25)
+    # lock_timeout=0.5 means we give up quickly if another command holds the lock,
+    # rather than blocking the page load indefinitely
+    raw = send_command("GetSiTechVersion\n", timeout=0.25, lock_timeout=0.5)
     # strip leading semicolons/newlines/spaces
     v = raw.lstrip(";\r\n ").strip()
     prefix = "_GetSiTechVersion="
@@ -1059,13 +1073,16 @@ def set_speed():
     """Set speed from virtual handpad"""
     global joystick_speed_index
     try:
-        data = request.get_json() or {}
+        data = request.get_json(force=True) or {}
         index = data.get('index')
         if index is not None and 0 <= index < len(joystick_speeds):
             joystick_speed_index = index
+            print(f"[DEBUG] Speed updated to index {index}: {joystick_speeds[joystick_speed_index]}")
             return jsonify(status="ok", speed=joystick_speeds[joystick_speed_index], index=joystick_speed_index)
+        print(f"[DEBUG] Invalid index received: {index}")
         return jsonify(status="error", message="Invalid index"), 400
     except Exception as e:
+        print(f"[DEBUG] Error in set_speed: {e}")
         return jsonify(status="error", message=str(e)), 500
 
 @app.route('/joystick_heartbeat', methods=['POST'])
@@ -1291,7 +1308,8 @@ def set_time_popup():
 def fix_wifi_permissions():
     """Fix WiFi script permissions - can be called independently."""
     if IS_WINDOWS:
-        return jsonify(success=False, error='WiFi hotspot functionality is not available on Windows. The application runs over LAN.'), 400
+        # On Windows, permission fixing is not needed - return success so the flow continues
+        return jsonify(success=True, message='Permission fixing not needed on Windows (uses LAN mode)')
     
     try:
         # Script is in the same directory as SiPi.py
@@ -1303,24 +1321,29 @@ def fix_wifi_permissions():
         if not os.path.exists(wifi_script):
             return jsonify(success=False, error=f'WiFi script not found at {wifi_script}'), 404
         
-        # Fix permissions
+        # Check current permissions
+        import stat
+        st = os.stat(wifi_script)
+        current_perms = st.st_mode & 0o777
+        
+        # If permissions are already correct (executable), just return success
+        if current_perms & 0o111:  # Check if any execute bit is set
+            messages.append(f'WiFi script permissions OK ({oct(current_perms)})')
+            return jsonify(success=True, message=' | '.join(messages))
+        
+        # Only try to fix if permissions are wrong
+        # Note: This requires chmod/chown to be in sudoers, otherwise it will fail
+        # For production, permissions should be set during installation
         result = subprocess.run(['sudo', 'chmod', '755', wifi_script], 
-                              capture_output=True, text=True)
+                              capture_output=True, text=True, timeout=2)
         if result.returncode != 0:
-            return jsonify(success=False, error=f'Failed to fix permissions: {result.stderr}'), 500
+            # Permission fix failed, but if script exists and is executable, continue anyway
+            messages.append(f'Permission fix failed (current: {oct(current_perms)}), continuing anyway')
+            return jsonify(success=True, message=' | '.join(messages))
         
         messages.append('WiFi script permissions fixed (755)')
         
-        # Fix ownership
-        try:
-            subprocess.run(['sudo', 'chown', 'root:root', wifi_script], 
-                         capture_output=True, text=True)
-            messages.append('WiFi script ownership fixed (root:root)')
-        except Exception as e:
-            messages.append(f'Warning: Could not fix ownership: {e}')
-        
-        # Verify permissions
-        import stat
+        # Verify final permissions
         st = os.stat(wifi_script)
         perms = oct(st.st_mode & 0o777)
         messages.append(f'Current permissions: {perms}')
@@ -1328,7 +1351,9 @@ def fix_wifi_permissions():
         return jsonify(success=True, message=' | '.join(messages))
         
     except Exception as e:
-        return jsonify(success=False, error=f'Unexpected error: {str(e)}'), 500
+        # If permission check/fix fails, return success anyway to not block WiFi save
+        # The actual WiFi update will fail if permissions are truly wrong
+        return jsonify(success=True, message=f'Permission check skipped: {str(e)}')
 
 @app.route('/update_wifi', methods=['POST'])
 def update_wifi():
@@ -1558,7 +1583,6 @@ def check_and_repair_git_corruption(env, force_repair=False):
                         remote_url = remote_url_result.stdout.strip()
                         
                         # Create backup directory name
-                        import time
                         backup_dir = f"{BASE_DIR}_corrupt_backup_{int(time.time())}"
                         
                         # Move current directory to backup
@@ -1577,7 +1601,6 @@ def check_and_repair_git_corruption(env, force_repair=False):
                             
                             # Try to remove backup if clone successful
                             try:
-                                import shutil
                                 shutil.rmtree(backup_dir)
                                 messages.append("Corrupt backup removed")
                             except Exception as e:
@@ -2042,6 +2065,11 @@ def wait_for_ip(interface='wlan0'):
 @app.route('/quickstart')
 def quickstart():
     return render_template('quickstart.html')
+
+@app.route('/pi_time')
+def pi_time():
+    """Return the Pi's current Unix timestamp so the browser can compare it to device time."""
+    return jsonify(unix=time.time())
 
 @app.route('/RemoveLastCalPoint', methods=['POST'])
 def remove_last_cal_point():
